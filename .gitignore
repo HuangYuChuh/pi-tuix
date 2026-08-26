@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.npm/
+*.tsbuildinfo
+.playwright-mcp/
+
+# Local scratch and generated output
+outputs/
+work/

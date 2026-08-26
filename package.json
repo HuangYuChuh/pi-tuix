@@ -1,0 +1,34 @@
+{
+  "name": "pi-tuix",
+  "version": "0.1.0",
+  "description": "A Claude Code-inspired TUI extension for Pi Coding Agent.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "pi-tui",
+    "tui",
+    "terminal",
+    "claude-code"
+  ],
+  "pi": {
+    "extensions": ["./extensions"],
+    "themes": ["./themes"]
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --test --import tsx test/**/*.test.ts"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.0",
+    "@earendil-works/pi-tui": ">=0.84.0"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.84.1",
+    "@earendil-works/pi-tui": "0.84.1",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0"
+  }
+}
