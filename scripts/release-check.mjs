@@ -87,9 +87,13 @@ try {
   }
 }
 
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-run(npmCommand, ["run", "check"]);
-run(npmCommand, ["run", "test"]);
-run(npmCommand, ["run", "pack:check"]);
+const npmCli = process.env.npm_execpath;
+if (!npmCli) {
+  fail("invoke this gate through npm run release:check");
+}
+
+run(process.execPath, [npmCli, "run", "check"]);
+run(process.execPath, [npmCli, "run", "test"]);
+run(process.execPath, [npmCli, "run", "pack:check"]);
 
 console.log(`release:check passed for ${tag} on npm channel ${channel}`);
