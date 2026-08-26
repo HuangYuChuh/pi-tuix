@@ -4,7 +4,27 @@ coverage/
 .npm/
 *.tsbuildinfo
 .playwright-mcp/
+npm-debug.log*
+*.log
+
+# Local credentials and machine-specific Pi state
+.env
+.env.*
+!.env.example
+.pi/
+*.key
+*.pem
+*.p12
+*.pfx
 
 # Local scratch and generated output
 outputs/
 work/
+
+# Private research and internal development notes
+.internal/
+docs/internal/
+research/
+notes/
+*.internal.md
+*.private.md

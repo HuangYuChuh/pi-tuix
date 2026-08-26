@@ -6,6 +6,8 @@ Pi-TUIX is an installable Pi package built on the official `ExtensionAPI` and `@
 
 The repository is currently in the foundation phase. The product boundary and MVP decisions are documented before deeper UI work begins, so each feature can be judged by whether it improves a real Pi workflow rather than merely looking like another terminal client.
 
+> Status: early development. The package is not published to npm yet.
+
 ## Positioning
 
 Pi-TUIX is a UI layer, not a Pi fork and not a second coding-agent runtime.
@@ -60,6 +62,12 @@ The bundled `pi-tuix-dark` theme can be selected from Pi's `/settings` screen.
 5. Session surface: resume, context inspection, subagent state, and session references.
 
 The MVP scope and acceptance criteria are recorded in [docs/product-context.md](docs/product-context.md). Repository-level implementation constraints for coding agents are in [AGENTS.md](AGENTS.md).
+
+## Contributing
+
+Pi-TUIX is being developed as an open-source project. Public architecture, product decisions, and user documentation live in [`docs/`](docs/). Local research, private links, raw transcripts, and internal development notes must stay in ignored internal paths described by [docs/README.md](docs/README.md).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Compatibility contract
 

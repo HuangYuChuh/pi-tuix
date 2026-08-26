@@ -4,6 +4,20 @@
   "description": "A Claude Code-inspired TUI extension for Pi Coding Agent.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HuangYuChuh/pi-tuix.git"
+  },
+  "homepage": "https://github.com/HuangYuChuh/pi-tuix#readme",
+  "bugs": {
+    "url": "https://github.com/HuangYuChuh/pi-tuix/issues"
+  },
+  "files": [
+    "extensions/",
+    "themes/",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "pi-package",
     "pi-coding-agent",
@@ -18,7 +32,14 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "node --test --import tsx test/**/*.test.ts"
+    "test": "node --test --import tsx test/**/*.test.ts",
+    "pack:check": "npm pack --dry-run --ignore-scripts"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": ">=0.84.0",

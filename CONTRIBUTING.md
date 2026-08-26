@@ -1,0 +1,38 @@
+# Contributing to Pi-TUIX
+
+Pi-TUIX welcomes focused issues and pull requests that improve Pi's terminal workflow through supported extension APIs.
+
+## Before contributing
+
+Read:
+
+- `docs/product-context.md` for the user problem and MVP;
+- `docs/positioning.md` for product ownership boundaries;
+- `docs/architecture.md` for runtime boundaries;
+- `AGENTS.md` for implementation and verification rules;
+- `docs/README.md` for the public/internal documentation policy.
+
+## Development
+
+Pi-TUIX requires Node.js 22.19 or newer and a compatible Pi Coding Agent installation.
+
+```bash
+npm install
+npm run check
+npm run test
+npm run pack:check
+```
+
+Load the extension locally with:
+
+```bash
+pi -e ./extensions/index.ts
+```
+
+## Pull requests
+
+Keep changes focused and explain the user workflow they improve. Include terminal widths and UI states tested for visual changes. Tool renderer changes must show that Pi's original execution path, cancellation, errors, and permissions remain intact.
+
+Do not commit private research, credentials, machine-specific paths, raw transcripts, proprietary assets, or generated browser/test artifacts. Use the ignored internal paths documented in `docs/README.md` for local working notes.
+
+By contributing, you agree that your contribution is licensed under the repository's MIT License.
