@@ -57,13 +57,13 @@ class PiTuixHeader implements Component {
 class PiTuixFooter implements Component {
   private readonly ctx: ExtensionContext;
   private readonly workflow: WorkflowRuntime;
-  private readonly tui: TUI;
+  private readonly requestRender: () => void;
 
   constructor(ctx: ExtensionContext, workflow: WorkflowRuntime, tui: TUI) {
     this.ctx = ctx;
     this.workflow = workflow;
-    this.tui = tui;
-    workflow.requestRender = () => tui.requestRender();
+    this.requestRender = () => tui.requestRender();
+    workflow.requestRender = this.requestRender;
   }
 
   render(width: number): string[] {
@@ -77,7 +77,9 @@ class PiTuixFooter implements Component {
   invalidate(): void {}
 
   dispose(): void {
-    this.tui.requestRender();
+    if (this.workflow.requestRender === this.requestRender) {
+      this.workflow.requestRender = undefined;
+    }
   }
 }
 
