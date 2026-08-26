@@ -65,6 +65,7 @@ Editor border는 `READY/WORKING`, 입력 줄 수 및 문자 수를 표시합니�
 | `/pituix-steer <message>` | 실행 중인 작업에 즉시 수정 지시 전송 |
 | `/pituix-followup <message>` | 현재 실행 후 처리할 메시지를 큐에 추가 |
 | `/pituix-queue` | Pi에 대기 중인 메시지가 있는지 표시 |
+| `/pituix-plan [show\|hide\|clear]` | 자동 감지된 읽기 전용 plan panel 제어 |
 
 포함된 `pi-tuix-dark` theme은 Pi의 `/settings`에서 선택할 수 있습니다.
 
@@ -79,14 +80,16 @@ Pi Coding Agent (runtime, provider, tool, session, permission)
           (header, footer, indicator, theme)
 ```
 
-component는 state만 렌더링합니다. lifecycle handler는 Pi event를 작은 UI state update로 변환하며, 렌더링의 부수 효과로 provider를 호출하거나 shell command를 실행하지 않습니다. 예정된 tool renderer 역시 실행을 Pi에 그대로 위임하고 표시 방식만 바꿉니다.
+component는 state만 렌더링합니다. lifecycle handler는 Pi event를 작은 UI state update로 변환하며, 렌더링의 부수 효과로 provider를 호출하거나 shell command를 실행하지 않습니다. tool renderer는 실행을 Pi에 그대로 위임하고 표시 방식만 바꿉니다.
+
+stream line은 Turn별 thinking, 응답, tool 실행을 구분합니다. context는 80%에서 `HIGH`, 95%에서 `CRITICAL`로 표시됩니다. `Plan:` 제목과 번호 또는 checkbox 단계가 있는 응답은 읽기 전용 plan panel로 표시되며 prompt, tool, 실행은 변경하지 않습니다.
 
 ## 로드맵
 
 1. **Shell (현재):** header, footer, terminal title, theme, working state, reversible editor chrome.
 2. **Tool surface (현재):** 간결한 Read/Bash/Edit/Write row, queued/running/success/error/cancelled 상태, 펼칠 수 있는 출력 및 diff summary.
-3. **Stream surface:** thinking label, 진행 상황, token/context 상태, 안정적인 repaint.
-4. **Control surface (진행 중):** steer/follow-up 큐 명령을 제공하며 approval, plan review, keyboard 규칙은 계획 중입니다.
+3. **Stream surface (현재):** thinking/responding/tool 상태, Turn 진행, thinking level, context pressure.
+4. **Control surface (진행 중):** steer/follow-up과 읽기 전용 plan review를 제공하며 approval과 keyboard 규칙은 계획 중입니다.
 5. **Session surface:** Pi가 신뢰할 수 있는 공개 event를 제공하는 범위에서 context, resume reference, subagent 상태 표시.
 
 자세한 내용은 [product context](docs/product-context.md), [positioning](docs/positioning.md), [architecture](docs/architecture.md)를 참조하세요.

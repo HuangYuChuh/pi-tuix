@@ -6,9 +6,12 @@ import {
   createWorkflowRuntime,
   finishAgentRun,
   finishTool,
+  formatContextPressure,
   formatWorkflowStatus,
   queueMessage,
   settleAgent,
+  setStreamActivity,
+  startTurn,
   startTool,
 } from "../extensions/stream/workflow-status.ts";
 
@@ -48,4 +51,20 @@ test("settled agent clears stale follow-up count", () => {
   settleAgent(runtime);
   assert.equal(runtime.queuedMessages, 0);
   assert.equal(runtime.phase, "DONE");
+});
+
+test("workflow status distinguishes thinking and responding by turn", () => {
+  const runtime = createWorkflowRuntime();
+  beginAgentRun(runtime);
+  startTurn(runtime, 1);
+  setStreamActivity(runtime, "THINKING");
+  assert.match(stripTerminalSequences(formatWorkflowStatus(runtime, theme)), /THINKING.*TURN 2/);
+  setStreamActivity(runtime, "RESPONDING");
+  assert.match(stripTerminalSequences(formatWorkflowStatus(runtime, theme)), /RESPONDING.*TURN 2/);
+});
+
+test("context pressure adds explicit high and critical labels", () => {
+  assert.equal(stripTerminalSequences(formatContextPressure(79, theme)), "ctx 79%");
+  assert.equal(stripTerminalSequences(formatContextPressure(80, theme)), "ctx 80% HIGH");
+  assert.equal(stripTerminalSequences(formatContextPressure(95, theme)), "ctx 95% CRITICAL");
 });

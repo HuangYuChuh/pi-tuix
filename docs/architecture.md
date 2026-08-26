@@ -32,7 +32,8 @@ The prototype intentionally uses only public hooks:
 - `ctx.ui.setHeader()` for the startup shell;
 - `ctx.ui.setFooter()` for persistent state;
 - `ctx.ui.setWorkingIndicator()` for streaming feedback;
-- `agent_*`, `input`, and `tool_execution_*` events for a read-only workflow status line;
+- `agent_*`, `turn_*`, `message_update`, `input`, and `tool_execution_*` events for read-only workflow and stream status;
+- `ctx.ui.setWidget()` for a detected read-only plan panel;
 - `ctx.ui.setEditorComponent()` with Pi's public `CustomEditor` for reversible editor chrome;
 - `ctx.ui.setTitle()` for terminal identity;
 - `pi.registerCommand()` for reversible toggles.
@@ -40,6 +41,8 @@ The prototype intentionally uses only public hooks:
 Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` delegation pattern. Pi-TUIX retains each original public tool definition and exact `execute()` function while replacing only `renderCall()` and `renderResult()` when its UI mode is active. `/pituix-default` switches future tool rendering back to the original Pi renderer in the same session.
 
 Workflow status shows the current phase, active tool, completed and failed tool counts, and queued follow-up messages. It resets for each agent run and never changes Pi's queue, tool inputs, or execution behavior.
+
+Stream status maps public assistant events to explicit `THINKING`, `RESPONDING`, and `TOOL` labels, includes the one-based turn number, and shows the active thinking level and context pressure. The plan adapter reads assistant text after a turn, recognizes a `Plan:` or localized plan heading with numbered or checkbox steps, and renders those steps through `setWidget()`. It is deliberately observational: it does not inject plan instructions, disable tools, or infer completion from tool execution.
 
 Queue controls use Pi's public `sendUserMessage()` contract: `/pituix-steer` sends an immediate steering message, `/pituix-followup` queues a message for the next continuation, and `/pituix-queue` reports the host queue. Pi-TUIX does not inspect or mutate private queue storage.
 

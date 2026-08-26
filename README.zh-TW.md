@@ -65,6 +65,7 @@ Editor border 會顯示 `READY/WORKING`、輸入行數與字元數。它繼承 P
 | `/pituix-steer <訊息>` | 立即修正目前執行中的任務 |
 | `/pituix-followup <訊息>` | 排隊追加，等目前任務結束後執行 |
 | `/pituix-queue` | 查看 Pi 是否還有待處理訊息 |
+| `/pituix-plan [show\|hide\|clear]` | 控制自動辨識的唯讀計畫面板 |
 
 可在 Pi 的 `/settings` 中選擇內建的 `pi-tuix-dark` theme。
 
@@ -79,14 +80,16 @@ Pi Coding Agent（runtime、provider、工具、工作階段、權限）
              （header、footer、狀態、theme）
 ```
 
-元件只負責渲染狀態。lifecycle handler 將 Pi event 轉換為小型 UI state update，不會在渲染過程中呼叫 provider 或執行 shell command。規劃中的 tool renderer 也會把執行原樣委派給 Pi，只取代顯示方式。
+元件只負責渲染狀態。lifecycle handler 將 Pi event 轉換為小型 UI state update，不會在渲染過程中呼叫 provider 或執行 shell command。tool renderer 把執行原樣委派給 Pi，只取代顯示方式。
+
+stream line 會按 Turn 區分 thinking、回覆與 tool 執行。Context 到 80% 顯示 `HIGH`，到 95% 顯示 `CRITICAL`。包含 `Plan:`、`計畫：`及編號或 checkbox 步驟的回覆會顯示為唯讀 plan panel，不會修改 prompt、tool 或執行。
 
 ## 路線圖
 
 1. **Shell（目前）:** header、footer、終端標題、theme、working state 與可逆的 editor chrome。
 2. **工具介面（目前）:** 緊湊的 Read/Bash/Edit/Write row、queued/running/success/error/cancelled 狀態、可展開輸出與 diff 摘要。
-3. **串流介面:** thinking label、進度、token/context 狀態與穩定刷新。
-4. **控制介面（進行中）:** 已提供 steer/follow-up queue 指令；approval、plan review 與鍵盤操作仍在規劃中。
+3. **流式介面（目前）:** thinking/responding/tool 狀態、Turn 進度、thinking level 與 context 壓力。
+4. **控制介面（進行中）:** 已提供 steer/follow-up queue 指令與唯讀 plan review；approval 與鍵盤操作仍在規劃中。
 5. **工作階段介面:** 在 Pi 提供可靠公開 event 的範圍內呈現 context、resume reference 與 subagent 狀態。
 
 詳細資訊請參閱 [產品背景](docs/product-context.md)、[產品定位](docs/positioning.md) 與 [架構](docs/architecture.md)。

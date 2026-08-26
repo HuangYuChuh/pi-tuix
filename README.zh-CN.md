@@ -67,6 +67,7 @@ Editor border 会显示 `READY/WORKING`、输入行数和字符数。它继承 P
 | `/pituix-steer <消息>` | 立即纠偏当前执行中的任务 |
 | `/pituix-followup <消息>` | 排队追加，等当前任务结束后执行 |
 | `/pituix-queue` | 查看 Pi 是否还有待处理消息 |
+| `/pituix-plan [show\|hide\|clear]` | 控制自动识别出的只读计划面板 |
 
 可在 Pi 的 `/settings` 中选择内置的 `pi-tuix-dark` 主题。
 
@@ -83,14 +84,16 @@ Pi Coding Agent（runtime、provider、工具、会话、权限）
              （header、footer、状态、主题）
 ```
 
-组件只负责渲染状态。生命周期 handler 将 Pi 事件转换为小型 UI 状态更新，不会在渲染过程中调用 provider 或执行 shell 命令。后续工具 renderer 只替换调用与结果的展示，并将执行过程原样委托给 Pi。
+组件只负责渲染状态。生命周期 handler 将 Pi 事件转换为小型 UI 状态更新，不会在渲染过程中调用 provider 或执行 shell 命令。工具 renderer 只替换调用与结果的展示，并将执行过程原样委托给 Pi。
+
+流式状态会按 Turn 区分 thinking、回复文字与工具执行。Context 使用量到 80% 显示 `HIGH`，到 95% 显示 `CRITICAL`。当助手输出包含 `Plan:`、`计划：`及编号或复选框步骤时，Pi-TUIX 会在编辑器上方显示自适应宽度的只读计划面板。面板识别勾选项和 `[DONE:n]` 标记，但不会修改提示词、工具或执行过程。
 
 ## 路线图
 
 1. **Shell（当前）：** header、footer、终端标题、主题、working state 与可逆的 editor chrome。
 2. **工具界面（当前）：** 紧凑的 Read/Bash/Edit/Write 行，明确区分 queued/running/success/error/cancelled，支持展开输出与 diff 摘要。
-3. **流式界面：** thinking 标签、进度、token/context 状态与稳定刷新。
-4. **控制界面（进行中）：** 已提供 steer/follow-up 队列命令；审批适配、计划审阅与键盘约定仍在规划中。
+3. **流式界面（当前）：** thinking/responding/tool 状态、Turn 进度、thinking level、context 压力与稳定刷新。
+4. **控制界面（进行中）：** 已提供 steer/follow-up 队列命令和只读计划审阅；审批适配与键盘约定仍在规划中。
 5. **会话界面：** 在 Pi 提供可靠公开事件的前提下，展示 context、resume 引用与 subagent 状态。
 
 范围和验收条件见 [docs/product-context.md](docs/product-context.md)，产品边界见 [docs/positioning.md](docs/positioning.md)，runtime 设计见 [docs/architecture.md](docs/architecture.md)。

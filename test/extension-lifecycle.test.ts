@@ -31,10 +31,12 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     setHeader: () => {},
     setFooter: () => {},
     setWorkingIndicator: () => {},
+    setHiddenThinkingLabel: () => {},
+    setWidget: () => {},
     setEditorComponent: (factory: unknown) => editorFactories.push(factory),
     notify: () => {},
   };
-  const context = { mode: "tui", ui } as unknown as ExtensionContext;
+  const context = { mode: "tui", ui, getContextUsage: () => undefined } as unknown as ExtensionContext;
 
   await handlers.get("session_start")?.({ type: "session_start", reason: "startup" }, context);
   assert.equal(typeof editorFactories.at(-1), "function");
@@ -78,4 +80,35 @@ test("queue commands delegate steering and follow-ups to Pi", async () => {
   await commands.get("pituix-steer")?.handler("focus tests", context);
   await commands.get("pituix-followup")?.handler("then package", context);
   assert.deepEqual(sent, [["focus tests", { deliverAs: "steer" }], ["then package", { deliverAs: "followUp" }]]);
+});
+
+test("plan panel follows Pi-TUIX enable and default lifecycle", async () => {
+  const handlers = new Map<string, (...args: any[]) => any>();
+  const commands = new Map<string, { handler: (...args: any[]) => Promise<void> }>();
+  const widgets: unknown[] = [];
+  const pi = {
+    on: (event: string, handler: (...args: any[]) => any) => handlers.set(event, handler),
+    registerCommand: (name: string, definition: { handler: (...args: any[]) => Promise<void> }) => commands.set(name, definition),
+    registerTool: () => {},
+  } as unknown as ExtensionAPI;
+  piTuix(pi);
+  const ui = {
+    theme: { fg: (_color: string, text: string) => text },
+    setTitle: () => {}, setHeader: () => {}, setFooter: () => {}, setEditorComponent: () => {},
+    setWorkingIndicator: () => {}, setHiddenThinkingLabel: () => {}, notify: () => {},
+    setWidget: (_key: string, value: unknown) => widgets.push(value),
+  };
+  const context = { mode: "tui", ui, getContextUsage: () => undefined } as unknown as ExtensionContext;
+
+  await handlers.get("session_start")?.({ type: "session_start", reason: "startup" }, context);
+  await handlers.get("turn_end")?.({
+    type: "turn_end", turnIndex: 0, toolResults: [],
+    message: { role: "assistant", content: [{ type: "text", text: "Plan:\n1. Inspect\n2. Test" }] },
+  }, context);
+  assert.equal(typeof widgets.at(-1), "function");
+
+  await commands.get("pituix-default")?.handler("", context);
+  assert.equal(widgets.at(-1), undefined);
+  await commands.get("pituix-plan")?.handler("show", context);
+  assert.equal(widgets.at(-1), undefined);
 });

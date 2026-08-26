@@ -64,6 +64,7 @@ These commands are reversible:
 | `/pituix-steer <message>` | Interrupt the current run with an immediate correction |
 | `/pituix-followup <message>` | Queue work to start after the current run |
 | `/pituix-queue` | Show whether Pi has queued follow-up messages |
+| `/pituix-plan [show\|hide\|clear]` | Control the detected read-only plan panel |
 
 The bundled `pi-tuix-dark` theme is available from Pi's `/settings` screen.
 
@@ -80,14 +81,16 @@ Pi Coding Agent (runtime, providers, tools, sessions, permissions)
           (header, footer, indicators, themes)
 ```
 
-Components render state. Lifecycle handlers translate Pi events into small UI updates; they do not call providers or execute shell commands as a rendering side effect. Planned tool renderers will delegate execution to Pi unchanged and replace only the call/result presentation.
+Components render state. Lifecycle handlers translate Pi events into small UI updates; they do not call providers or execute shell commands as a rendering side effect. Tool renderers delegate execution to Pi unchanged and replace only the call/result presentation.
+
+The stream line distinguishes thinking, response text, and tool execution by turn. Context pressure is labelled `HIGH` at 80% and `CRITICAL` at 95%. When an assistant response contains a `Plan:` heading followed by numbered or checkbox steps, Pi-TUIX shows a width-safe read-only plan panel above the editor. The panel reflects checked items and `[DONE:n]` markers without changing prompts, tools, or execution.
 
 ## Roadmap
 
 1. **Shell (current):** header, footer, terminal title, theme, working state, and reversible editor chrome.
 2. **Tool surface (current):** compact Read/Bash/Edit/Write rows, explicit queued/running/success/error/cancelled states, expandable output, and diff summaries.
-3. **Stream surface:** thinking labels, progress, token/context status, and repaint discipline.
-4. **Control surface (in progress):** steer/follow-up queue commands are available; approval adapters, plan review, and keyboard conventions remain planned.
+3. **Stream surface (current):** thinking/responding/tool activity, turn progress, thinking level, context pressure, and stable repainting.
+4. **Control surface (in progress):** steer/follow-up queue commands and read-only plan review are available; approval adapters and keyboard conventions remain planned.
 5. **Session surface:** context inspection, resume references, subagent state, and session surfaces where Pi exposes reliable public events.
 
 The scope and acceptance criteria are documented in [docs/product-context.md](docs/product-context.md). The product boundary is in [docs/positioning.md](docs/positioning.md), and the runtime design is in [docs/architecture.md](docs/architecture.md).

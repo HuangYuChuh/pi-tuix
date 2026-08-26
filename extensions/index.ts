@@ -14,20 +14,19 @@ import {
   createWorkflowRuntime,
   finishAgentRun,
   finishTool,
+  formatContextPressure,
   formatWorkflowStatus,
   queueMessage,
+  refreshWorkflow,
   settleAgent,
+  setStreamActivity,
+  startTurn,
   startTool,
   type WorkflowRuntime,
 } from "./stream/workflow-status.ts";
+import { clearPlan, createPlanRuntime, syncPlanWidget, updatePlan, type PlanRuntime } from "./control/plan.ts";
 
 const PACKAGE_NAME = "Pi-TUIX";
-
-function formatContext(ctx: ExtensionContext): string {
-  const usage = ctx.getContextUsage();
-  if (!usage || usage.percent === null) return "ctx ?";
-  return `ctx ${Math.round(usage.percent)}%`;
-}
 
 function formatCwd(cwd: string): string {
   const home = process.env.HOME ?? process.env.USERPROFILE;
@@ -68,7 +67,11 @@ class PiTuixFooter implements Component {
 
   render(width: number): string[] {
     const theme: Theme = this.ctx.ui.theme;
-    const left = theme.fg("muted", `${this.ctx.model?.id ?? "no-model"} · ${formatContext(this.ctx)}`);
+    const usage = this.ctx.getContextUsage();
+    const model = theme.fg("muted", this.ctx.model?.id ?? "no-model");
+    const thinking = theme.fg("dim", `think ${this.ctx.thinkingLevel ?? "off"}`);
+    const context = formatContextPressure(usage?.percent ?? null, theme);
+    const left = `${model} · ${thinking} · ${context}`;
     const right = theme.fg("dim", formatCwd(this.ctx.cwd));
     const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(right));
     return [truncateToWidth(`${left}${" ".repeat(gap)}${right}`, width), formatWorkflowStatus(this.workflow, theme, width)];
@@ -88,6 +91,7 @@ function applyPiTuix(
   toolMode: ToolRendererMode,
   editorRuntime: EditorChromeRuntime,
   workflow: WorkflowRuntime,
+  plan: PlanRuntime,
 ): void {
   if (ctx.mode !== "tui") return;
   toolMode.enabled = true;
@@ -95,6 +99,7 @@ function applyPiTuix(
   ctx.ui.setTitle(PACKAGE_NAME);
   ctx.ui.setHeader(() => new PiTuixHeader(ctx));
   ctx.ui.setFooter((tui) => new PiTuixFooter(ctx, workflow, tui));
+  syncPlanWidget(ctx, plan);
   ctx.ui.setEditorComponent((tui, theme, keybindings) =>
     createPiTuixEditor(tui, theme, keybindings, editorRuntime),
   );
@@ -102,15 +107,21 @@ function applyPiTuix(
     frames: ["◐", "◓", "◑", "◒"].map((frame) => ctx.ui.theme.fg("accent", frame)),
     intervalMs: 120,
   });
+  ctx.ui.setHiddenThinkingLabel("Thinking details hidden");
 }
 
 export default function piTuix(pi: ExtensionAPI): void {
   const toolMode: ToolRendererMode = { enabled: false };
   const editorRuntime = createEditorChromeRuntime();
   const workflow = createWorkflowRuntime();
+  const plan = createPlanRuntime();
   registerCompactToolRenderers(pi, toolMode);
 
-  pi.on("session_start", (_event, ctx) => applyPiTuix(ctx, toolMode, editorRuntime, workflow));
+  pi.on("session_start", (_event, ctx) => {
+    clearPlan(plan);
+    plan.visible = true;
+    applyPiTuix(ctx, toolMode, editorRuntime, workflow, plan);
+  });
   pi.on("agent_start", () => {
     beginAgentRun(workflow);
     setEditorWorking(editorRuntime, true);
@@ -120,6 +131,18 @@ export default function piTuix(pi: ExtensionAPI): void {
     setEditorWorking(editorRuntime, false);
   });
   pi.on("agent_settled", () => settleAgent(workflow));
+  pi.on("turn_start", (event) => startTurn(workflow, event.turnIndex));
+  pi.on("turn_end", (event, ctx) => {
+    if (updatePlan(plan, event.message) && toolMode.enabled) syncPlanWidget(ctx, plan);
+    refreshWorkflow(workflow);
+  });
+  pi.on("message_update", (event) => {
+    const type = event.assistantMessageEvent.type;
+    if (type === "thinking_start" || type === "thinking_delta") setStreamActivity(workflow, "THINKING");
+    if (type === "text_start" || type === "text_delta") setStreamActivity(workflow, "RESPONDING");
+    if (type === "toolcall_start" || type === "toolcall_delta") setStreamActivity(workflow, "TOOL");
+  });
+  pi.on("thinking_level_select", () => refreshWorkflow(workflow));
   pi.on("input", (event) => {
     if (event.streamingBehavior === "followUp") queueMessage(workflow);
   });
@@ -130,7 +153,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.registerCommand("pituix", {
     description: "Show Pi-TUIX status and restore its interface",
     handler: async (_args, ctx) => {
-      applyPiTuix(ctx, toolMode, editorRuntime, workflow);
+      applyPiTuix(ctx, toolMode, editorRuntime, workflow, plan);
       ctx.ui.notify(`${PACKAGE_NAME} interface enabled`, "info");
     },
   });
@@ -142,9 +165,11 @@ export default function piTuix(pi: ExtensionAPI): void {
       ctx.ui.setTitle("pi");
       ctx.ui.setHeader(undefined);
       ctx.ui.setFooter(undefined);
+      ctx.ui.setWidget("pituix-plan", undefined);
       ctx.ui.setEditorComponent(undefined);
       detachEditorChrome(editorRuntime);
       ctx.ui.setWorkingIndicator();
+      ctx.ui.setHiddenThinkingLabel();
       ctx.ui.notify("Pi default interface restored", "info");
     },
   });
@@ -199,6 +224,41 @@ export default function piTuix(pi: ExtensionAPI): void {
       const pending = ctx.hasPendingMessages();
       const suffix = pending ? "Pi has pending messages" : "Pi queue is clear";
       ctx.ui.notify(`Follow-ups: ${count} · ${suffix}`, pending ? "warning" : "info");
+    },
+  });
+
+  pi.registerCommand("pituix-plan", {
+    description: "Show, hide, or clear the detected plan panel",
+    handler: async (args, ctx) => {
+      const action = args.trim().toLowerCase() || "show";
+      if (action === "clear") {
+        clearPlan(plan);
+        syncPlanWidget(ctx, plan);
+        ctx.ui.notify("Plan cleared", "info");
+        return;
+      }
+      if (action === "hide") {
+        plan.visible = false;
+        syncPlanWidget(ctx, plan);
+        ctx.ui.notify("Plan panel hidden", "info");
+        return;
+      }
+      if (action !== "show") {
+        ctx.ui.notify("Usage: /pituix-plan [show|hide|clear]", "warning");
+        return;
+      }
+      if (!toolMode.enabled) {
+        ctx.ui.notify("Enable Pi-TUIX with /pituix before showing the plan panel", "warning");
+        return;
+      }
+      if (plan.items.length === 0) {
+        ctx.ui.notify("No numbered plan detected in this session", "warning");
+        return;
+      }
+      plan.visible = true;
+      syncPlanWidget(ctx, plan);
+      const complete = plan.items.filter((item) => item.completed).length;
+      ctx.ui.notify(`Plan ${complete}/${plan.items.length}`, "info");
     },
   });
 }
