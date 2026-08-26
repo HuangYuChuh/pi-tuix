@@ -43,7 +43,8 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "node --test test/**/*.test.ts",
-    "pack:check": "npm pack --dry-run --ignore-scripts"
+    "pack:check": "npm pack --dry-run --ignore-scripts",
+    "release:check": "node scripts/release-check.mjs"
   },
   "engines": {
     "node": ">=22.19.0"

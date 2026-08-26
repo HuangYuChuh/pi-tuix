@@ -26,15 +26,18 @@
 
 ## クイックスタート
 
-### 現在のプロトタイプをローカルで試す
+### 開発版をインストールする
 
 要件: Node.js `>=22.19.0`、Pi Coding Agent `>=0.84.0`。
 
 ```bash
 npm install
 npm run check
-pi -e ./extensions/index.ts
+pi install /absolute/path/to/pi-tuix --approve
+pi list
 ```
+
+Pi はローカルパスをユーザー設定に保存し、すべてのプロジェクトでその working tree を読み込みます。コード変更後は Pi を再起動してください。プロジェクト単位では `pi install -l /absolute/path/to/pi-tuix --approve`、保存しない一時的なプレビューでは `pi -e ./extensions/index.ts` を使用します。
 
 ### npm からインストール（初回リリース後）
 
@@ -43,6 +46,8 @@ pi install npm:pi-tuix
 ```
 
 プロジェクト単位では `pi install -l npm:pi-tuix` を使用します。
+
+インストール元の切り替えは[開発版ガイド](docs/development.md)、開発版・prerelease・stable の規則は[リリース手順](docs/releasing.md)を参照してください。
 
 ## 現在のプロトタイプ
 
@@ -97,6 +102,8 @@ component は state の描画だけを担当します。lifecycle handler が Pi
 - [Product context](docs/product-context.md)
 - [Positioning](docs/positioning.md)
 - [Architecture](docs/architecture.md)
+- [Development version](docs/development.md)
+- [Release process](docs/releasing.md)
 - [Documentation policy](docs/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)

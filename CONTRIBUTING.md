@@ -9,6 +9,8 @@ Read:
 - `docs/product-context.md` for the user problem and MVP;
 - `docs/positioning.md` for product ownership boundaries;
 - `docs/architecture.md` for runtime boundaries;
+- `docs/development.md` for persistent local installation and channel switching;
+- `docs/releasing.md` for version and release rules;
 - `AGENTS.md` for implementation and verification rules;
 - `docs/README.md` for the public/internal documentation policy.
 
@@ -23,11 +25,14 @@ npm run test
 npm run pack:check
 ```
 
-Load the extension locally with:
+Install the working tree as the persistent development package with:
 
 ```bash
-pi -e ./extensions/index.ts
+pi install /absolute/path/to/pi-tuix --approve
+pi list
 ```
+
+Restart Pi after extension changes. For a one-off load that does not update Pi settings, use `pi -e ./extensions/index.ts`.
 
 ## Pull requests
 

@@ -26,15 +26,18 @@
 
 ## 빠른 시작
 
-### 현재 프로토타입을 로컬에서 실행
+### 개발 버전 설치
 
 요구 사항: Node.js `>=22.19.0`, Pi Coding Agent `>=0.84.0`.
 
 ```bash
 npm install
 npm run check
-pi -e ./extensions/index.ts
+pi install /absolute/path/to/pi-tuix --approve
+pi list
 ```
+
+Pi는 로컬 경로를 사용자 설정에 저장하고 모든 프로젝트에서 해당 working tree를 로드합니다. 코드를 변경한 후 Pi를 다시 시작하세요. 프로젝트 단위 설치에는 `pi install -l /absolute/path/to/pi-tuix --approve`, 저장하지 않는 일회성 미리 보기에는 `pi -e ./extensions/index.ts`를 사용합니다.
 
 ### npm 설치 (첫 릴리스 이후)
 
@@ -43,6 +46,8 @@ pi install npm:pi-tuix
 ```
 
 프로젝트 단위 설치는 `pi install -l npm:pi-tuix`를 사용합니다.
+
+설치 소스 전환은 [개발 버전 가이드](docs/development.md), 개발·prerelease·stable 채널 규칙은 [릴리스 절차](docs/releasing.md)를 참조하세요.
 
 ## 현재 프로토타입
 
@@ -97,6 +102,8 @@ component는 state만 렌더링합니다. lifecycle handler는 Pi event를 작�
 - [Product context](docs/product-context.md)
 - [Positioning](docs/positioning.md)
 - [Architecture](docs/architecture.md)
+- [Development version](docs/development.md)
+- [Release process](docs/releasing.md)
 - [Documentation policy](docs/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)

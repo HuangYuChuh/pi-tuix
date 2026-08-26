@@ -26,15 +26,18 @@
 
 ## 快速開始
 
-### 在本機試用目前原型
+### 安裝開發版
 
 需求：Node.js `>=22.19.0`、Pi Coding Agent `>=0.84.0`。
 
 ```bash
 npm install
 npm run check
-pi -e ./extensions/index.ts
+pi install /absolute/path/to/pi-tuix --approve
+pi list
 ```
+
+Pi 會將本機路徑記錄在使用者設定中，並於所有專案載入該工作目錄。修改程式碼後請重新啟動 Pi。僅限目前專案時使用 `pi install -l /absolute/path/to/pi-tuix --approve`；一次性預覽則使用 `pi -e ./extensions/index.ts`，不會儲存安裝記錄。
 
 ### 從 npm 安裝（首次發佈後）
 
@@ -43,6 +46,8 @@ pi install npm:pi-tuix
 ```
 
 專案層級安裝請使用 `pi install -l npm:pi-tuix`。
+
+安裝來源切換請參閱[開發版使用手冊](docs/development.md)，開發版、預發佈版與正式版規則請參閱[發佈流程](docs/releasing.md)。
 
 ## 目前原型
 
@@ -97,6 +102,8 @@ Pi Coding Agent（runtime、provider、工具、工作階段、權限）
 - [產品背景](docs/product-context.md)
 - [產品定位](docs/positioning.md)
 - [架構](docs/architecture.md)
+- [開發版使用](docs/development.md)
+- [發佈流程](docs/releasing.md)
 - [文件規則](docs/README.md)
 - [貢獻指南](CONTRIBUTING.md)
 - [安全政策](SECURITY.md)

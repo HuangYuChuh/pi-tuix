@@ -26,15 +26,18 @@ Cuando una sesión se alarga, cuesta saber qué está ocurriendo, qué cambió y
 
 ## Inicio rápido
 
-### Probar el prototipo actual localmente
+### Instalar la versión de desarrollo
 
 Requisitos: Node.js `>=22.19.0` y Pi Coding Agent `>=0.84.0`.
 
 ```bash
 npm install
 npm run check
-pi -e ./extensions/index.ts
+pi install /absolute/path/to/pi-tuix --approve
+pi list
 ```
+
+Pi guarda la ruta local en la configuración del usuario y carga ese working tree en todos los proyectos. Reinicia Pi después de cambiar el código. Usa `pi install -l /absolute/path/to/pi-tuix --approve` para una instalación por proyecto o `pi -e ./extensions/index.ts` para una vista previa puntual que no se guarda.
 
 ### Instalar desde npm (después del primer lanzamiento)
 
@@ -43,6 +46,8 @@ pi install npm:pi-tuix
 ```
 
 Para instalarlo solo en un proyecto, usa `pi install -l npm:pi-tuix`.
+
+Consulta [la guia de desarrollo](docs/development.md) para cambiar la fuente instalada y [el proceso de lanzamiento](docs/releasing.md) para las reglas de los canales development, prerelease y stable.
 
 ## Prototipo actual
 
@@ -97,6 +102,8 @@ Consulta [product context](docs/product-context.md), [positioning](docs/position
 - [Product context](docs/product-context.md)
 - [Positioning](docs/positioning.md)
 - [Architecture](docs/architecture.md)
+- [Development version](docs/development.md)
+- [Release process](docs/releasing.md)
 - [Documentation policy](docs/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)

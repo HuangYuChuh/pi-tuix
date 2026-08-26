@@ -23,15 +23,18 @@ When a coding session is long, the hard part is often knowing what is happening,
 
 ## Quick Start
 
-### Try the current prototype locally
+### Install the development version
 
 Requirements: Node.js `>=22.19.0` and Pi Coding Agent `>=0.84.0`.
 
 ```bash
 npm install
 npm run check
-pi -e ./extensions/index.ts
+pi install /absolute/path/to/pi-tuix --approve
+pi list
 ```
+
+Pi stores the local path in user settings and loads that working tree across projects. Restart Pi after code changes. Use `pi install -l /absolute/path/to/pi-tuix --approve` for a project-local installation, or `pi -e ./extensions/index.ts` for a one-off preview that is not saved.
 
 ### Install from npm (after the first release)
 
@@ -40,6 +43,8 @@ pi install npm:pi-tuix
 ```
 
 For a project-local install, use `pi install -l npm:pi-tuix`.
+
+See [Using the development version](docs/development.md) for installation-source switching and [Releasing Pi-TUIX](docs/releasing.md) for development, prerelease, and stable channel rules.
 
 ## Current Prototype
 
@@ -98,6 +103,8 @@ The scope and acceptance criteria are documented in [docs/product-context.md](do
 - [Product context](docs/product-context.md) - user problem, MVP workflow, and non-goals
 - [Positioning](docs/positioning.md) - ownership boundaries and design principles
 - [Architecture](docs/architecture.md) - event-to-view rules and compatibility strategy
+- [Development version](docs/development.md) - persistent local installation and channel switching
+- [Release process](docs/releasing.md) - version, npm channel, tag, and publication gates
 - [Documentation policy](docs/README.md) - what belongs in public documentation
 - [Contributing](CONTRIBUTING.md) - local setup and pull-request expectations
 - [Security policy](SECURITY.md) - vulnerability reporting

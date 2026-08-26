@@ -71,6 +71,16 @@ For built-in tools, delegate to Pi's official tool implementation and replace on
 - Add compatibility adapters near the affected component; do not vendor the Pi runtime.
 - Prefer ASCII in source and documentation unless a UI symbol has a tested fallback.
 
+## Development and release channels
+
+- Treat a local-path Pi installation as the default development channel. It points directly at the working tree and does not require a package version bump for each change.
+- Keep `main` usable. Use short-lived feature branches for incomplete or risky work, and use Conventional Commits for repository history.
+- Do not run `npm publish`, create or push a version tag, or create a GitHub Release unless the user explicitly requests a release.
+- Do not describe the value in `package.json#version` as a published release by itself. A stable release requires a matching `v<version>` Git tag, an npm package published with the `latest` dist-tag, and a GitHub Release.
+- Publish prerelease versions only with a prerelease SemVer such as `0.2.0-beta.1` and a non-`latest` npm dist-tag such as `beta` or `next`.
+- Before a release, require a clean `main` worktree and run `npm run release:check -- --tag v<version> --channel <latest|beta|next>`.
+- Keep installation sources explicit in commands and documentation: local path for development, `npm:pi-tuix@<version>` for a pinned release, and `npm:pi-tuix` for the current stable release.
+
 ## Verification
 
 Every UI change should be checked at minimum for:

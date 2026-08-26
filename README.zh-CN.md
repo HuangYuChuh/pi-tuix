@@ -26,15 +26,18 @@
 
 ## 快速开始
 
-### 本地试用当前原型
+### 安装开发版
 
 要求：Node.js `>=22.19.0`、Pi Coding Agent `>=0.84.0`。
 
 ```bash
 npm install
 npm run check
-pi -e ./extensions/index.ts
+pi install /absolute/path/to/pi-tuix --approve
+pi list
 ```
+
+Pi 会把本地路径记录到用户设置中，并在所有项目中加载这份工作目录。修改代码后请重启 Pi。仅当前项目使用时执行 `pi install -l /absolute/path/to/pi-tuix --approve`；只做一次性预览时执行 `pi -e ./extensions/index.ts`，它不会保存安装记录。
 
 ### 从 npm 安装（首次发布后）
 
@@ -43,6 +46,8 @@ pi install npm:pi-tuix
 ```
 
 项目级安装请使用 `pi install -l npm:pi-tuix`。
+
+安装来源切换见[开发版使用手册](docs/development.md)，开发版、预发布版与正式版规则见[发版流程](docs/releasing.md)。
 
 ## 当前原型
 
@@ -101,6 +106,8 @@ Pi Coding Agent（runtime、provider、工具、会话、权限）
 - [产品背景](docs/product-context.md) - 用户问题、MVP 流程与非目标
 - [产品定位](docs/positioning.md) - 职责边界与设计原则
 - [架构](docs/architecture.md) - 事件到视图规则与兼容策略
+- [开发版使用](docs/development.md) - 永久本地安装与渠道切换
+- [发版流程](docs/releasing.md) - 版本、npm 渠道、Tag 与发布校验
 - [文档规则](docs/README.md) - 哪些内容属于公开文档
 - [贡献指南](CONTRIBUTING.md) - 本地开发与 PR 要求
 - [安全策略](SECURITY.md) - 漏洞报告方式

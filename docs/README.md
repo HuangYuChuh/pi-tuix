@@ -52,6 +52,11 @@ npm run test
 npm run pack:check
 ```
 
+Development installation and release channels are documented separately:
+
+- [`development.md`](development.md) explains persistent local-path installation, source switching, and version mismatch diagnosis.
+- [`releasing.md`](releasing.md) defines development, prerelease, and stable channels plus the guarded release workflow.
+
 Review matches in context. Words such as `token` or `credential` are valid in architecture documentation, but actual values and private identifiers are not.
 
 ## Documentation standard
