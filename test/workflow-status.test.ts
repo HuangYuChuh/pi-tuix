@@ -8,6 +8,7 @@ import {
   finishTool,
   formatWorkflowStatus,
   queueMessage,
+  settleAgent,
   startTool,
 } from "../extensions/stream/workflow-status.ts";
 
@@ -39,4 +40,12 @@ test("workflow status exposes current tool and queue within a narrow width", () 
   const status = formatWorkflowStatus(runtime, theme, 28);
   assert.ok(visibleWidth(status) <= 28);
   assert.match(stripTerminalSequences(status), /WORKING/);
+});
+
+test("settled agent clears stale follow-up count", () => {
+  const runtime = createWorkflowRuntime();
+  queueMessage(runtime);
+  settleAgent(runtime);
+  assert.equal(runtime.queuedMessages, 0);
+  assert.equal(runtime.phase, "DONE");
 });

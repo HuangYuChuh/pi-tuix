@@ -54,8 +54,9 @@ export function finishAgentRun(runtime: WorkflowRuntime): void {
 }
 
 export function settleAgent(runtime: WorkflowRuntime): void {
+  runtime.queuedMessages = 0;
   finishAgentRun(runtime);
-};
+}
 
 function phaseText(theme: Theme, phase: WorkflowPhase): string {
   if (phase === "WORKING") return theme.fg("accent", "WORKING");
