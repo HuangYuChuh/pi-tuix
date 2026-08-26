@@ -32,11 +32,14 @@ The prototype intentionally uses only public hooks:
 - `ctx.ui.setHeader()` for the startup shell;
 - `ctx.ui.setFooter()` for persistent state;
 - `ctx.ui.setWorkingIndicator()` for streaming feedback;
+- `agent_*`, `input`, and `tool_execution_*` events for a read-only workflow status line;
 - `ctx.ui.setEditorComponent()` with Pi's public `CustomEditor` for reversible editor chrome;
 - `ctx.ui.setTitle()` for terminal identity;
 - `pi.registerCommand()` for reversible toggles.
 
 Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` delegation pattern. Pi-TUIX retains each original public tool definition and exact `execute()` function while replacing only `renderCall()` and `renderResult()` when its UI mode is active. `/pituix-default` switches future tool rendering back to the original Pi renderer in the same session.
+
+Workflow status shows the current phase, active tool, completed and failed tool counts, and queued follow-up messages. It resets for each agent run and never changes Pi's queue, tool inputs, or execution behavior.
 
 ## Compatibility strategy
 
