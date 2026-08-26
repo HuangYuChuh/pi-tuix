@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { VERSION } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
+import { registerCompactToolRenderers, type ToolRendererMode } from "./tools/renderers.ts";
 
 const PACKAGE_NAME = "Pi-TUIX";
 
@@ -45,8 +46,9 @@ class PiTuixFooter implements Component {
   invalidate(): void {}
 }
 
-function applyPiTuix(ctx: ExtensionContext): void {
+function applyPiTuix(ctx: ExtensionContext, toolMode: ToolRendererMode): void {
   if (ctx.mode !== "tui") return;
+  toolMode.enabled = true;
   ctx.ui.setTitle(PACKAGE_NAME);
   ctx.ui.setHeader(() => new PiTuixHeader(ctx));
   ctx.ui.setFooter(() => new PiTuixFooter(ctx));
@@ -57,12 +59,15 @@ function applyPiTuix(ctx: ExtensionContext): void {
 }
 
 export default function piTuix(pi: ExtensionAPI): void {
-  pi.on("session_start", (_event, ctx) => applyPiTuix(ctx));
+  const toolMode: ToolRendererMode = { enabled: false };
+  registerCompactToolRenderers(pi, toolMode);
+
+  pi.on("session_start", (_event, ctx) => applyPiTuix(ctx, toolMode));
 
   pi.registerCommand("pituix", {
     description: "Show Pi-TUIX status and restore its interface",
     handler: async (_args, ctx) => {
-      applyPiTuix(ctx);
+      applyPiTuix(ctx, toolMode);
       ctx.ui.notify(`${PACKAGE_NAME} interface enabled`, "info");
     },
   });
@@ -70,6 +75,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.registerCommand("pituix-default", {
     description: "Restore Pi's default TUI components",
     handler: async (_args, ctx) => {
+      toolMode.enabled = false;
       ctx.ui.setTitle("pi");
       ctx.ui.setHeader(undefined);
       ctx.ui.setFooter(undefined);

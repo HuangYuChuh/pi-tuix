@@ -13,12 +13,12 @@ Pi-TUIX is a presentation layer. Pi continues to own model requests, built-in to
 - Pi-TUIX header with model and workspace information
 - Footer with model, context usage, and working directory
 - Working indicator for active turns
+- Compact Read, Bash, Edit, and Write rows with explicit state and attention labels
+- Expandable ANSI-aware output and edit diff summaries
 - `pituix`, `pituix-default`, and `pituix-about` commands
 - Bundled `pi-tuix-dark` theme
 
 ## Planned Features
-- Compact Read, Bash, Edit, and Write tool rows
-- Folded tool output and diff summaries
 - Thinking, progress, token/context, approval, plan, queue, and session surfaces
 
 ## Compatibility

@@ -43,7 +43,11 @@ For a project-local install, use `pi install -l npm:pi-tuix`.
 
 ## Current Prototype
 
-The foundation release wires Pi's public `ExtensionAPI` to a Pi-TUIX header, footer, terminal title, and working indicator. These commands are reversible:
+The foundation release wires Pi's public `ExtensionAPI` to a Pi-TUIX header, footer, terminal title, working indicator, and compact Read/Bash/Edit/Write presentation. Tool execution remains delegated to Pi unchanged.
+
+Each compact tool row keeps the action, target, state, and attention signal visible. Read and Bash results summarize output size, Edit reports diff statistics, and Write reports the written line count. Expanded rows reveal output or diffs using ANSI-aware width constraints.
+
+These commands are reversible:
 
 | Command | Purpose |
 | --- | --- |
@@ -71,7 +75,7 @@ Components render state. Lifecycle handlers translate Pi events into small UI up
 ## Roadmap
 
 1. **Shell (current):** header, footer, terminal title, theme, and working state.
-2. **Tool surface:** compact Read/Bash/Edit/Write rows, folded output, and diff summaries.
+2. **Tool surface (current):** compact Read/Bash/Edit/Write rows, explicit queued/running/success/error/cancelled states, expandable output, and diff summaries.
 3. **Stream surface:** thinking labels, progress, token/context status, and repaint discipline.
 4. **Control surface:** approval dialogs, plan review, steering queue, and keyboard conventions.
 5. **Session surface:** context inspection, resume references, subagent state, and session surfaces where Pi exposes reliable public events.

@@ -46,7 +46,9 @@ pi install npm:pi-tuix
 
 ## 現在のプロトタイプ
 
-基盤リリースは Pi の公開 `ExtensionAPI` を通じて header、footer、terminal title、working indicator を提供します。
+基盤リリースは Pi の公開 `ExtensionAPI` を通じて header、footer、terminal title、working indicator、およびコンパクトな Read/Bash/Edit/Write 表示を提供します。tool execution は変更せず Pi に委譲します。
+
+各 tool row は action、target、state、`ATTENTION/CLEAR` を明示します。Read/Bash は出力量、Edit は diff stats、Write は書き込み行数を要約し、展開すると ANSI-aware な幅制約のある詳細を確認できます。
 
 | コマンド | 目的 |
 | --- | --- |
@@ -72,7 +74,7 @@ component は state の描画だけを担当します。lifecycle handler が Pi
 ## ロードマップ
 
 1. **Shell（現在）:** header、footer、terminal title、theme、working state。
-2. **Tool surface:** コンパクトな Read/Bash/Edit/Write row、折りたたみ出力、diff summary。
+2. **Tool surface（現在）:** コンパクトな Read/Bash/Edit/Write row、queued/running/success/error/cancelled 状態、展開可能な出力、diff summary。
 3. **Stream surface:** thinking label、進捗、token/context 状態、安定した再描画。
 4. **Control surface:** approval dialog、plan review、steering queue、keyboard 操作。
 5. **Session surface:** Pi が信頼できる公開 event を提供する範囲で context、resume reference、subagent 状態を表示。

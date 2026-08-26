@@ -25,7 +25,7 @@ Pi-TUIX
 
 Pi-TUIX should translate Pi events into small UI state updates. Components should not call providers, execute shell commands, or read sessions directly just to render a line. The extension entrypoint owns lifecycle wiring; each component owns only rendering and input behavior.
 
-## Initial implementation
+## Current implementation
 
 The prototype intentionally uses only public hooks:
 
@@ -35,7 +35,7 @@ The prototype intentionally uses only public hooks:
 - `ctx.ui.setTitle()` for terminal identity;
 - `pi.registerCommand()` for reversible toggles.
 
-Tool rendering will use Pi's documented `registerTool()` delegation pattern: create the original built-in tool, delegate `execute()`, and provide Pi-TUIX-specific `renderCall()` and `renderResult()` components.
+Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` delegation pattern. Pi-TUIX retains each original public tool definition and exact `execute()` function while replacing only `renderCall()` and `renderResult()` when its UI mode is active. `/pituix-default` switches future tool rendering back to the original Pi renderer in the same session.
 
 ## Compatibility strategy
 
