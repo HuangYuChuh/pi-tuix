@@ -46,7 +46,9 @@ pi install npm:pi-tuix
 
 ## 현재 프로토타입
 
-기반 릴리스는 Pi의 공개 `ExtensionAPI`를 통해 header, footer, terminal title, working indicator 및 간결한 Read/Bash/Edit/Write 표시를 제공합니다. tool execution은 변경 없이 Pi에 위임합니다.
+기반 릴리스는 Pi의 공개 `ExtensionAPI`를 통해 header, footer, terminal title, working indicator, editor chrome 및 간결한 Read/Bash/Edit/Write 표시를 제공합니다. tool execution은 변경 없이 Pi에 위임합니다.
+
+Editor border는 `READY/WORKING`, 입력 줄 수 및 문자 수를 표시합니다. Pi의 공개 `CustomEditor`를 확장하므로 submit, history, autocomplete, paste 및 app shortcut 동작이 유지됩니다.
 
 각 tool row는 action, target, state 및 `ATTENTION/CLEAR`를 명확히 표시합니다. Read/Bash는 출력 크기, Edit는 diff stats, Write는 작성된 줄 수를 요약하며, 펼치면 ANSI-aware 너비 제한이 적용된 세부 정보를 볼 수 있습니다.
 
@@ -73,7 +75,7 @@ component는 state만 렌더링합니다. lifecycle handler는 Pi event를 작�
 
 ## 로드맵
 
-1. **Shell (현재):** header, footer, terminal title, theme, working state.
+1. **Shell (현재):** header, footer, terminal title, theme, working state, reversible editor chrome.
 2. **Tool surface (현재):** 간결한 Read/Bash/Edit/Write row, queued/running/success/error/cancelled 상태, 펼칠 수 있는 출력 및 diff summary.
 3. **Stream surface:** thinking label, 진행 상황, token/context 상태, 안정적인 repaint.
 4. **Control surface:** approval dialog, plan review, steering queue, keyboard 규칙.

@@ -32,6 +32,7 @@ The prototype intentionally uses only public hooks:
 - `ctx.ui.setHeader()` for the startup shell;
 - `ctx.ui.setFooter()` for persistent state;
 - `ctx.ui.setWorkingIndicator()` for streaming feedback;
+- `ctx.ui.setEditorComponent()` with Pi's public `CustomEditor` for reversible editor chrome;
 - `ctx.ui.setTitle()` for terminal identity;
 - `pi.registerCommand()` for reversible toggles.
 

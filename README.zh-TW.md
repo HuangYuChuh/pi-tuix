@@ -46,7 +46,9 @@ pi install npm:pi-tuix
 
 ## 目前原型
 
-基礎版本透過 Pi 的公開 `ExtensionAPI` 提供 header、footer、終端標題、working indicator，以及緊湊的 Read/Bash/Edit/Write 顯示。工具執行仍原樣委派給 Pi。
+基礎版本透過 Pi 的公開 `ExtensionAPI` 提供 header、footer、終端標題、working indicator、editor chrome，以及緊湊的 Read/Bash/Edit/Write 顯示。工具執行仍原樣委派給 Pi。
+
+Editor border 會顯示 `READY/WORKING`、輸入行數與字元數。它繼承 Pi 公開的 `CustomEditor`，保留提交、歷史記錄、autocomplete、貼上處理與應用快捷鍵。
 
 每個 tool row 都會清楚顯示 action、target、state 與 `ATTENTION/CLEAR`。Read/Bash 摘要輸出規模，Edit 顯示 diff stats，Write 顯示寫入行數；展開後可查看具 ANSI-aware 寬度限制的詳細內容。
 
@@ -73,7 +75,7 @@ Pi Coding Agent（runtime、provider、工具、工作階段、權限）
 
 ## 路線圖
 
-1. **Shell（目前）:** header、footer、終端標題、theme 與 working state。
+1. **Shell（目前）:** header、footer、終端標題、theme、working state 與可逆的 editor chrome。
 2. **工具介面（目前）:** 緊湊的 Read/Bash/Edit/Write row、queued/running/success/error/cancelled 狀態、可展開輸出與 diff 摘要。
 3. **串流介面:** thinking label、進度、token/context 狀態與穩定刷新。
 4. **控制介面:** approval dialog、plan review、steering queue 與鍵盤操作。

@@ -1,6 +1,13 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { VERSION } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
+import {
+  createEditorChromeRuntime,
+  createPiTuixEditor,
+  detachEditorChrome,
+  setEditorWorking,
+  type EditorChromeRuntime,
+} from "./shell/editor.ts";
 import { registerCompactToolRenderers, type ToolRendererMode } from "./tools/renderers.ts";
 
 const PACKAGE_NAME = "Pi-TUIX";
@@ -18,7 +25,11 @@ function formatCwd(cwd: string): string {
 }
 
 class PiTuixHeader implements Component {
-  constructor(private readonly ctx: ExtensionContext) {}
+  private readonly ctx: ExtensionContext;
+
+  constructor(ctx: ExtensionContext) {
+    this.ctx = ctx;
+  }
 
   render(width: number): string[] {
     const theme = this.ctx.ui.theme;
@@ -33,7 +44,11 @@ class PiTuixHeader implements Component {
 }
 
 class PiTuixFooter implements Component {
-  constructor(private readonly ctx: ExtensionContext) {}
+  private readonly ctx: ExtensionContext;
+
+  constructor(ctx: ExtensionContext) {
+    this.ctx = ctx;
+  }
 
   render(width: number): string[] {
     const theme: Theme = this.ctx.ui.theme;
@@ -46,12 +61,20 @@ class PiTuixFooter implements Component {
   invalidate(): void {}
 }
 
-function applyPiTuix(ctx: ExtensionContext, toolMode: ToolRendererMode): void {
+function applyPiTuix(
+  ctx: ExtensionContext,
+  toolMode: ToolRendererMode,
+  editorRuntime: EditorChromeRuntime,
+): void {
   if (ctx.mode !== "tui") return;
   toolMode.enabled = true;
+  setEditorWorking(editorRuntime, false);
   ctx.ui.setTitle(PACKAGE_NAME);
   ctx.ui.setHeader(() => new PiTuixHeader(ctx));
   ctx.ui.setFooter(() => new PiTuixFooter(ctx));
+  ctx.ui.setEditorComponent((tui, theme, keybindings) =>
+    createPiTuixEditor(tui, theme, keybindings, editorRuntime),
+  );
   ctx.ui.setWorkingIndicator({
     frames: ["◐", "◓", "◑", "◒"].map((frame) => ctx.ui.theme.fg("accent", frame)),
     intervalMs: 120,
@@ -60,14 +83,18 @@ function applyPiTuix(ctx: ExtensionContext, toolMode: ToolRendererMode): void {
 
 export default function piTuix(pi: ExtensionAPI): void {
   const toolMode: ToolRendererMode = { enabled: false };
+  const editorRuntime = createEditorChromeRuntime();
   registerCompactToolRenderers(pi, toolMode);
 
-  pi.on("session_start", (_event, ctx) => applyPiTuix(ctx, toolMode));
+  pi.on("session_start", (_event, ctx) => applyPiTuix(ctx, toolMode, editorRuntime));
+  pi.on("agent_start", () => setEditorWorking(editorRuntime, true));
+  pi.on("agent_end", () => setEditorWorking(editorRuntime, false));
+  pi.on("session_shutdown", () => detachEditorChrome(editorRuntime));
 
   pi.registerCommand("pituix", {
     description: "Show Pi-TUIX status and restore its interface",
     handler: async (_args, ctx) => {
-      applyPiTuix(ctx, toolMode);
+      applyPiTuix(ctx, toolMode, editorRuntime);
       ctx.ui.notify(`${PACKAGE_NAME} interface enabled`, "info");
     },
   });
@@ -79,6 +106,8 @@ export default function piTuix(pi: ExtensionAPI): void {
       ctx.ui.setTitle("pi");
       ctx.ui.setHeader(undefined);
       ctx.ui.setFooter(undefined);
+      ctx.ui.setEditorComponent(undefined);
+      detachEditorChrome(editorRuntime);
       ctx.ui.setWorkingIndicator();
       ctx.ui.notify("Pi default interface restored", "info");
     },

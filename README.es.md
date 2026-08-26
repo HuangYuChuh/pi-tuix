@@ -46,7 +46,9 @@ Para instalarlo solo en un proyecto, usa `pi install -l npm:pi-tuix`.
 
 ## Prototipo actual
 
-La versión base conecta la `ExtensionAPI` pública de Pi con un header, footer, título de terminal, working indicator y presentación compacta de Read/Bash/Edit/Write. La ejecución de las herramientas sigue delegada a Pi sin cambios.
+La versión base conecta la `ExtensionAPI` pública de Pi con un header, footer, título de terminal, working indicator, editor chrome y presentación compacta de Read/Bash/Edit/Write. La ejecución de las herramientas sigue delegada a Pi sin cambios.
+
+El borde del editor muestra `READY/WORKING`, líneas y caracteres del prompt. Extiende el `CustomEditor` público de Pi, por lo que conserva submission, history, autocomplete, paste y los app shortcuts registrados.
 
 Cada tool row muestra explícitamente la acción, el objetivo, el estado y la señal `ATTENTION/CLEAR`. Read/Bash resumen el volumen de salida, Edit muestra estadísticas del diff y Write indica las líneas escritas; al expandir se muestran los detalles con límites de ancho compatibles con ANSI.
 
@@ -73,7 +75,7 @@ Los components solo renderizan state. Los lifecycle handlers convierten los even
 
 ## Hoja de ruta
 
-1. **Shell (actual):** header, footer, título, theme y working state.
+1. **Shell (actual):** header, footer, título, theme, working state y editor chrome reversible.
 2. **Tool surface (actual):** filas compactas para Read/Bash/Edit/Write, estados queued/running/success/error/cancelled, salida expandible y resúmenes de diff.
 3. **Stream surface:** etiquetas de thinking, progreso, estado de token/context y repaint estable.
 4. **Control surface:** diálogos de approval, revisión de planes, steering queue y teclado.

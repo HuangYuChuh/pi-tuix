@@ -13,6 +13,8 @@ Pi-TUIX is a presentation layer. Pi continues to own model requests, built-in to
 - Pi-TUIX header with model and workspace information
 - Footer with model, context usage, and working directory
 - Working indicator for active turns
+- Reversible editor chrome with READY/WORKING and prompt size status
+- Pi CustomEditor behavior preserved for history, autocomplete, paste, and shortcuts
 - Compact Read, Bash, Edit, and Write rows with explicit state and attention labels
 - Expandable ANSI-aware output and edit diff summaries
 - `pituix`, `pituix-default`, and `pituix-about` commands
