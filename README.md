@@ -61,6 +61,9 @@ These commands are reversible:
 | `/pituix` | Enable or restore the Pi-TUIX shell |
 | `/pituix-default` | Restore Pi's default TUI components |
 | `/pituix-about` | Show the package and compatible Pi version |
+| `/pituix-steer <message>` | Interrupt the current run with an immediate correction |
+| `/pituix-followup <message>` | Queue work to start after the current run |
+| `/pituix-queue` | Show whether Pi has queued follow-up messages |
 
 The bundled `pi-tuix-dark` theme is available from Pi's `/settings` screen.
 
@@ -84,7 +87,7 @@ Components render state. Lifecycle handlers translate Pi events into small UI up
 1. **Shell (current):** header, footer, terminal title, theme, working state, and reversible editor chrome.
 2. **Tool surface (current):** compact Read/Bash/Edit/Write rows, explicit queued/running/success/error/cancelled states, expandable output, and diff summaries.
 3. **Stream surface:** thinking labels, progress, token/context status, and repaint discipline.
-4. **Control surface:** approval dialogs, plan review, steering queue, and keyboard conventions.
+4. **Control surface (in progress):** steer/follow-up queue commands are available; approval adapters, plan review, and keyboard conventions remain planned.
 5. **Session surface:** context inspection, resume references, subagent state, and session surfaces where Pi exposes reliable public events.
 
 The scope and acceptance criteria are documented in [docs/product-context.md](docs/product-context.md). The product boundary is in [docs/positioning.md](docs/positioning.md), and the runtime design is in [docs/architecture.md](docs/architecture.md).

@@ -62,6 +62,9 @@ Editor border は `READY/WORKING`、入力行数、文字数を表示します�
 | `/pituix` | Pi-TUIX shell を有効化または復元 |
 | `/pituix-default` | Pi 標準 TUI component を復元 |
 | `/pituix-about` | package と互換性のある Pi バージョンを表示 |
+| `/pituix-steer <message>` | 実行中のタスクへ即時に修正指示を送る |
+| `/pituix-followup <message>` | 現在の実行後に処理するメッセージをキューへ追加 |
+| `/pituix-queue` | Pi に保留中のメッセージがあるか表示 |
 
 同梱の `pi-tuix-dark` theme は Pi の `/settings` から選択できます。
 
@@ -83,7 +86,7 @@ component は state の描画だけを担当します。lifecycle handler が Pi
 1. **Shell（現在）:** header、footer、terminal title、theme、working state、reversible editor chrome。
 2. **Tool surface（現在）:** コンパクトな Read/Bash/Edit/Write row、queued/running/success/error/cancelled 状態、展開可能な出力、diff summary。
 3. **Stream surface:** thinking label、進捗、token/context 状態、安定した再描画。
-4. **Control surface:** approval dialog、plan review、steering queue、keyboard 操作。
+4. **Control surface (進行中):** steer/follow-up キューコマンドを提供。approval、plan review、keyboard 操作は計画中。
 5. **Session surface:** Pi が信頼できる公開 event を提供する範囲で context、resume reference、subagent 状態を表示。
 
 詳細は [product context](docs/product-context.md)、[positioning](docs/positioning.md)、[architecture](docs/architecture.md) を参照してください。

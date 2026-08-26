@@ -62,6 +62,9 @@ Editor border는 `READY/WORKING`, 입력 줄 수 및 문자 수를 표시합니�
 | `/pituix` | Pi-TUIX shell 활성화 또는 복원 |
 | `/pituix-default` | Pi 기본 TUI component 복원 |
 | `/pituix-about` | package 및 호환 Pi 버전 표시 |
+| `/pituix-steer <message>` | 실행 중인 작업에 즉시 수정 지시 전송 |
+| `/pituix-followup <message>` | 현재 실행 후 처리할 메시지를 큐에 추가 |
+| `/pituix-queue` | Pi에 대기 중인 메시지가 있는지 표시 |
 
 포함된 `pi-tuix-dark` theme은 Pi의 `/settings`에서 선택할 수 있습니다.
 
@@ -83,7 +86,7 @@ component는 state만 렌더링합니다. lifecycle handler는 Pi event를 작�
 1. **Shell (현재):** header, footer, terminal title, theme, working state, reversible editor chrome.
 2. **Tool surface (현재):** 간결한 Read/Bash/Edit/Write row, queued/running/success/error/cancelled 상태, 펼칠 수 있는 출력 및 diff summary.
 3. **Stream surface:** thinking label, 진행 상황, token/context 상태, 안정적인 repaint.
-4. **Control surface:** approval dialog, plan review, steering queue, keyboard 규칙.
+4. **Control surface (진행 중):** steer/follow-up 큐 명령을 제공하며 approval, plan review, keyboard 규칙은 계획 중입니다.
 5. **Session surface:** Pi가 신뢰할 수 있는 공개 event를 제공하는 범위에서 context, resume reference, subagent 상태 표시.
 
 자세한 내용은 [product context](docs/product-context.md), [positioning](docs/positioning.md), [architecture](docs/architecture.md)를 참조하세요.

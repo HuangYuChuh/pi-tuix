@@ -64,6 +64,9 @@ Editor border 会显示 `READY/WORKING`、输入行数和字符数。它继承 P
 | `/pituix` | 启用或恢复 Pi-TUIX shell |
 | `/pituix-default` | 恢复 Pi 默认 TUI 组件 |
 | `/pituix-about` | 查看 package 与兼容的 Pi 版本 |
+| `/pituix-steer <消息>` | 立即纠偏当前执行中的任务 |
+| `/pituix-followup <消息>` | 排队追加，等当前任务结束后执行 |
+| `/pituix-queue` | 查看 Pi 是否还有待处理消息 |
 
 可在 Pi 的 `/settings` 中选择内置的 `pi-tuix-dark` 主题。
 
@@ -87,7 +90,7 @@ Pi Coding Agent（runtime、provider、工具、会话、权限）
 1. **Shell（当前）：** header、footer、终端标题、主题、working state 与可逆的 editor chrome。
 2. **工具界面（当前）：** 紧凑的 Read/Bash/Edit/Write 行，明确区分 queued/running/success/error/cancelled，支持展开输出与 diff 摘要。
 3. **流式界面：** thinking 标签、进度、token/context 状态与稳定刷新。
-4. **控制界面：** 审批对话框、计划审阅、steering queue 与键盘约定。
+4. **控制界面（进行中）：** 已提供 steer/follow-up 队列命令；审批适配、计划审阅与键盘约定仍在规划中。
 5. **会话界面：** 在 Pi 提供可靠公开事件的前提下，展示 context、resume 引用与 subagent 状态。
 
 范围和验收条件见 [docs/product-context.md](docs/product-context.md)，产品边界见 [docs/positioning.md](docs/positioning.md)，runtime 设计见 [docs/architecture.md](docs/architecture.md)。

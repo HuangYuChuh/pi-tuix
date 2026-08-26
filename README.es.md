@@ -62,6 +62,9 @@ Cada tool row muestra explícitamente la acción, el objetivo, el estado y la se
 | `/pituix` | Activar o restaurar el shell de Pi-TUIX |
 | `/pituix-default` | Restaurar los componentes TUI predeterminados de Pi |
 | `/pituix-about` | Mostrar el package y la versión compatible de Pi |
+| `/pituix-steer <mensaje>` | Enviar una corrección inmediata durante la ejecución |
+| `/pituix-followup <mensaje>` | Poner trabajo en cola para después de la ejecución actual |
+| `/pituix-queue` | Mostrar si Pi tiene mensajes pendientes |
 
 El theme `pi-tuix-dark` incluido se puede seleccionar desde `/settings` en Pi.
 
@@ -83,7 +86,7 @@ Los components solo renderizan state. Los lifecycle handlers convierten los even
 1. **Shell (actual):** header, footer, título, theme, working state y editor chrome reversible.
 2. **Tool surface (actual):** filas compactas para Read/Bash/Edit/Write, estados queued/running/success/error/cancelled, salida expandible y resúmenes de diff.
 3. **Stream surface:** etiquetas de thinking, progreso, estado de token/context y repaint estable.
-4. **Control surface:** diálogos de approval, revisión de planes, steering queue y teclado.
+4. **Control surface (en progreso):** comandos steer/follow-up disponibles; approval, revisión de planes y teclado siguen planificados.
 5. **Session surface:** context, referencias de resume y estado de subagents cuando Pi exponga eventos públicos fiables.
 
 Consulta [product context](docs/product-context.md), [positioning](docs/positioning.md) y [architecture](docs/architecture.md) para conocer los límites y criterios del producto.

@@ -17,6 +17,7 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     registerCommand: (name: string, definition: { handler: (...args: any[]) => Promise<void> }) =>
       commands.set(name, definition),
     registerTool: () => {},
+    sendUserMessage: () => {},
   } as unknown as ExtensionAPI;
 
   piTuix(pi);
@@ -58,4 +59,23 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
 
   await commands.get("pituix-default")?.handler("", context);
   assert.equal(editorFactories.at(-1), undefined);
+});
+
+test("queue commands delegate steering and follow-ups to Pi", async () => {
+  const handlers = new Map<string, (...args: any[]) => any>();
+  const commands = new Map<string, { handler: (...args: any[]) => Promise<void> }>();
+  const sent: unknown[] = [];
+  const pi = {
+    on: (event: string, handler: (...args: any[]) => any) => handlers.set(event, handler),
+    registerCommand: (name: string, definition: { handler: (...args: any[]) => Promise<void> }) => commands.set(name, definition),
+    registerTool: () => {},
+    sendUserMessage: (...args: unknown[]) => sent.push(args),
+  } as unknown as ExtensionAPI;
+  piTuix(pi);
+  const ui = { theme: { fg: (_color: string, text: string) => text }, notify: () => {} };
+  const context = { mode: "tui", ui, isIdle: () => false, hasPendingMessages: () => true } as unknown as ExtensionContext;
+
+  await commands.get("pituix-steer")?.handler("focus tests", context);
+  await commands.get("pituix-followup")?.handler("then package", context);
+  assert.deepEqual(sent, [["focus tests", { deliverAs: "steer" }], ["then package", { deliverAs: "followUp" }]]);
 });

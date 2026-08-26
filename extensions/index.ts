@@ -121,7 +121,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   });
   pi.on("agent_settled", () => settleAgent(workflow));
   pi.on("input", (event) => {
-    if (event.streamingBehavior) queueMessage(workflow);
+    if (event.streamingBehavior === "followUp") queueMessage(workflow);
   });
   pi.on("tool_execution_start", (event) => startTool(workflow, event.toolName));
   pi.on("tool_execution_end", (event) => finishTool(workflow, event.isError));
@@ -153,6 +153,52 @@ export default function piTuix(pi: ExtensionAPI): void {
     description: "Show Pi-TUIX positioning and current compatibility",
     handler: async (_args, ctx) => {
       ctx.ui.notify(`${PACKAGE_NAME} 0.1.0 · Pi ${VERSION} compatible`, "info");
+    },
+  });
+
+  pi.registerCommand("pituix-steer", {
+    description: "Send an immediate steering message while Pi is working",
+    handler: async (args, ctx) => {
+      const text = args.trim();
+      if (!text) {
+        ctx.ui.notify("Usage: /pituix-steer <message>", "warning");
+        return;
+      }
+      if (ctx.isIdle()) {
+        pi.sendUserMessage(text);
+        ctx.ui.notify("Steering message sent", "info");
+        return;
+      }
+      pi.sendUserMessage(text, { deliverAs: "steer" });
+      ctx.ui.notify("Steering message sent", "info");
+    },
+  });
+
+  pi.registerCommand("pituix-followup", {
+    description: "Queue a follow-up message after the current Pi run",
+    handler: async (args, ctx) => {
+      const text = args.trim();
+      if (!text) {
+        ctx.ui.notify("Usage: /pituix-followup <message>", "warning");
+        return;
+      }
+      if (ctx.isIdle()) {
+        pi.sendUserMessage(text);
+        ctx.ui.notify("Follow-up started", "info");
+        return;
+      }
+      pi.sendUserMessage(text, { deliverAs: "followUp" });
+      ctx.ui.notify("Follow-up queued", "info");
+    },
+  });
+
+  pi.registerCommand("pituix-queue", {
+    description: "Show queued follow-up messages and Pi queue state",
+    handler: async (_args, ctx) => {
+      const count = workflow.queuedMessages;
+      const pending = ctx.hasPendingMessages();
+      const suffix = pending ? "Pi has pending messages" : "Pi queue is clear";
+      ctx.ui.notify(`Follow-ups: ${count} · ${suffix}`, pending ? "warning" : "info");
     },
   });
 }
