@@ -1,0 +1,114 @@
+# Pi-TUIX
+
+<div align="center">
+
+[English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Node.js >=22.19](https://img.shields.io/badge/Node.js-%3E%3D22.19-339933?logo=node.js&logoColor=white)](https://nodejs.org/) [![Pi Coding Agent >=0.84](https://img.shields.io/badge/Pi%20Coding%20Agent-%3E%3D0.84-4B5563)](https://github.com/badlogic/pi-mono)
+
+</div>
+
+> [!NOTE]
+> 本翻譯由社群維護。如有錯誤，歡迎提交 PR！內容基於目前的 [`README.md`](README.md)。
+
+> **狀態：** 早期開發階段。`pi-tuix` 尚未發佈至 npm。
+
+**Pi-TUIX** 是 Pi Coding Agent 的開源終端 UI 擴充套件。它讓長時間的編碼工作階段更清晰、更緊湊，同時模型請求、內建工具、工作階段、權限及 provider 整合仍由 Pi 管理。
+
+## 為什麼需要 Pi-TUIX
+
+工作階段變長後，真正耗費心力的往往是判斷目前正在做什麼、修改了什麼，以及是否需要人工介入。Pi-TUIX 改善資訊層級，但不會把工作遷移到另一套 Agent runtime。
+
+- 在 shell 中查看目前模型、workspace 與 context 訊號。
+- 保持 running 與 streaming 狀態可見，減少 transcript 雜訊。
+- 在同一工作階段中恢復 Pi 預設介面。
+- 作為可移除的 package 使用，Pi 始終是 system of record。
+
+## 快速開始
+
+### 在本機試用目前原型
+
+需求：Node.js `>=22.19.0`、Pi Coding Agent `>=0.84.0`。
+
+```bash
+npm install
+npm run check
+pi -e ./extensions/index.ts
+```
+
+### 從 npm 安裝（首次發佈後）
+
+```bash
+pi install npm:pi-tuix
+```
+
+專案層級安裝請使用 `pi install -l npm:pi-tuix`。
+
+## 目前原型
+
+基礎版本透過 Pi 的公開 `ExtensionAPI` 提供 header、footer、終端標題與 working indicator。
+
+| 指令 | 用途 |
+| --- | --- |
+| `/pituix` | 啟用或恢復 Pi-TUIX shell |
+| `/pituix-default` | 恢復 Pi 預設 TUI 元件 |
+| `/pituix-about` | 顯示 package 與相容的 Pi 版本 |
+
+可在 Pi 的 `/settings` 中選擇內建的 `pi-tuix-dark` theme。
+
+## 運作方式
+
+```text
+Pi Coding Agent（runtime、provider、工具、工作階段、權限）
+                     |
+               public ExtensionAPI
+                     |
+                 Pi-TUIX shell
+             （header、footer、狀態、theme）
+```
+
+元件只負責渲染狀態。lifecycle handler 將 Pi event 轉換為小型 UI state update，不會在渲染過程中呼叫 provider 或執行 shell command。規劃中的 tool renderer 也會把執行原樣委派給 Pi，只取代顯示方式。
+
+## 路線圖
+
+1. **Shell（目前）:** header、footer、終端標題、theme 與 working state。
+2. **工具介面:** 緊湊的 Read/Bash/Edit/Write row、摺疊輸出與 diff 摘要。
+3. **串流介面:** thinking label、進度、token/context 狀態與穩定刷新。
+4. **控制介面:** approval dialog、plan review、steering queue 與鍵盤操作。
+5. **工作階段介面:** 在 Pi 提供可靠公開 event 的範圍內呈現 context、resume reference 與 subagent 狀態。
+
+詳細資訊請參閱 [產品背景](docs/product-context.md)、[產品定位](docs/positioning.md) 與 [架構](docs/architecture.md)。
+
+## 相容性約定
+
+- Pi Coding Agent `>=0.84.0`。
+- `@earendil-works/pi-tui` `>=0.84.0` 為 peer dependency。
+- model call、tool execution、session、permission、credential 與 persistence 由 Pi 管理。
+- 僅使用文件化的公開 extension contract，不 patch 或 vendor 私有模組。
+- 停用或移除時不必遷移 Pi session 或 project file。
+- 不包含 Claude Code source、private protocol、branding 或 proprietary asset。
+
+## 文件
+
+- [產品背景](docs/product-context.md)
+- [產品定位](docs/positioning.md)
+- [架構](docs/architecture.md)
+- [文件規則](docs/README.md)
+- [貢獻指南](CONTRIBUTING.md)
+- [安全政策](SECURITY.md)
+
+## 參與貢獻
+
+歡迎範圍明確的 issue 與 PR。修改前請執行：
+
+```bash
+npm run check
+npm run test
+npm run pack:check
+```
+
+UI 修改應在窄螢幕與一般寬度下檢查 idle、running、success、error、cancellation 狀態。tool renderer 修改必須證明 Pi 原有的執行、取消、錯誤與權限行為保持不變。
+
+## 授權條款
+
+Pi-TUIX 採用 [MIT License](LICENSE)。

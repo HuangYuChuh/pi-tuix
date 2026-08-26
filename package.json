@@ -1,7 +1,7 @@
 {
   "name": "pi-tuix",
   "version": "0.1.0",
-  "description": "A Claude Code-inspired TUI extension for Pi Coding Agent.",
+  "description": "Open source terminal UI extension for Pi Coding Agent with a clearer Claude Code-inspired workflow.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -15,16 +15,26 @@
   "files": [
     "extensions/",
     "themes/",
-    "README.md",
+    "README*.md",
+    "llms.txt",
     "LICENSE"
   ],
   "keywords": [
-    "pi-package",
+    "pi-tuix",
     "pi-coding-agent",
+    "pi-extension",
     "pi-tui",
+    "terminal-ui",
     "tui",
     "terminal",
-    "claude-code"
+    "coding-agent",
+    "developer-tools",
+    "open-source",
+    "claude-code-alternative",
+    "command-line",
+    "typescript",
+    "nodejs",
+    "ai-coding"
   ],
   "pi": {
     "extensions": ["./extensions"],

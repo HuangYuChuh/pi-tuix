@@ -1,0 +1,33 @@
+# Pi-TUIX
+> Open-source terminal UI extension for Pi Coding Agent with a clearer, denser workflow for long coding sessions.
+
+Pi-TUIX is a presentation layer. Pi continues to own model requests, built-in tool execution, sessions, permissions, credentials, and provider integrations.
+
+## Quick Start
+- [README](README.md): Overview, local prototype setup, commands, compatibility, and roadmap
+- [Product context](docs/product-context.md): User problem, MVP workflow, success criteria, and non-goals
+- [Architecture](docs/architecture.md): Public ExtensionAPI boundary and event-to-view rules
+- [Positioning](docs/positioning.md): Product ownership and design principles
+
+## Current Features
+- Pi-TUIX header with model and workspace information
+- Footer with model, context usage, and working directory
+- Working indicator for active turns
+- `pituix`, `pituix-default`, and `pituix-about` commands
+- Bundled `pi-tuix-dark` theme
+
+## Planned Features
+- Compact Read, Bash, Edit, and Write tool rows
+- Folded tool output and diff summaries
+- Thinking, progress, token/context, approval, plan, queue, and session surfaces
+
+## Compatibility
+- Pi Coding Agent `>=0.84.0`
+- `@earendil-works/pi-tui` `>=0.84.0` as a peer dependency
+- Node.js `>=22.19.0` for local development
+
+## Links
+- [GitHub repository](https://github.com/HuangYuChuh/pi-tuix)
+- [Issues](https://github.com/HuangYuChuh/pi-tuix/issues)
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
