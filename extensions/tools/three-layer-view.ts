@@ -53,11 +53,13 @@ export class ThreeLayerToolView implements Component {
 
     // === Preview 模式：前2 + 后2 ===
     if (this.mode === "preview") {
-      const head = this.details.slice(0, 2);
-      const tail = this.details.slice(-2);
-      const hidden = this.details.length - 4;
+      const visibleLines =
+        this.details.length <= 4
+          ? this.details
+          : [...this.details.slice(0, 2), ...this.details.slice(-2)];
+      const hidden = Math.max(0, this.details.length - visibleLines.length);
 
-      head.forEach((line) => {
+      visibleLines.slice(0, 2).forEach((line) => {
         lines.push(truncateToWidth(`  ${line}`, safeWidth));
       });
 
@@ -69,7 +71,7 @@ export class ThreeLayerToolView implements Component {
         lines.push(truncateToWidth(hiddenLine, safeWidth));
       }
 
-      tail.forEach((line) => {
+      visibleLines.slice(2).forEach((line) => {
         lines.push(truncateToWidth(`  ${line}`, safeWidth));
       });
 

@@ -52,6 +52,7 @@ function cleanSingleLine(value: unknown, fallback: string): string {
 }
 
 function splitLines(value: string): string[] {
+  if (!value) return [];
   return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
 }
 
