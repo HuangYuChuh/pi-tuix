@@ -97,3 +97,14 @@ Tool renderer changes also require a test confirming that execution is still del
 ## Scope decisions
 
 Read `docs/product-context.md`, `docs/positioning.md`, and `docs/architecture.md` before changing product boundaries or introducing a new runtime dependency. Update those documents when a decision changes the ownership model, MVP scope, or compatibility contract.
+
+## Engineering standards
+
+- Use Biome for formatting and linting; do not introduce a parallel ESLint or Prettier configuration.
+- Before committing code, run `npm run check` and `npm test`. Run `npm run pack:check` when package contents or release behavior changes.
+- Add or update regression tests for behavior changes. Do not lower coverage thresholds merely to make a check pass.
+- Use Conventional Commits in the form `<type>(<scope>): <subject>`. Common types are `feat`, `fix`, `refactor`, `test`, `docs`, and `chore`.
+- During MVP validation, keep development on the `0.1.x` line and do not bump the package version for ordinary development commits. A version bump must represent an intentional release candidate approved by the user.
+- Do not advance to a new minor version merely because work accumulated. Require a meaningful, documented product milestone and explicit user approval.
+
+For detailed commands, coverage information, and release procedures, see `docs/engineering.md` and `CHANGELOG.md`.
