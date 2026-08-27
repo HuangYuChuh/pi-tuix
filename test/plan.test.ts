@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { stripTerminalSequences, visibleWidth, type TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { createPlanRuntime, extractPlan, PlanWidget, updatePlan } from "../extensions/control/plan.ts";
+import { stripTerminalSequences, type TUI, visibleWidth } from "@earendil-works/pi-tui";
+import {
+  createPlanRuntime,
+  extractPlan,
+  PlanWidget,
+  updatePlan,
+} from "../extensions/control/plan.ts";
 
 const theme = {
   bold: (text: string) => text,
@@ -14,10 +19,13 @@ test("extractPlan recognizes English and Chinese numbered plans", () => {
     { text: "Inspect API", completed: false },
     { text: "Add tests", completed: false },
   ]);
-  assert.deepEqual(extractPlan("\u8ba1\u5212\uff1a\n1. \u68c0\u67e5 API\n2. \u589e\u52a0\u6d4b\u8bd5"), [
-    { text: "\u68c0\u67e5 API", completed: false },
-    { text: "\u589e\u52a0\u6d4b\u8bd5", completed: false },
-  ]);
+  assert.deepEqual(
+    extractPlan("\u8ba1\u5212\uff1a\n1. \u68c0\u67e5 API\n2. \u589e\u52a0\u6d4b\u8bd5"),
+    [
+      { text: "\u68c0\u67e5 API", completed: false },
+      { text: "\u589e\u52a0\u6d4b\u8bd5", completed: false },
+    ],
+  );
 });
 
 test("plan updates completion tags without replacing existing steps", () => {

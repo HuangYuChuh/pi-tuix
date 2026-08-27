@@ -28,5 +28,5 @@ test("expanded detail lines are ANSI-aware and width constrained", () => {
   const lines = view.render(32);
   assert.equal(lines.length, 2);
   assert.ok(lines.every((line) => visibleWidth(line) <= 32));
-  assert.match(stripTerminalSequences(lines[1] ?? ""), /^  this is a long error/);
+  assert.match(stripTerminalSequences(lines[1] ?? ""), /^ {2}this is a long error/);
 });

@@ -15,12 +15,19 @@ import {
   type ToolRenderResultOptions,
   type WriteToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { CompactToolView } from "./compact-view.ts";
-
-type ToolState = "QUEUED" | "RUNNING" | "OK" | "ERROR" | "CANCELLED";
+import {
+  type DisplayMode,
+  diffStats,
+  extractErrorSummary,
+  ThreeLayerToolView,
+  type ToolStatus,
+  type ToolSummary,
+  truncatePath,
+} from "./three-layer-view.ts";
 
 export interface ToolRendererMode {
   enabled: boolean;
+  defaultMode: DisplayMode; // collapsed | preview | expanded
 }
 
 type ReadDefinition = ReturnType<typeof createReadToolDefinition>;
@@ -28,8 +35,10 @@ type BashDefinition = ReturnType<typeof createBashToolDefinition>;
 type EditDefinition = ReturnType<typeof createEditToolDefinition>;
 type WriteDefinition = ReturnType<typeof createWriteToolDefinition>;
 
+// ===== 辅助函数 =====
+
 function contextForOriginal<T extends { lastComponent: unknown }>(context: T): T {
-  if (!(context.lastComponent instanceof CompactToolView)) return context;
+  if (!(context.lastComponent instanceof ThreeLayerToolView)) return context;
   return { ...context, lastComponent: undefined };
 }
 
@@ -68,55 +77,13 @@ function resultState(
   options: ToolRenderResultOptions,
   context: { isError: boolean },
   output: string,
-): ToolState {
+): ToolStatus {
   if (options.isPartial) return "RUNNING";
   if (!context.isError) return "OK";
   return isCancellation(output) ? "CANCELLED" : "ERROR";
 }
 
-function stateStyle(theme: Theme, state: ToolState, text: string): string {
-  if (state === "OK") return theme.fg("success", text);
-  if (state === "ERROR") return theme.fg("error", text);
-  if (state === "CANCELLED") return theme.fg("warning", text);
-  return theme.fg("warning", text);
-}
-
-function createView(
-  theme: Theme,
-  action: string,
-  target: string,
-  state: ToolState,
-  meta?: string,
-  details: string[] = [],
-): CompactToolView {
-  const actionText = theme.fg("toolTitle", theme.bold(action.toUpperCase()));
-  const targetText = theme.fg("accent", `${target}${meta ? ` | ${meta}` : ""}`);
-  const attention = state === "ERROR" ? "ATTENTION" : "CLEAR";
-  const stateText = stateStyle(theme, state, `[${state}]`);
-  const attentionText =
-    state === "ERROR" ? theme.fg("error", attention) : theme.fg("dim", attention);
-  return new CompactToolView(
-    { action: actionText, target: targetText, suffix: `${stateText} ${attentionText}` },
-    details,
-  );
-}
-
-function outputDetails(output: string, theme: Theme): string[] {
-  if (!output) return [];
-  return splitLines(output).map((line) => theme.fg("toolOutput", line));
-}
-
-function errorSummary(output: string): string {
-  const lines = splitLines(output)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const commandStatus = [...lines]
-    .reverse()
-    .find((line) => /^Command (?:exited|aborted|timed out)/i.test(line));
-  return cleanSingleLine(commandStatus ?? lines[0], "failed");
-}
-
-function callState(context: { executionStarted: boolean }): ToolState {
+function callState(context: { executionStarted: boolean }): ToolStatus {
   return context.executionStarted ? "RUNNING" : "QUEUED";
 }
 
@@ -125,17 +92,11 @@ function readLineCount(output: string): number {
   return splitLines(output).length;
 }
 
-function diffStats(diff: string): { additions: number; removals: number } {
-  let additions = 0;
-  let removals = 0;
-  for (const line of splitLines(diff)) {
-    if (line.startsWith("+") && !line.startsWith("+++")) additions += 1;
-    if (line.startsWith("-") && !line.startsWith("---")) removals += 1;
-  }
-  return { additions, removals };
+function formatLines(lines: string[], theme: Theme): string[] {
+  return lines.map((line) => theme.fg("toolOutput", line));
 }
 
-function diffDetails(diff: string, theme: Theme): string[] {
+function formatDiff(diff: string, theme: Theme): string[] {
   return splitLines(diff).map((line) => {
     if (line.startsWith("+") && !line.startsWith("+++")) return theme.fg("success", line);
     if (line.startsWith("-") && !line.startsWith("---")) return theme.fg("error", line);
@@ -143,7 +104,9 @@ function diffDetails(diff: string, theme: Theme): string[] {
   });
 }
 
-export function createCompactReadDefinition(
+// ===== READ 工具渲染器（三层版本）=====
+
+export function createThreeLayerReadDefinition(
   cwd: string,
   mode: ToolRendererMode,
   original: ReadDefinition = createReadToolDefinition(cwd),
@@ -151,47 +114,69 @@ export function createCompactReadDefinition(
   return {
     ...original,
     renderCall(args: ReadToolInput, theme, context) {
-      if (!mode.enabled && original.renderCall)
+      if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
+      }
+
       const range =
         args.offset || args.limit
           ? `lines ${args.offset ?? 1}-${args.limit ? (args.offset ?? 1) + args.limit - 1 : "end"}`
           : undefined;
-      return createView(
-        theme,
-        "read",
-        cleanSingleLine(args.path, "(path pending)"),
-        callState(context),
-        range,
-      );
+
+      const summary: ToolSummary = {
+        action: "read",
+        target: truncatePath(cleanSingleLine(args.path, "(path pending)"), 56),
+        status: callState(context),
+        meta: range,
+        attention: false,
+      };
+
+      return new ThreeLayerToolView("collapsed", summary, [], theme);
     },
+
     renderResult(result, options, theme, context) {
       if (!mode.enabled && original.renderResult) {
         return original.renderResult(result, options, theme, contextForOriginal(context));
       }
+
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const details = result.details as ReadToolDetails | undefined;
+      const args = context.args as ReadToolInput;
+
+      // 计算元信息
       let meta = hasImage(result) ? "image" : `${readLineCount(output)} lines`;
       if (details?.truncation?.truncated) {
         const shown = details.truncation.outputLines ?? readLineCount(output);
         const total = details.truncation.totalLines;
         meta = total ? `truncated ${shown}/${total} lines` : `truncated ${shown} lines`;
       }
-      if (context.isError) meta = errorSummary(output);
-      return createView(
-        theme,
-        "read",
-        cleanSingleLine((context.args as ReadToolInput).path, "(unknown path)"),
-        state,
+      if (context.isError) {
+        meta = extractErrorSummary(output);
+      }
+
+      const summary: ToolSummary = {
+        action: "read",
+        target: truncatePath(cleanSingleLine(args.path, "(unknown path)"), 56),
+        status: state,
         meta,
-        options.expanded ? outputDetails(output, theme) : [],
-      );
+        attention: context.isError,
+      };
+
+      // 决定显示模式
+      const displayMode: DisplayMode = options.expanded ? "expanded" : mode.defaultMode;
+
+      // 准备详情行
+      const detailLines = formatLines(splitLines(output), theme);
+
+      return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
     },
   };
 }
 
-export function createCompactBashDefinition(
+// ===== BASH 工具渲染器（三层版本）=====
+
+export function createThreeLayerBashDefinition(
   cwd: string,
   mode: ToolRendererMode,
   original: BashDefinition = createBashToolDefinition(cwd),
@@ -199,41 +184,56 @@ export function createCompactBashDefinition(
   return {
     ...original,
     renderCall(args: BashToolInput, theme, context) {
-      if (!mode.enabled && original.renderCall)
+      if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
+      }
+
       const meta = args.timeout ? `timeout ${args.timeout}s` : undefined;
-      return createView(
-        theme,
-        "bash",
-        cleanSingleLine(args.command, "(command pending)"),
-        callState(context),
+      const summary: ToolSummary = {
+        action: "bash",
+        target: cleanSingleLine(args.command, "(command pending)"),
+        status: callState(context),
         meta,
-      );
+        attention: false,
+      };
+
+      return new ThreeLayerToolView("collapsed", summary, [], theme);
     },
+
     renderResult(result, options, theme, context) {
       if (!mode.enabled && original.renderResult) {
         return original.renderResult(result, options, theme, contextForOriginal(context));
       }
+
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const details = result.details as BashToolDetails | undefined;
+      const args = context.args as BashToolInput;
+
       let meta = context.isError
-        ? errorSummary(output)
+        ? extractErrorSummary(output)
         : `${splitLines(output).filter((line) => line.trim()).length} output lines`;
       if (details?.truncation?.truncated) meta += " | truncated";
-      return createView(
-        theme,
-        "bash",
-        cleanSingleLine((context.args as BashToolInput).command, "(unknown command)"),
-        state,
+
+      const summary: ToolSummary = {
+        action: "bash",
+        target: cleanSingleLine(args.command, "(unknown command)"),
+        status: state,
         meta,
-        options.expanded ? outputDetails(output, theme) : [],
-      );
+        attention: context.isError,
+      };
+
+      const displayMode: DisplayMode = options.expanded ? "expanded" : mode.defaultMode;
+      const detailLines = formatLines(splitLines(output), theme);
+
+      return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
     },
   };
 }
 
-export function createCompactEditDefinition(
+// ===== EDIT 工具渲染器（三层版本）=====
+
+export function createThreeLayerEditDefinition(
   cwd: string,
   mode: ToolRendererMode,
   original: EditDefinition = createEditToolDefinition(cwd),
@@ -241,47 +241,64 @@ export function createCompactEditDefinition(
   return {
     ...original,
     renderCall(args: EditToolInput, theme, context) {
-      if (!mode.enabled && original.renderCall)
+      if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
+      }
+
       const count = Array.isArray(args.edits) ? args.edits.length : 0;
-      return createView(
-        theme,
-        "edit",
-        cleanSingleLine(args.path, "(path pending)"),
-        callState(context),
-        `${count} replacement${count === 1 ? "" : "s"}`,
-      );
+      const summary: ToolSummary = {
+        action: "edit",
+        target: truncatePath(cleanSingleLine(args.path, "(path pending)"), 56),
+        status: callState(context),
+        meta: `${count} replacement${count === 1 ? "" : "s"}`,
+        attention: false,
+      };
+
+      return new ThreeLayerToolView("collapsed", summary, [], theme);
     },
+
     renderResult(result, options, theme, context) {
       if (!mode.enabled && original.renderResult) {
         return original.renderResult(result, options, theme, contextForOriginal(context));
       }
+
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const details = result.details as EditToolDetails | undefined;
+      const args = context.args as EditToolInput;
+
       const stats = details?.diff ? diffStats(details.diff) : undefined;
       const meta = context.isError
-        ? errorSummary(output)
+        ? extractErrorSummary(output)
         : stats
           ? `+${stats.additions} -${stats.removals}`
           : "applied";
-      return createView(
-        theme,
-        "edit",
-        cleanSingleLine((context.args as EditToolInput).path, "(unknown path)"),
-        state,
+
+      const summary: ToolSummary = {
+        action: "edit",
+        target: truncatePath(cleanSingleLine(args.path, "(unknown path)"), 56),
+        status: state,
         meta,
-        options.expanded && details?.diff
-          ? diffDetails(details.diff, theme)
-          : options.expanded && context.isError
-            ? outputDetails(output, theme)
-            : [],
-      );
+        attention: context.isError,
+      };
+
+      const displayMode: DisplayMode = options.expanded ? "expanded" : mode.defaultMode;
+
+      // 详情：优先显示 diff，否则显示错误输出
+      const detailLines = details?.diff
+        ? formatDiff(details.diff, theme)
+        : context.isError
+          ? formatLines(splitLines(output), theme)
+          : [];
+
+      return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
     },
   };
 }
 
-export function createCompactWriteDefinition(
+// ===== WRITE 工具渲染器（三层版本）=====
+
+export function createThreeLayerWriteDefinition(
   cwd: string,
   mode: ToolRendererMode,
   original: WriteDefinition = createWriteToolDefinition(cwd),
@@ -289,47 +306,64 @@ export function createCompactWriteDefinition(
   return {
     ...original,
     renderCall(args: WriteToolInput, theme, context) {
-      if (!mode.enabled && original.renderCall)
+      if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
+      }
+
       const content = typeof args.content === "string" ? args.content : "";
-      return createView(
-        theme,
-        "write",
-        cleanSingleLine(args.path, "(path pending)"),
-        callState(context),
-        `${readLineCount(content)} lines`,
-        context.expanded ? outputDetails(content, theme) : [],
-      );
+      const summary: ToolSummary = {
+        action: "write",
+        target: truncatePath(cleanSingleLine(args.path, "(path pending)"), 56),
+        status: callState(context),
+        meta: `${readLineCount(content)} lines`,
+        attention: false,
+      };
+
+      // Write 工具在 call 阶段可以 preview 内容
+      const displayMode: DisplayMode = context.expanded ? "preview" : "collapsed";
+      const detailLines = formatLines(splitLines(content), theme);
+
+      return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
     },
+
     renderResult(result, options, theme, context) {
       if (!mode.enabled && original.renderResult) {
         return original.renderResult(result, options, theme, contextForOriginal(context));
       }
+
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const args = context.args as WriteToolInput;
+
       const meta = context.isError
-        ? errorSummary(output)
+        ? extractErrorSummary(output)
         : `${readLineCount(args.content)} lines written`;
-      return createView(
-        theme,
-        "write",
-        cleanSingleLine(args.path, "(unknown path)"),
-        state,
+
+      const summary: ToolSummary = {
+        action: "write",
+        target: truncatePath(cleanSingleLine(args.path, "(unknown path)"), 56),
+        status: state,
         meta,
-        options.expanded && context.isError ? outputDetails(output, theme) : [],
-      );
+        attention: context.isError,
+      };
+
+      const displayMode: DisplayMode = options.expanded ? "expanded" : "collapsed";
+      const detailLines = context.isError ? formatLines(splitLines(output), theme) : [];
+
+      return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
     },
   };
 }
 
-export function registerCompactToolRenderers(
+// ===== 注册函数 =====
+
+export function registerThreeLayerToolRenderers(
   pi: ExtensionAPI,
   mode: ToolRendererMode,
   cwd: string = process.cwd(),
 ): void {
-  pi.registerTool(createCompactReadDefinition(cwd, mode));
-  pi.registerTool(createCompactBashDefinition(cwd, mode));
-  pi.registerTool(createCompactEditDefinition(cwd, mode));
-  pi.registerTool(createCompactWriteDefinition(cwd, mode));
+  pi.registerTool(createThreeLayerReadDefinition(cwd, mode));
+  pi.registerTool(createThreeLayerBashDefinition(cwd, mode));
+  pi.registerTool(createThreeLayerEditDefinition(cwd, mode));
+  pi.registerTool(createThreeLayerWriteDefinition(cwd, mode));
 }

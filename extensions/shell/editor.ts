@@ -1,10 +1,10 @@
 import { CustomEditor, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import {
+  type EditorTheme,
   stripTerminalSequences,
+  type TUI,
   truncateToWidth,
   visibleWidth,
-  type EditorTheme,
-  type TUI,
 } from "@earendil-works/pi-tui";
 
 export interface EditorChromeRuntime {
@@ -56,7 +56,12 @@ function scrollLabel(line: string): string | undefined {
 export class PiTuixEditor extends CustomEditor {
   private runtime: EditorChromeRuntime;
 
-  constructor(tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager, runtime: EditorChromeRuntime) {
+  constructor(
+    tui: TUI,
+    theme: EditorTheme,
+    keybindings: KeybindingsManager,
+    runtime: EditorChromeRuntime,
+  ) {
     super(tui, theme, keybindings);
     this.runtime = runtime;
   }

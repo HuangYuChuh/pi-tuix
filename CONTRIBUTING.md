@@ -20,10 +20,18 @@ Pi-TUIX requires Node.js 22.19 or newer and a compatible Pi Coding Agent install
 
 ```bash
 npm install
-npm run check
-npm run test
+npm run check     # typecheck + lint
+npm run test      # test suite
 npm run pack:check
 ```
+
+### Code quality tools
+
+- **Biome**: formatter and linter (`npm run lint`, `npm run format`)
+- **TypeScript**: type checking (`npm run typecheck`)
+- **Tests**: Node.js native test runner
+
+See [docs/engineering.md](docs/engineering.md) for detailed workflow and CI/CD information.
 
 Install the working tree as the persistent development package with:
 

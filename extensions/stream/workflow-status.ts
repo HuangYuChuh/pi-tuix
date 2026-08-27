@@ -103,7 +103,10 @@ export function formatWorkflowStatus(runtime: WorkflowRuntime, theme: Theme, wid
   const turn = runtime.turn > 0 ? ` | TURN ${runtime.turn}` : "";
   const queue = runtime.queuedMessages > 0 ? ` | QUEUED ${runtime.queuedMessages}` : "";
   const failed = runtime.failedTools > 0 ? ` | FAILED ${runtime.failedTools}` : "";
-  return truncateToWidth(`${phaseText(theme, runtime.phase)}${activity}${turn} | TOOLS ${runtime.completedTools}${failed}${queue}`, Math.max(1, width));
+  return truncateToWidth(
+    `${phaseText(theme, runtime.phase)}${activity}${turn} | TOOLS ${runtime.completedTools}${failed}${queue}`,
+    Math.max(1, width),
+  );
 }
 
 export function formatContextPressure(percent: number | null, theme: Theme): string {

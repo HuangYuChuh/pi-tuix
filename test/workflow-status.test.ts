@@ -9,18 +9,21 @@ import {
   formatContextPressure,
   formatWorkflowStatus,
   queueMessage,
-  settleAgent,
   setStreamActivity,
-  startTurn,
+  settleAgent,
   startTool,
+  startTurn,
 } from "../extensions/stream/workflow-status.ts";
 
+// biome-ignore lint/suspicious/noExplicitAny: Test mock type
 const theme = { fg: (_color: string, text: string) => text } as any;
 
 test("workflow runtime tracks a run and failed tools", () => {
   const runtime = createWorkflowRuntime();
   let renders = 0;
-  runtime.requestRender = () => { renders += 1; };
+  runtime.requestRender = () => {
+    renders += 1;
+  };
   queueMessage(runtime);
   beginAgentRun(runtime);
   startTool(runtime, "Bash");
@@ -32,7 +35,10 @@ test("workflow runtime tracks a run and failed tools", () => {
   assert.equal(runtime.failedTools, 1);
   assert.equal(runtime.queuedMessages, 0);
   assert.ok(renders >= 4);
-  assert.match(stripTerminalSequences(formatWorkflowStatus(runtime, theme)), /ERROR.*TOOLS 1.*FAILED 1/);
+  assert.match(
+    stripTerminalSequences(formatWorkflowStatus(runtime, theme)),
+    /ERROR.*TOOLS 1.*FAILED 1/,
+  );
 });
 
 test("workflow status exposes current tool and queue within a narrow width", () => {

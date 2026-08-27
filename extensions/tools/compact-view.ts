@@ -1,4 +1,4 @@
-import { truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
+import { type Component, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 export interface CompactSummary {
   action: string;

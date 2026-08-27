@@ -37,11 +37,19 @@
     "ai-coding"
   ],
   "pi": {
-    "extensions": ["./extensions"],
-    "themes": ["./themes"]
+    "extensions": [
+      "./extensions"
+    ],
+    "themes": [
+      "./themes"
+    ]
   },
   "scripts": {
-    "check": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
     "test": "node --test test/**/*.test.ts",
     "pack:check": "npm pack --dry-run --ignore-scripts",
     "release:check": "node scripts/release-check.mjs"
@@ -57,6 +65,7 @@
     "@earendil-works/pi-tui": ">=0.84.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.10",
     "@earendil-works/pi-coding-agent": "0.84.1",
     "@earendil-works/pi-tui": "0.84.1",
     "@types/node": "^22.0.0",

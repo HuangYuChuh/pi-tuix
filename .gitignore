@@ -28,3 +28,10 @@ research/
 notes/
 *.internal.md
 *.private.md
+
+# Design research and reference analysis (not for public repo)
+docs/codewhale-analysis.md
+docs/claude-code-reverse-engineering.md
+docs/vision.md
+docs/tui-improvement-roadmap.md
+assets/screenshots/

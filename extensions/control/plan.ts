@@ -1,5 +1,5 @@
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
+import { type Component, type TUI, truncateToWidth } from "@earendil-works/pi-tui";
 
 const PLAN_WIDGET_KEY = "pituix-plan";
 const MAX_PLAN_ITEMS = 12;
@@ -34,7 +34,12 @@ export function messageText(message: unknown): string {
   if (!Array.isArray(content)) return "";
   return content
     .filter((part): part is { type: "text"; text: string } =>
-      Boolean(part && typeof part === "object" && (part as { type?: unknown }).type === "text" && typeof (part as { text?: unknown }).text === "string"),
+      Boolean(
+        part &&
+          typeof part === "object" &&
+          (part as { type?: unknown }).type === "text" &&
+          typeof (part as { text?: unknown }).text === "string",
+      ),
     )
     .map((part) => part.text)
     .join("\n");
@@ -42,7 +47,8 @@ export function messageText(message: unknown): string {
 
 export function extractPlan(text: string): PlanItem[] {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
-  const header = /^(?:#{1,6}\s*)?(?:\*\*)?(?:implementation\s+plan|plan|\u5b9e\u65bd\u8ba1\u5212|\u8ba1\u5212|\u5be6\u65bd\u8a08\u756b|\u8a08\u756b)(?:\*\*)?\s*[:\uff1a]?\s*$/i;
+  const header =
+    /^(?:#{1,6}\s*)?(?:\*\*)?(?:implementation\s+plan|plan|\u5b9e\u65bd\u8ba1\u5212|\u8ba1\u5212|\u5be6\u65bd\u8a08\u756b|\u8a08\u756b)(?:\*\*)?\s*[:\uff1a]?\s*$/i;
   const headerIndex = lines.findIndex((line) => header.test(line.trim()));
   if (headerIndex < 0) return [];
 
@@ -104,11 +110,17 @@ export class PlanWidget implements Component {
   render(width: number): string[] {
     const safeWidth = Math.max(1, width);
     const complete = this.runtime.items.filter((item) => item.completed).length;
-    const header = this.theme.fg("accent", this.theme.bold(`PLAN ${complete}/${this.runtime.items.length}`));
+    const header = this.theme.fg(
+      "accent",
+      this.theme.bold(`PLAN ${complete}/${this.runtime.items.length}`),
+    );
     const lines = this.runtime.items.map((item, index) => {
       const marker = item.completed ? "[x]" : "[ ]";
       const color = item.completed ? "dim" : "muted";
-      return this.theme.fg(color, truncateToWidth(` ${marker} ${index + 1}. ${item.text}`, safeWidth));
+      return this.theme.fg(
+        color,
+        truncateToWidth(` ${marker} ${index + 1}. ${item.text}`, safeWidth),
+      );
     });
     return [truncateToWidth(header, safeWidth), ...lines];
   }

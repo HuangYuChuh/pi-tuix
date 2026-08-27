@@ -5,9 +5,7 @@ import process from "node:process";
 const args = process.argv.slice(2);
 
 if (args.includes("--help") || args.includes("-h")) {
-  console.log(
-    "Usage: npm run release:check -- --tag v<version> --channel <latest|beta|next>",
-  );
+  console.log("Usage: npm run release:check -- --tag v<version> --channel <latest|beta|next>");
   process.exit(0);
 }
 

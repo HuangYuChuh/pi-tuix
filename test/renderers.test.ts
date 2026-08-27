@@ -5,10 +5,10 @@ import {
   createWriteToolDefinition,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, type Component } from "@earendil-works/pi-tui";
+import { type Component, stripTerminalSequences } from "@earendil-works/pi-tui";
 import {
-  createCompactEditDefinition,
   createCompactBashDefinition,
+  createCompactEditDefinition,
   createCompactReadDefinition,
   createCompactWriteDefinition,
   type ToolRendererMode,
@@ -68,7 +68,11 @@ test("read call distinguishes queued from running", () => {
   const mode: ToolRendererMode = { enabled: true };
   const definition = createCompactReadDefinition("C:\\workspace", mode);
   const args = { path: "src/queued.ts" };
-  const queued = definition.renderCall?.(args, theme, renderContext(args, { executionStarted: false }));
+  const queued = definition.renderCall?.(
+    args,
+    theme,
+    renderContext(args, { executionStarted: false }),
+  );
 
   assert.ok(queued);
   assert.match(render(queued), /\[QUEUED\] CLEAR/);
@@ -80,7 +84,10 @@ test("bash renderer distinguishes errors and cancellations", () => {
   const args = { command: "npm run check" };
 
   const failed = definition.renderResult?.(
-    { content: [{ type: "text", text: "Type error\n\nCommand exited with code 2" }], details: undefined },
+    {
+      content: [{ type: "text", text: "Type error\n\nCommand exited with code 2" }],
+      details: undefined,
+    },
     { expanded: false, isPartial: false },
     theme,
     renderContext(args, { isError: true }),
@@ -91,7 +98,10 @@ test("bash renderer distinguishes errors and cancellations", () => {
   assert.equal(failed.render(100).length, 1);
 
   const failedExpanded = definition.renderResult?.(
-    { content: [{ type: "text", text: "Type error\n\nCommand exited with code 2" }], details: undefined },
+    {
+      content: [{ type: "text", text: "Type error\n\nCommand exited with code 2" }],
+      details: undefined,
+    },
     { expanded: true, isPartial: false },
     theme,
     renderContext(args, { expanded: true, isError: true }),
@@ -144,7 +154,10 @@ test("write renderer summarizes the target and written line count", () => {
   const definition = createCompactWriteDefinition("C:\\workspace", mode);
   const args = { path: "src/new.ts", content: "one\ntwo\nthree" };
   const result = definition.renderResult?.(
-    { content: [{ type: "text", text: "Successfully wrote 13 bytes to src/new.ts" }], details: undefined },
+    {
+      content: [{ type: "text", text: "Successfully wrote 13 bytes to src/new.ts" }],
+      details: undefined,
+    },
     { expanded: false, isPartial: false },
     theme,
     renderContext(args),
@@ -177,10 +190,17 @@ test("switching to default rendering discards an incompatible compact component"
   assert.ok(compact);
 
   mode.enabled = false;
-  const restored = definition.renderCall?.(args, theme, renderContext(args, { lastComponent: compact }));
+  const restored = definition.renderCall?.(
+    args,
+    theme,
+    renderContext(args, { lastComponent: compact }),
+  );
   assert.ok(restored);
   assert.notEqual(restored, compact);
-  assert.equal(render(restored), render(original.renderCall?.(args, theme, renderContext(args)) as Component));
+  assert.equal(
+    render(restored),
+    render(original.renderCall?.(args, theme, renderContext(args)) as Component),
+  );
 });
 
 test("compact definitions retain Pi's exact execution function", async () => {

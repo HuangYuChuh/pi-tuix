@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import {
-  stripTerminalSequences,
-  visibleWidth,
   type EditorTheme,
+  stripTerminalSequences,
   type TUI,
+  visibleWidth,
 } from "@earendil-works/pi-tui";
 import {
   createEditorChromeRuntime,
