@@ -35,3 +35,7 @@ docs/claude-code-reverse-engineering.md
 docs/vision.md
 docs/tui-improvement-roadmap.md
 assets/screenshots/
+
+# Test coverage
+coverage/
+.nyc_output/

@@ -17,7 +17,14 @@
 ### Testing
 - **Framework**: Node.js native test runner (`node --test`)
 - **Command**: `npm test`
+- **Coverage**: `npm run test:coverage` (generates HTML report in `coverage/`)
+- **Watch mode**: `npm run test:watch`
 - **Location**: `test/**/*.test.ts`
+
+**Current coverage baseline:**
+- Overall: ~63% statements
+- High coverage: `plan.ts` (98%), `editor.ts` (100%), `workflow-status.ts` (98%)
+- Needs improvement: `three-layer-view.ts` (20%), `renderers-v2.ts` (35%)
 
 ## CI/CD
 

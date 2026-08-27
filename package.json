@@ -51,6 +51,8 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "test": "node --test test/**/*.test.ts",
+    "test:coverage": "c8 --reporter=text --reporter=html --reporter=lcov npm test",
+    "test:watch": "node --test --watch test/**/*.test.ts",
     "pack:check": "npm pack --dry-run --ignore-scripts",
     "release:check": "node scripts/release-check.mjs"
   },
@@ -69,6 +71,7 @@
     "@earendil-works/pi-coding-agent": "0.84.1",
     "@earendil-works/pi-tui": "0.84.1",
     "@types/node": "^22.0.0",
+    "c8": "^12.0.0",
     "typescript": "^5.9.0"
   }
 }
