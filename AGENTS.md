@@ -107,4 +107,15 @@ Read `docs/product-context.md`, `docs/positioning.md`, and `docs/architecture.md
 - During MVP validation, keep development on the `0.1.x` line and do not bump the package version for ordinary development commits. A version bump must represent an intentional release candidate approved by the user.
 - Do not advance to a new minor version merely because work accumulated. Require a meaningful, documented product milestone and explicit user approval.
 
+### Development workflow
+
+- Do not push development changes directly to `main`.
+- Start each change from an up-to-date `main` branch using a short-lived `feat/*`, `fix/*`, `docs/*`, or `chore/*` branch.
+- Before opening a PR, run `npm run check` and `npm test`. Run `npm run pack:check` when package contents or release behavior changes.
+- Open a Pull Request targeting `main`; CI must pass before merging.
+- Address review feedback by pushing follow-up commits to the same PR branch.
+- Use Squash merge by default so each PR becomes one clear commit on `main`.
+- Delete the short-lived branch after merge.
+- Do not merge a PR or bypass required checks without the user's explicit approval.
+
 For detailed commands, coverage information, and release procedures, see `docs/engineering.md` and `CHANGELOG.md`.
