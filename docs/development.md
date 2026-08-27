@@ -39,7 +39,7 @@ Run `pi list` before diagnosing a version mismatch. The source determines the ch
 | Source | Channel | Updates |
 | --- | --- | --- |
 | `C:\path\to\pi-tuix` | Development | Follows the local working tree after Pi restarts |
-| `npm:pi-tuix@0.2.0-beta.1` | Prerelease | Pinned to the named npm version |
+| `npm:pi-tuix@0.1.1-beta.1` | Prerelease | Pinned to the named npm version |
 | `npm:pi-tuix@0.1.0` | Stable, pinned | Stays on that exact npm version |
 | `npm:pi-tuix` | Stable, current | Resolves through npm's `latest` dist-tag |
 

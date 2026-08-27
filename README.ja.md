@@ -49,9 +49,9 @@ pi install npm:pi-tuix
 
 インストール元の切り替えは[開発版ガイド](docs/development.md)、開発版・prerelease・stable の規則は[リリース手順](docs/releasing.md)を参照してください。
 
-## 現在のプロトタイプ
+## 0.1.0 stable release
 
-基盤リリースは Pi の公開 `ExtensionAPI` を通じて header、footer、terminal title、working indicator、editor chrome、およびコンパクトな Read/Bash/Edit/Write 表示を提供します。tool execution は変更せず Pi に委譲します。
+`0.1.0` は Pi の公開 `ExtensionAPI` を通じて header、footer、terminal title、working indicator、editor chrome、および三層の Read/Bash/Edit/Write 表示を提供します。tool execution は変更せず Pi に委譲します。既定は preview で、先頭2行と末尾2行を表示します。collapsed は要約のみ、expanded は全出力または diff を表示します。
 
 Editor border は `READY/WORKING`、入力行数、文字数を表示します。Pi の公開 `CustomEditor` を継承するため、submit、history、autocomplete、paste、app shortcut はそのまま維持されます。
 
@@ -61,6 +61,9 @@ Editor border は `READY/WORKING`、入力行数、文字数を表示します�
 | --- | --- |
 | `/pituix` | Pi-TUIX shell を有効化または復元 |
 | `/pituix-default` | Pi 標準 TUI component を復元 |
+| `/pituix-compact` | 従来の compact tool renderer を使用 |
+| `/pituix-three-layer` | 三層 tool renderer を使用 |
+| `/pituix-mode <collapsed\|preview\|expanded>` | tool detail mode を設定（既定は preview） |
 | `/pituix-about` | package と互換性のある Pi バージョンを表示 |
 | `/pituix-steer <message>` | 実行中のタスクへ即時に修正指示を送る |
 | `/pituix-followup <message>` | 現在の実行後に処理するメッセージをキューへ追加 |
@@ -87,7 +90,7 @@ stream line は Turn ごとに thinking、応答、tool 実行を区別します
 ## ロードマップ
 
 1. **Shell（現在）:** header、footer、terminal title、theme、working state、reversible editor chrome。
-2. **Tool surface（現在）:** コンパクトな Read/Bash/Edit/Write row、queued/running/success/error/cancelled 状態、展開可能な出力、diff summary。
+2. **Tool surface（現在）:** collapsed、preview、expanded に対応した Read/Bash/Edit/Write row、queued/running/success/error/cancelled 状態、展開可能な出力、diff summary。
 3. **Stream surface (現在):** thinking/responding/tool 状態、Turn 進捗、thinking level、context pressure。
 4. **Control surface (進行中):** steer/follow-up と読み取り専用 plan review を提供。approval と keyboard 操作は計画中。
 5. **Session surface:** Pi が信頼できる公開 event を提供する範囲で context、resume reference、subagent 状態を表示。

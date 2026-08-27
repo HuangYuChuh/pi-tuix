@@ -49,9 +49,9 @@ pi install npm:pi-tuix
 
 安裝來源切換請參閱[開發版使用手冊](docs/development.md)，開發版、預發佈版與正式版規則請參閱[發佈流程](docs/releasing.md)。
 
-## 目前原型
+## 0.1.0 穩定版
 
-基礎版本透過 Pi 的公開 `ExtensionAPI` 提供 header、footer、終端標題、working indicator、editor chrome，以及緊湊的 Read/Bash/Edit/Write 顯示。工具執行仍原樣委派給 Pi。
+`0.1.0` 透過 Pi 的公開 `ExtensionAPI` 提供 header、footer、終端標題、working indicator、editor chrome，以及三層 Read/Bash/Edit/Write 顯示。工具執行仍原樣委派給 Pi。預設 preview 顯示前兩行與後兩行；collapsed 只顯示摘要，expanded 顯示完整輸出或 diff。
 
 Editor border 會顯示 `READY/WORKING`、輸入行數與字元數。它繼承 Pi 公開的 `CustomEditor`，保留提交、歷史記錄、autocomplete、貼上處理與應用快捷鍵。
 
@@ -61,6 +61,9 @@ Editor border 會顯示 `READY/WORKING`、輸入行數與字元數。它繼承 P
 | --- | --- |
 | `/pituix` | 啟用或恢復 Pi-TUIX shell |
 | `/pituix-default` | 恢復 Pi 預設 TUI 元件 |
+| `/pituix-compact` | 使用原有 compact tool renderer |
+| `/pituix-three-layer` | 使用三層 tool renderer |
+| `/pituix-mode <collapsed\|preview\|expanded>` | 設定 tool detail mode，預設為 preview |
 | `/pituix-about` | 顯示 package 與相容的 Pi 版本 |
 | `/pituix-steer <訊息>` | 立即修正目前執行中的任務 |
 | `/pituix-followup <訊息>` | 排隊追加，等目前任務結束後執行 |
@@ -87,7 +90,7 @@ stream line 會按 Turn 區分 thinking、回覆與 tool 執行。Context 到 80
 ## 路線圖
 
 1. **Shell（目前）:** header、footer、終端標題、theme、working state 與可逆的 editor chrome。
-2. **工具介面（目前）:** 緊湊的 Read/Bash/Edit/Write row、queued/running/success/error/cancelled 狀態、可展開輸出與 diff 摘要。
+2. **工具介面（目前）:** 支援 collapsed、preview、expanded 的 Read/Bash/Edit/Write row、queued/running/success/error/cancelled 狀態、可展開輸出與 diff 摘要。
 3. **流式介面（目前）:** thinking/responding/tool 狀態、Turn 進度、thinking level 與 context 壓力。
 4. **控制介面（進行中）:** 已提供 steer/follow-up queue 指令與唯讀 plan review；approval 與鍵盤操作仍在規劃中。
 5. **工作階段介面:** 在 Pi 提供可靠公開 event 的範圍內呈現 context、resume reference 與 subagent 狀態。

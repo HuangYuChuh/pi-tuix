@@ -49,9 +49,9 @@ pi install npm:pi-tuix
 
 安装来源切换见[开发版使用手册](docs/development.md)，开发版、预发布版与正式版规则见[发版流程](docs/releasing.md)。
 
-## 当前原型
+## 0.1.0 稳定版
 
-基础版本通过 Pi 的公开 `ExtensionAPI` 提供 Pi-TUIX header、footer、终端标题、working indicator、editor chrome，以及紧凑的 Read/Bash/Edit/Write 展示。工具执行过程仍原样委托给 Pi。
+`0.1.0` 版本通过 Pi 的公开 `ExtensionAPI` 提供 Pi-TUIX header、footer、终端标题、working indicator、editor chrome，以及三层 Read/Bash/Edit/Write 展示。工具执行过程仍原样委托给 Pi。默认是 preview 模式：显示前两行和后两行；collapsed 只显示摘要，expanded 显示完整输出或 diff。
 
 Editor border 会显示 `READY/WORKING`、输入行数和字符数。它继承 Pi 公开的 `CustomEditor`，保留提交、历史记录、autocomplete、粘贴处理和应用快捷键。
 
@@ -63,6 +63,9 @@ Editor border 会显示 `READY/WORKING`、输入行数和字符数。它继承 P
 | --- | --- |
 | `/pituix` | 启用或恢复 Pi-TUIX shell |
 | `/pituix-default` | 恢复 Pi 默认 TUI 组件 |
+| `/pituix-compact` | 使用原有紧凑工具展示 |
+| `/pituix-three-layer` | 使用三层工具展示 |
+| `/pituix-mode <collapsed\|preview\|expanded>` | 设置工具详情模式，默认是 preview |
 | `/pituix-about` | 查看 package 与兼容的 Pi 版本 |
 | `/pituix-steer <消息>` | 立即纠偏当前执行中的任务 |
 | `/pituix-followup <消息>` | 排队追加，等当前任务结束后执行 |
@@ -91,7 +94,7 @@ Pi Coding Agent（runtime、provider、工具、会话、权限）
 ## 路线图
 
 1. **Shell（当前）：** header、footer、终端标题、主题、working state 与可逆的 editor chrome。
-2. **工具界面（当前）：** 紧凑的 Read/Bash/Edit/Write 行，明确区分 queued/running/success/error/cancelled，支持展开输出与 diff 摘要。
+2. **工具界面（当前）：** 支持 collapsed、preview、expanded 三种模式的 Read/Bash/Edit/Write 行，明确区分 queued/running/success/error/cancelled，并提供 diff 摘要。
 3. **流式界面（当前）：** thinking/responding/tool 状态、Turn 进度、thinking level、context 压力与稳定刷新。
 4. **控制界面（进行中）：** 已提供 steer/follow-up 队列命令和只读计划审阅；审批适配与键盘约定仍在规划中。
 5. **会话界面：** 在 Pi 提供可靠公开事件的前提下，展示 context、resume 引用与 subagent 状态。

@@ -49,9 +49,9 @@ Para instalarlo solo en un proyecto, usa `pi install -l npm:pi-tuix`.
 
 Consulta [la guia de desarrollo](docs/development.md) para cambiar la fuente instalada y [el proceso de lanzamiento](docs/releasing.md) para las reglas de los canales development, prerelease y stable.
 
-## Prototipo actual
+## Versión estable 0.1.0
 
-La versión base conecta la `ExtensionAPI` pública de Pi con un header, footer, título de terminal, working indicator, editor chrome y presentación compacta de Read/Bash/Edit/Write. La ejecución de las herramientas sigue delegada a Pi sin cambios.
+La versión `0.1.0` conecta la `ExtensionAPI` pública de Pi con un header, footer, título de terminal, working indicator, editor chrome y una presentación de tres niveles para Read/Bash/Edit/Write. La ejecución de las herramientas sigue delegada a Pi sin cambios. El modo preview predeterminado muestra las dos primeras y las dos últimas líneas; collapsed muestra solo el resumen y expanded muestra toda la salida o el diff.
 
 El borde del editor muestra `READY/WORKING`, líneas y caracteres del prompt. Extiende el `CustomEditor` público de Pi, por lo que conserva submission, history, autocomplete, paste y los app shortcuts registrados.
 
@@ -61,6 +61,9 @@ Cada tool row muestra explícitamente la acción, el objetivo, el estado y la se
 | --- | --- |
 | `/pituix` | Activar o restaurar el shell de Pi-TUIX |
 | `/pituix-default` | Restaurar los componentes TUI predeterminados de Pi |
+| `/pituix-compact` | Usar el renderer compacto original |
+| `/pituix-three-layer` | Usar el renderer de tres niveles |
+| `/pituix-mode <collapsed\|preview\|expanded>` | Elegir el modo de detalle; preview es el predeterminado |
 | `/pituix-about` | Mostrar el package y la versión compatible de Pi |
 | `/pituix-steer <mensaje>` | Enviar una corrección inmediata durante la ejecución |
 | `/pituix-followup <mensaje>` | Poner trabajo en cola para después de la ejecución actual |
@@ -87,7 +90,7 @@ La línea de stream distingue thinking, respuesta y ejecución de tools por turn
 ## Hoja de ruta
 
 1. **Shell (actual):** header, footer, título, theme, working state y editor chrome reversible.
-2. **Tool surface (actual):** filas compactas para Read/Bash/Edit/Write, estados queued/running/success/error/cancelled, salida expandible y resúmenes de diff.
+2. **Tool surface (actual):** filas Read/Bash/Edit/Write con modos collapsed, preview y expanded; estados queued/running/success/error/cancelled; salida expandible y resúmenes de diff.
 3. **Stream surface (actual):** estados thinking/responding/tool, progreso por turno, thinking level y presión de context.
 4. **Control surface (en progreso):** comandos steer/follow-up y revisión de plan de solo lectura disponibles; approval y teclado siguen planificados.
 5. **Session surface:** context, referencias de resume y estado de subagents cuando Pi exponga eventos públicos fiables.

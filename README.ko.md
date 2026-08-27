@@ -49,9 +49,9 @@ pi install npm:pi-tuix
 
 설치 소스 전환은 [개발 버전 가이드](docs/development.md), 개발·prerelease·stable 채널 규칙은 [릴리스 절차](docs/releasing.md)를 참조하세요.
 
-## 현재 프로토타입
+## 0.1.0 안정 릴리스
 
-기반 릴리스는 Pi의 공개 `ExtensionAPI`를 통해 header, footer, terminal title, working indicator, editor chrome 및 간결한 Read/Bash/Edit/Write 표시를 제공합니다. tool execution은 변경 없이 Pi에 위임합니다.
+`0.1.0`은 Pi의 공개 `ExtensionAPI`를 통해 header, footer, terminal title, working indicator, editor chrome 및 3단계 Read/Bash/Edit/Write 표시를 제공합니다. tool execution은 변경 없이 Pi에 위임합니다. 기본 preview는 앞 2줄과 뒤 2줄을 표시하며, collapsed는 요약만, expanded는 전체 출력 또는 diff를 표시합니다.
 
 Editor border는 `READY/WORKING`, 입력 줄 수 및 문자 수를 표시합니다. Pi의 공개 `CustomEditor`를 확장하므로 submit, history, autocomplete, paste 및 app shortcut 동작이 유지됩니다.
 
@@ -61,6 +61,9 @@ Editor border는 `READY/WORKING`, 입력 줄 수 및 문자 수를 표시합니�
 | --- | --- |
 | `/pituix` | Pi-TUIX shell 활성화 또는 복원 |
 | `/pituix-default` | Pi 기본 TUI component 복원 |
+| `/pituix-compact` | 기존 compact tool renderer 사용 |
+| `/pituix-three-layer` | 3단계 tool renderer 사용 |
+| `/pituix-mode <collapsed\|preview\|expanded>` | tool detail mode 설정, 기본값은 preview |
 | `/pituix-about` | package 및 호환 Pi 버전 표시 |
 | `/pituix-steer <message>` | 실행 중인 작업에 즉시 수정 지시 전송 |
 | `/pituix-followup <message>` | 현재 실행 후 처리할 메시지를 큐에 추가 |
@@ -87,7 +90,7 @@ stream line은 Turn별 thinking, 응답, tool 실행을 구분합니다. context
 ## 로드맵
 
 1. **Shell (현재):** header, footer, terminal title, theme, working state, reversible editor chrome.
-2. **Tool surface (현재):** 간결한 Read/Bash/Edit/Write row, queued/running/success/error/cancelled 상태, 펼칠 수 있는 출력 및 diff summary.
+2. **Tool surface (현재):** collapsed, preview, expanded 모드를 지원하는 Read/Bash/Edit/Write row, queued/running/success/error/cancelled 상태, 확장 가능한 출력 및 diff summary.
 3. **Stream surface (현재):** thinking/responding/tool 상태, Turn 진행, thinking level, context pressure.
 4. **Control surface (진행 중):** steer/follow-up과 읽기 전용 plan review를 제공하며 approval과 keyboard 규칙은 계획 중입니다.
 5. **Session surface:** Pi가 신뢰할 수 있는 공개 event를 제공하는 범위에서 context, resume reference, subagent 상태 표시.

@@ -8,7 +8,7 @@
 
 </div>
 
-> **Status:** early development. `pi-tuix` is not published to npm yet.
+> **Status:** `0.1.0` stable release.
 
 **Pi-TUIX** is an open-source terminal UI extension for the Pi Coding Agent. It adds a clearer, denser interface for long coding sessions while Pi continues to own model requests, built-in tools, sessions, permissions, and provider integrations.
 
@@ -48,11 +48,11 @@ See [Using the development version](docs/development.md) for installation-source
 
 ## Current Prototype
 
-The foundation release wires Pi's public `ExtensionAPI` to a Pi-TUIX header, footer, terminal title, working indicator, editor chrome, and compact Read/Bash/Edit/Write presentation. Tool execution remains delegated to Pi unchanged.
+The `0.1.0` release wires Pi's public `ExtensionAPI` to a Pi-TUIX header, footer, terminal title, working indicator, editor chrome, and three-layer Read/Bash/Edit/Write presentation. Tool execution remains delegated to Pi unchanged.
 
 The editor border shows `READY/WORKING` plus prompt line and character counts. It extends Pi's public `CustomEditor`, preserving submission, history, autocomplete, paste handling, and registered application shortcuts.
 
-Each compact tool row keeps the action, target, state, and attention signal visible. Read and Bash results summarize output size, Edit reports diff statistics, and Write reports the written line count. Expanded rows reveal output or diffs using ANSI-aware width constraints.
+Each tool row keeps the action, target, state, and attention signal visible. The default preview shows the first and last two detail lines; collapsed mode keeps only the summary, and expanded mode reveals the full output or diff. Read and Bash results summarize output size, Edit reports diff statistics, and Write reports the written line count. All views use ANSI-aware width constraints.
 
 These commands are reversible:
 
@@ -60,6 +60,9 @@ These commands are reversible:
 | --- | --- |
 | `/pituix` | Enable or restore the Pi-TUIX shell |
 | `/pituix-default` | Restore Pi's default TUI components |
+| `/pituix-compact` | Use the original compact tool renderer |
+| `/pituix-three-layer` | Use the three-layer tool renderer |
+| `/pituix-mode <collapsed\|preview\|expanded>` | Set the tool detail display mode; preview is the default |
 | `/pituix-about` | Show the package and compatible Pi version |
 | `/pituix-steer <message>` | Interrupt the current run with an immediate correction |
 | `/pituix-followup <message>` | Queue work to start after the current run |
@@ -88,7 +91,7 @@ The stream line distinguishes thinking, response text, and tool execution by tur
 ## Roadmap
 
 1. **Shell (current):** header, footer, terminal title, theme, working state, and reversible editor chrome.
-2. **Tool surface (current):** compact Read/Bash/Edit/Write rows, explicit queued/running/success/error/cancelled states, expandable output, and diff summaries.
+2. **Tool surface (current):** three-layer Read/Bash/Edit/Write rows with collapsed, preview, and expanded modes; explicit queued/running/success/error/cancelled states; and diff summaries.
 3. **Stream surface (current):** thinking/responding/tool activity, turn progress, thinking level, context pressure, and stable repainting.
 4. **Control surface (in progress):** steer/follow-up queue commands and read-only plan review are available; approval adapters and keyboard conventions remain planned.
 5. **Session surface:** context inspection, resume references, subagent state, and session surfaces where Pi exposes reliable public events.

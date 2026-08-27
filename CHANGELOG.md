@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.1.0] - 2026-08-27
+
+### Overview
+First stable release of Pi-TUIX, published to npm with the `latest` dist-tag.
+
 ### Added
 - Engineering infrastructure
   - Biome for code formatting and linting
@@ -50,17 +57,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Footer redraw callback properly detached on cleanup
 - npm checks run portably across platforms
 
-## [0.1.0] - TBD
-
-### Overview
-First development preview of Pi-TUIX. Not yet published to npm.
-
-**Status:** Early development, local installation only.
-
 ### Features
 - Claude Code-inspired terminal UI for Pi Coding Agent
 - Reversible installation through Pi's package system
-- Compact built-in tool rendering (Read/Bash/Edit/Write)
+- Three-layer built-in tool rendering (Read/Bash/Edit/Write) with collapsed, preview, and expanded modes
+- Original compact tool rendering remains available through `/pituix-compact`
 - Workflow state visibility and steering commands
 - Plan detection and progress tracking
 - Context pressure monitoring
@@ -71,12 +72,11 @@ First development preview of Pi-TUIX. Not yet published to npm.
 
 ### Installation
 ```bash
-pi install /absolute/path/to/pi-tuix --approve
+pi install npm:pi-tuix@0.1.0
 ```
 
 ### Known Limitations
-- Approval UI not yet implemented (waiting for Pi API support)
-- Local installation only (not published to npm)
+- Approval UI is not implemented because no supported public Pi API is available yet
 - Limited terminal emulator testing
 
 ---
@@ -85,7 +85,7 @@ pi install /absolute/path/to/pi-tuix --approve
 
 1. Update version in `package.json`
 2. Update `[Unreleased]` section in this file
-3. Run `npm run release:check -- --tag v<version> --channel <latest|beta>`
+3. Run `npm run release:check -- --tag v<version> --channel <latest|beta|next>`
 4. Commit: `git commit -am "chore(release): v<version>"`
 5. Tag: `git tag v<version>`
 6. Push: `git push && git push --tags`
