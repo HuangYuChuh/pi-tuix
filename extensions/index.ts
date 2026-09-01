@@ -7,6 +7,7 @@ import {
   syncPlanWidget,
   updatePlan,
 } from "./control/plan.ts";
+import { registerSessionTreeCommand } from "./session/session-tree.ts";
 import { createOpenTuiShellRuntime } from "./shell/open-tui/shell.ts";
 import {
   beginAgentRun,
@@ -63,6 +64,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   const shell = createOpenTuiShellRuntime(pi);
   const workflow = createWorkflowRuntime();
   const plan = createPlanRuntime();
+  registerSessionTreeCommand(pi);
 
   // 注册两套渲染器（可切换）
   registerCompactToolRenderers(pi, toolMode);

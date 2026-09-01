@@ -30,6 +30,7 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
 
   piTuix(pi);
   assert.ok(commands.has("pituix-settings"));
+  assert.ok(commands.has("pituix-session"));
   assert.ok(!commands.has("open-tui"));
 
   const editorFactories: unknown[] = [];
