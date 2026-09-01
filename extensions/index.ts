@@ -1,6 +1,5 @@
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { VERSION } from "@earendil-works/pi-coding-agent";
-import { type Component, type TUI, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
   clearPlan,
   createPlanRuntime,
@@ -8,27 +7,18 @@ import {
   syncPlanWidget,
   updatePlan,
 } from "./control/plan.ts";
-import {
-  createEditorChromeRuntime,
-  createPiTuixEditor,
-  detachEditorChrome,
-  type EditorChromeRuntime,
-  setEditorWorking,
-} from "./shell/editor.ts";
+import { createOpenTuiShellRuntime } from "./shell/open-tui/shell.ts";
 import {
   beginAgentRun,
   createWorkflowRuntime,
   finishAgentRun,
   finishTool,
-  formatContextPressure,
-  formatWorkflowStatus,
   queueMessage,
   refreshWorkflow,
   setStreamActivity,
   settleAgent,
   startTool,
   startTurn,
-  type WorkflowRuntime,
 } from "./stream/workflow-status.ts";
 import { registerCompactToolRenderers, type ToolRendererMode } from "./tools/renderers.ts";
 import {
@@ -39,76 +29,11 @@ import type { DisplayMode } from "./tools/three-layer-view.ts";
 
 const PACKAGE_NAME = "Pi-TUIX";
 
-function formatCwd(cwd: string): string {
-  const home = process.env.HOME ?? process.env.USERPROFILE;
-  if (home && cwd.startsWith(home)) return `~${cwd.slice(home.length)}`;
-  return cwd;
-}
-
-class PiTuixHeader implements Component {
-  private readonly ctx: ExtensionContext;
-
-  constructor(ctx: ExtensionContext) {
-    this.ctx = ctx;
-  }
-
-  render(width: number): string[] {
-    const theme = this.ctx.ui.theme;
-    const model = this.ctx.model ? `${this.ctx.model.provider}/${this.ctx.model.id}` : "no model";
-    const left = theme.fg("accent", `◈ ${PACKAGE_NAME}`);
-    const right = theme.fg("muted", `${model} · ${formatCwd(this.ctx.cwd)}`);
-    const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(right));
-    return [
-      truncateToWidth(`${left}${" ".repeat(gap)}${right}`, width),
-      theme.fg("dim", "  Claude Code-inspired interface for Pi"),
-    ];
-  }
-
-  invalidate(): void {}
-}
-
-class PiTuixFooter implements Component {
-  private readonly ctx: ExtensionContext;
-  private readonly workflow: WorkflowRuntime;
-  private readonly requestRender: () => void;
-
-  constructor(ctx: ExtensionContext, workflow: WorkflowRuntime, tui: TUI) {
-    this.ctx = ctx;
-    this.workflow = workflow;
-    this.requestRender = () => tui.requestRender();
-    workflow.requestRender = this.requestRender;
-  }
-
-  render(width: number): string[] {
-    const theme: Theme = this.ctx.ui.theme;
-    const usage = this.ctx.getContextUsage();
-    const model = theme.fg("muted", this.ctx.model?.id ?? "no-model");
-    const thinking = theme.fg("dim", `think ${this.ctx.thinkingLevel ?? "off"}`);
-    const context = formatContextPressure(usage?.percent ?? null, theme);
-    const left = `${model} · ${thinking} · ${context}`;
-    const right = theme.fg("dim", formatCwd(this.ctx.cwd));
-    const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(right));
-    return [
-      truncateToWidth(`${left}${" ".repeat(gap)}${right}`, width),
-      formatWorkflowStatus(this.workflow, theme, width),
-    ];
-  }
-
-  invalidate(): void {}
-
-  dispose(): void {
-    if (this.workflow.requestRender === this.requestRender) {
-      this.workflow.requestRender = undefined;
-    }
-  }
-}
-
 function applyPiTuix(
   ctx: ExtensionContext,
   toolMode: ToolRendererMode,
   threeLayerMode: ThreeLayerMode,
-  editorRuntime: EditorChromeRuntime,
-  workflow: WorkflowRuntime,
+  shell: ReturnType<typeof createOpenTuiShellRuntime>,
   plan: PlanRuntime,
   useThreeLayer: boolean = true,
 ): void {
@@ -122,19 +47,9 @@ function applyPiTuix(
     toolMode.enabled = true;
     threeLayerMode.enabled = false;
   }
-  setEditorWorking(editorRuntime, false);
   ctx.ui.setTitle(PACKAGE_NAME);
-  ctx.ui.setHeader(() => new PiTuixHeader(ctx));
-  ctx.ui.setFooter((tui) => new PiTuixFooter(ctx, workflow, tui));
+  shell.apply(ctx);
   syncPlanWidget(ctx, plan);
-  ctx.ui.setEditorComponent((tui, theme, keybindings) =>
-    createPiTuixEditor(tui, theme, keybindings, editorRuntime),
-  );
-  ctx.ui.setWorkingIndicator({
-    frames: ["◐", "◓", "◑", "◒"].map((frame) => ctx.ui.theme.fg("accent", frame)),
-    intervalMs: 120,
-  });
-  ctx.ui.setHiddenThinkingLabel("Thinking details hidden");
 }
 
 export default function piTuix(pi: ExtensionAPI): void {
@@ -145,7 +60,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     defaultMode: "preview" as DisplayMode, // collapsed | preview | expanded
   };
 
-  const editorRuntime = createEditorChromeRuntime();
+  const shell = createOpenTuiShellRuntime(pi);
   const workflow = createWorkflowRuntime();
   const plan = createPlanRuntime();
 
@@ -154,19 +69,24 @@ export default function piTuix(pi: ExtensionAPI): void {
   registerThreeLayerToolRenderers(pi, threeLayerMode);
 
   pi.on("session_start", (_event, ctx) => {
+    shell.handleSessionStart(ctx);
     clearPlan(plan);
     plan.visible = true;
-    applyPiTuix(ctx, toolMode, threeLayerMode, editorRuntime, workflow, plan, true);
+    applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, true);
+    shell.handleRefresh(ctx, true);
   });
   pi.on("agent_start", () => {
     beginAgentRun(workflow);
-    setEditorWorking(editorRuntime, true);
+    shell.handleAgentStart();
   });
   pi.on("agent_end", () => {
     finishAgentRun(workflow);
-    setEditorWorking(editorRuntime, false);
+    shell.handleAgentEnd();
   });
-  pi.on("agent_settled", () => settleAgent(workflow));
+  pi.on("agent_settled", (event, ctx) => {
+    settleAgent(workflow);
+    shell.handleAgentSettled(event, ctx);
+  });
   pi.on("turn_start", (event) => startTurn(workflow, event.turnIndex));
   pi.on("turn_end", (event, ctx) => {
     if (updatePlan(plan, event.message) && (toolMode.enabled || threeLayerMode.enabled)) {
@@ -181,18 +101,28 @@ export default function piTuix(pi: ExtensionAPI): void {
     if (type === "text_start" || type === "text_delta") setStreamActivity(workflow, "RESPONDING");
     if (type === "toolcall_start" || type === "toolcall_delta") setStreamActivity(workflow, "TOOL");
   });
-  pi.on("thinking_level_select", () => refreshWorkflow(workflow));
+  pi.on("thinking_level_select", (_event, ctx) => {
+    refreshWorkflow(workflow);
+    shell.handleRefresh(ctx);
+  });
+  pi.on("model_select", (_event, ctx) => shell.handleRefresh(ctx));
   pi.on("input", (event) => {
     if (event.streamingBehavior === "followUp") queueMessage(workflow);
   });
   pi.on("tool_execution_start", (event) => startTool(workflow, event.toolName));
-  pi.on("tool_execution_end", (event) => finishTool(workflow, event.isError));
-  pi.on("session_shutdown", () => detachEditorChrome(editorRuntime));
+  pi.on("tool_execution_end", (event, ctx) => {
+    finishTool(workflow, event.isError);
+    shell.handleRefresh(ctx);
+  });
+  pi.on("message_end", (_event, ctx) => shell.handleRefresh(ctx));
+  pi.on("session_compact", (_event, ctx) => shell.handleRefresh(ctx));
+  pi.on("session_tree", (_event, ctx) => shell.handleRefresh(ctx));
+  pi.on("session_shutdown", (_event, ctx) => shell.handleSessionShutdown(ctx));
 
   pi.registerCommand("pituix", {
     description: "Show Pi-TUIX status and restore its interface",
     handler: async (_args, ctx) => {
-      applyPiTuix(ctx, toolMode, threeLayerMode, editorRuntime, workflow, plan, true);
+      applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, true);
       ctx.ui.notify(`${PACKAGE_NAME} interface enabled (three-layer mode)`, "info");
     },
   });
@@ -203,13 +133,8 @@ export default function piTuix(pi: ExtensionAPI): void {
       toolMode.enabled = false;
       threeLayerMode.enabled = false;
       ctx.ui.setTitle("pi");
-      ctx.ui.setHeader(undefined);
-      ctx.ui.setFooter(undefined);
+      shell.remove(ctx);
       ctx.ui.setWidget("pituix-plan", undefined);
-      ctx.ui.setEditorComponent(undefined);
-      detachEditorChrome(editorRuntime);
-      ctx.ui.setWorkingIndicator();
-      ctx.ui.setHiddenThinkingLabel();
       ctx.ui.notify("Pi default interface restored", "info");
     },
   });
@@ -217,7 +142,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.registerCommand("pituix-compact", {
     description: "Switch to compact tool rendering (original Pi-TUIX v0.1)",
     handler: async (_args, ctx) => {
-      applyPiTuix(ctx, toolMode, threeLayerMode, editorRuntime, workflow, plan, false);
+      applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, false);
       ctx.ui.notify(`${PACKAGE_NAME} compact mode enabled`, "info");
     },
   });
@@ -225,7 +150,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.registerCommand("pituix-three-layer", {
     description: "Switch to three-layer tool rendering (collapsed/preview/expanded)",
     handler: async (_args, ctx) => {
-      applyPiTuix(ctx, toolMode, threeLayerMode, editorRuntime, workflow, plan, true);
+      applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, true);
       ctx.ui.notify(`${PACKAGE_NAME} three-layer mode enabled`, "info");
     },
   });

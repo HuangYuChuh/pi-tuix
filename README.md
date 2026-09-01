@@ -46,11 +46,11 @@ For a project-local install, use `pi install -l npm:pi-tuix`.
 
 See [Using the development version](docs/development.md) for installation-source switching and [Releasing Pi-TUIX](docs/releasing.md) for development, prerelease, and stable channel rules.
 
-## Current Prototype
+## Current Development
 
-The `0.1.0` release wires Pi's public `ExtensionAPI` to a Pi-TUIX header, footer, terminal title, working indicator, editor chrome, and three-layer Read/Bash/Edit/Write presentation. Tool execution remains delegated to Pi unchanged.
+The `feat/open-tui-pituix` development branch combines an adapted `pi-open-tui` shell with Pi-TUIX three-layer Read/Bash/Edit/Write presentation. The shell supplies the responsive header, footer, framed editor, Git/runtime/context/cost indicators, settings UI, and turn telemetry. Tool execution remains delegated to Pi unchanged.
 
-The editor border shows `READY/WORKING` plus prompt line and character counts. It extends Pi's public `CustomEditor`, preserving submission, history, autocomplete, paste handling, and registered application shortcuts.
+The framed editor extends Pi's public `CustomEditor`, preserving submission, history, autocomplete, paste handling, and registered application shortcuts. `/pituix-default` removes the Pi-TUIX shell and restores Pi's native components in the active session.
 
 Each tool row keeps the action, target, state, and attention signal visible. The default preview shows the first and last two detail lines; collapsed mode keeps only the summary, and expanded mode reveals the full output or diff. Read and Bash results summarize output size, Edit reports diff statistics, and Write reports the written line count. All views use ANSI-aware width constraints.
 
@@ -64,12 +64,13 @@ These commands are reversible:
 | `/pituix-three-layer` | Use the three-layer tool renderer |
 | `/pituix-mode <collapsed\|preview\|expanded>` | Set the tool detail display mode; preview is the default |
 | `/pituix-about` | Show the package and compatible Pi version |
+| `/pituix-settings` | Open shell, footer, icon, and telemetry settings |
 | `/pituix-steer <message>` | Interrupt the current run with an immediate correction |
 | `/pituix-followup <message>` | Queue work to start after the current run |
 | `/pituix-queue` | Show whether Pi has queued follow-up messages |
 | `/pituix-plan [show\|hide\|clear]` | Control the detected read-only plan panel |
 
-The bundled `pi-tuix-dark` theme is available from Pi's `/settings` screen.
+The bundled `pi-tuix-dark` theme is available from Pi's `/settings` screen. This branch includes adapted MIT-licensed code from [OldSuns/pi-open-tui](https://github.com/OldSuns/pi-open-tui); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## How It Works
 

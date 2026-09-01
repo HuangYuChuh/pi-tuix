@@ -29,6 +29,8 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   } as unknown as ExtensionAPI;
 
   piTuix(pi);
+  assert.ok(commands.has("pituix-settings"));
+  assert.ok(!commands.has("open-tui"));
 
   const editorFactories: unknown[] = [];
   const ui = {
@@ -46,6 +48,8 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   };
   const context = {
     mode: "tui",
+    hasUI: true,
+    cwd: process.cwd(),
     ui,
     getContextUsage: () => undefined,
   } as unknown as ExtensionContext;
@@ -59,20 +63,24 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     keybindings: KeybindingsManager,
   ) => EditorComponent;
   const editor = editorFactory(
-    { terminal: { rows: 40 }, requestRender: () => {} } as TUI,
+    {
+      terminal: { rows: 40, write: () => {} },
+      getShowHardwareCursor: () => false,
+      setShowHardwareCursor: () => {},
+      requestRender: () => {},
+    } as unknown as TUI,
     { borderColor: (text: string) => text, selectList: {} } as EditorTheme,
     { matches: () => false } as unknown as KeybindingsManager,
   );
-  assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /READY/);
+  assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /╭/);
 
   await handlers.get("agent_start")?.({ type: "agent_start" }, context);
-  assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /WORKING/);
-
   await handlers.get("agent_end")?.({ type: "agent_end" }, context);
-  assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /READY/);
+  assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /╭/);
 
   await commands.get("pituix-default")?.handler("", context);
   assert.equal(editorFactories.at(-1), undefined);
+  assert.equal(commands.has("pituix-settings"), true);
 });
 
 test("queue commands delegate steering and follow-ups to Pi", async () => {
@@ -135,6 +143,8 @@ test("plan panel follows Pi-TUIX enable and default lifecycle", async () => {
   };
   const context = {
     mode: "tui",
+    hasUI: true,
+    cwd: process.cwd(),
     ui,
     getContextUsage: () => undefined,
   } as unknown as ExtensionContext;
