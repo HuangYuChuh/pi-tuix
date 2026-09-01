@@ -486,11 +486,11 @@ export function registerSettingsCommand(
             },
           };
         },
-        { overlay: true },
+        // Render as a full custom view so settings behave like a page, not a floating dialog.
+        { overlay: false },
       );
-      // Overlay is closed and focus is back on the editor. Deferred UI changes
-      // (e.g. toggling the extension) run here, so pi core's focus restore
-      // cannot strand the overlay without keyboard input.
+      // The settings view is closed and focus is back on the editor. Deferred UI
+      // changes (e.g. toggling the extension) run here after Pi restores focus.
       hooks.onOverlayClosed?.();
     },
   });
