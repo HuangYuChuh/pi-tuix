@@ -8,6 +8,7 @@ import {
   updatePlan,
 } from "./control/plan.ts";
 import { registerSessionTreeCommand } from "./session/session-tree.ts";
+import { createSubagentActivityObserver } from "./session/subagent-activity.ts";
 import { createOpenTuiShellRuntime } from "./shell/open-tui/shell.ts";
 import {
   beginAgentRun,
@@ -61,7 +62,8 @@ export default function piTuix(pi: ExtensionAPI): void {
     defaultMode: "preview" as DisplayMode, // collapsed | preview | expanded
   };
 
-  const shell = createOpenTuiShellRuntime(pi);
+  const subagentActivity = createSubagentActivityObserver(pi);
+  const shell = createOpenTuiShellRuntime(pi, subagentActivity);
   const workflow = createWorkflowRuntime();
   const plan = createPlanRuntime();
   registerSessionTreeCommand(pi);
