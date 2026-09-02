@@ -11,7 +11,7 @@
 > [!NOTE]
 > 本翻译由社区维护。如有错误，欢迎提交 PR！内容基于当前 [`README.md`](README.md)。
 
-> **状态：** 早期开发阶段。`pi-tuix` 尚未发布到 npm。
+> **状态：** `0.1.0` 源码版本。`pi-tuix` 尚未发布到 npm。
 
 **Pi-TUIX** 是 Pi Coding Agent 的开源终端 UI 扩展。它为长时间编码会话提供更清晰、更紧凑的界面，同时模型请求、内置工具、会话、权限与 provider 集成仍由 Pi 管理。
 
@@ -28,9 +28,11 @@
 
 ### 安装开发版
 
-要求：Node.js `>=22.19.0`、Pi Coding Agent `>=0.84.0`。
+要求：Node.js `>=22.19.0`、Pi Coding Agent `>=0.84.0`。目前尚未发布 npm 包，开发版需要使用本地源码目录。先克隆仓库，或直接使用已有的 checkout：
 
 ```bash
+git clone https://github.com/HuangYuChuh/pi-tuix.git
+cd pi-tuix
 npm install
 npm run check
 pi install /absolute/path/to/pi-tuix --approve
@@ -39,15 +41,11 @@ pi list
 
 Pi 会把本地路径记录到用户设置中，并在所有项目中加载这份工作目录。修改代码后请重启 Pi。仅当前项目使用时执行 `pi install -l /absolute/path/to/pi-tuix --approve`；只做一次性预览时执行 `pi -e ./extensions/index.ts`，它不会保存安装记录。
 
-### 从 npm 安装（首次发布后）
+### 从 npm 安装
 
-```bash
-pi install npm:pi-tuix
-```
+Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-tuix`。正式发布后，安装命令和发布流程会记录在[发版流程](docs/releasing.md)中。
 
-项目级安装请使用 `pi install -l npm:pi-tuix`。
-
-安装来源切换见[开发版使用手册](docs/development.md)，开发版、预发布版与正式版规则见[发版流程](docs/releasing.md)。
+本地安装方式见[开发版使用手册](docs/development.md)，开发版、预发布版与正式版规则见[发版流程](docs/releasing.md)。
 
 ## 0.1.0 稳定版
 

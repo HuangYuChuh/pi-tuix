@@ -8,7 +8,7 @@
 
 </div>
 
-> **Status:** `0.1.0` stable release.
+> **Status:** `0.1.0` source release; npm publication is not available yet.
 
 **Pi-TUIX** is an open-source terminal UI extension for the Pi Coding Agent. It adds a clearer, denser interface for long coding sessions while Pi continues to own model requests, built-in tools, sessions, permissions, and provider integrations.
 
@@ -25,9 +25,11 @@ When a coding session is long, the hard part is often knowing what is happening,
 
 ### Install the development version
 
-Requirements: Node.js `>=22.19.0` and Pi Coding Agent `>=0.84.0`.
+Requirements: Node.js `>=22.19.0` and Pi Coding Agent `>=0.84.0`. The npm package is not published yet, so development installs use a local source checkout. Clone the repository first, or use an existing checkout:
 
 ```bash
+git clone https://github.com/HuangYuChuh/pi-tuix.git
+cd pi-tuix
 npm install
 npm run check
 pi install /absolute/path/to/pi-tuix --approve
@@ -36,15 +38,11 @@ pi list
 
 Pi stores the local path in user settings and loads that working tree across projects. Restart Pi after code changes. Use `pi install -l /absolute/path/to/pi-tuix --approve` for a project-local installation, or `pi -e ./extensions/index.ts` for a one-off preview that is not saved.
 
-### Install from npm (after the first release)
+### npm installation
 
-```bash
-pi install npm:pi-tuix
-```
+Pi-TUIX has not been published to npm yet. Do not use `pi install npm:pi-tuix` until a release is announced. The eventual npm installation and release process is documented in [Releasing Pi-TUIX](docs/releasing.md).
 
-For a project-local install, use `pi install -l npm:pi-tuix`.
-
-See [Using the development version](docs/development.md) for installation-source switching and [Releasing Pi-TUIX](docs/releasing.md) for development, prerelease, and stable channel rules.
+See [Using the development version](docs/development.md) for local installation and [Releasing Pi-TUIX](docs/releasing.md) for development, prerelease, and stable channel rules.
 
 ## Current Development
 

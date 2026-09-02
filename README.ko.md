@@ -28,9 +28,11 @@
 
 ### 개발 버전 설치
 
-요구 사항: Node.js `>=22.19.0`, Pi Coding Agent `>=0.84.0`.
+요구 사항: Node.js `>=22.19.0`, Pi Coding Agent `>=0.84.0`. npm 패키지는 아직 배포되지 않았으므로 개발 버전은 로컬 소스 checkout에서 설치합니다. 아직 소스가 없다면 먼저 저장소를 복제하세요.
 
 ```bash
+git clone https://github.com/HuangYuChuh/pi-tuix.git
+cd pi-tuix
 npm install
 npm run check
 pi install /absolute/path/to/pi-tuix --approve
@@ -39,13 +41,9 @@ pi list
 
 Pi는 로컬 경로를 사용자 설정에 저장하고 모든 프로젝트에서 해당 working tree를 로드합니다. 코드를 변경한 후 Pi를 다시 시작하세요. 프로젝트 단위 설치에는 `pi install -l /absolute/path/to/pi-tuix --approve`, 저장하지 않는 일회성 미리 보기에는 `pi -e ./extensions/index.ts`를 사용합니다.
 
-### npm 설치 (첫 릴리스 이후)
+### npm 설치
 
-```bash
-pi install npm:pi-tuix
-```
-
-프로젝트 단위 설치는 `pi install -l npm:pi-tuix`를 사용합니다.
+Pi-TUIX는 아직 npm에 배포되지 않았으므로 현재 `pi install npm:pi-tuix`를 사용할 수 없습니다. 배포 후 절차는 [릴리스 절차](docs/releasing.md)에 안내됩니다.
 
 설치 소스 전환은 [개발 버전 가이드](docs/development.md), 개발·prerelease·stable 채널 규칙은 [릴리스 절차](docs/releasing.md)를 참조하세요.
 
