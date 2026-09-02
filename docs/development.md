@@ -1,10 +1,16 @@
 # Using the development version
 
-Pi-TUIX uses a local-path Pi package as its permanent development channel. Pi records the source in user settings and loads the current working tree, so code changes can be tested without publishing to npm or changing the package version.
+Pi-TUIX uses a local-path Pi package as its permanent development channel. The npm package is not published yet. Clone the repository, or use an existing checkout; Pi records that source in user settings and loads the current working tree, so code changes can be tested without publishing to npm or changing the package version.
 
 > **Important:** A local-path installation follows the checked-out files. Switching branches or leaving incomplete changes in the working tree changes what Pi loads the next time it starts.
 
 ## Install the development version
+
+Obtain the source first if you do not already have a checkout:
+
+```powershell
+git clone https://github.com/HuangYuChuh/pi-tuix.git C:\path\to\pi-tuix
+```
 
 Install dependencies and verify the checkout:
 
@@ -31,6 +37,10 @@ pi install -l "C:\path\to\pi-tuix" --approve
 ```
 
 Project-local packages are recorded in the project's `.pi/settings.json`. Do not commit a machine-specific absolute path to a shared repository.
+
+## npm publication status
+
+The npm installation examples below describe future prerelease and stable channels. They are unavailable until Pi-TUIX is published to npm. For the current development version, use the local-path installation above.
 
 ## Identify the active channel
 

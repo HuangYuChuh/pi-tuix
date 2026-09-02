@@ -28,9 +28,11 @@
 
 ### 開発版をインストールする
 
-要件: Node.js `>=22.19.0`、Pi Coding Agent `>=0.84.0`。
+要件: Node.js `>=22.19.0`、Pi Coding Agent `>=0.84.0`。npm パッケージはまだ公開されていないため、開発版はローカルのソースチェックアウトからインストールします。まだチェックアウトしていない場合は、先にリポジトリをクローンしてください。
 
 ```bash
+git clone https://github.com/HuangYuChuh/pi-tuix.git
+cd pi-tuix
 npm install
 npm run check
 pi install /absolute/path/to/pi-tuix --approve
@@ -39,13 +41,9 @@ pi list
 
 Pi はローカルパスをユーザー設定に保存し、すべてのプロジェクトでその working tree を読み込みます。コード変更後は Pi を再起動してください。プロジェクト単位では `pi install -l /absolute/path/to/pi-tuix --approve`、保存しない一時的なプレビューでは `pi -e ./extensions/index.ts` を使用します。
 
-### npm からインストール（初回リリース後）
+### npm からのインストール
 
-```bash
-pi install npm:pi-tuix
-```
-
-プロジェクト単位では `pi install -l npm:pi-tuix` を使用します。
+Pi-TUIX はまだ npm に公開されていないため、現時点では `pi install npm:pi-tuix` は使用できません。公開後の手順は[リリース手順](docs/releasing.md)に記載します。
 
 インストール元の切り替えは[開発版ガイド](docs/development.md)、開発版・prerelease・stable の規則は[リリース手順](docs/releasing.md)を参照してください。
 

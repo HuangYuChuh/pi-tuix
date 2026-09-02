@@ -28,9 +28,11 @@ Cuando una sesión se alarga, cuesta saber qué está ocurriendo, qué cambió y
 
 ### Instalar la versión de desarrollo
 
-Requisitos: Node.js `>=22.19.0` y Pi Coding Agent `>=0.84.0`.
+Requisitos: Node.js `>=22.19.0` y Pi Coding Agent `>=0.84.0`. El paquete npm aún no está publicado, así que la versión de desarrollo se instala desde una copia local del código fuente. Si todavía no tienes una copia, clona primero el repositorio:
 
 ```bash
+git clone https://github.com/HuangYuChuh/pi-tuix.git
+cd pi-tuix
 npm install
 npm run check
 pi install /absolute/path/to/pi-tuix --approve
@@ -39,13 +41,9 @@ pi list
 
 Pi guarda la ruta local en la configuración del usuario y carga ese working tree en todos los proyectos. Reinicia Pi después de cambiar el código. Usa `pi install -l /absolute/path/to/pi-tuix --approve` para una instalación por proyecto o `pi -e ./extensions/index.ts` para una vista previa puntual que no se guarda.
 
-### Instalar desde npm (después del primer lanzamiento)
+### Instalar desde npm
 
-```bash
-pi install npm:pi-tuix
-```
-
-Para instalarlo solo en un proyecto, usa `pi install -l npm:pi-tuix`.
+Pi-TUIX aún no está publicado en npm, por lo que `pi install npm:pi-tuix` no está disponible. El procedimiento posterior a la publicación se documenta en [el proceso de lanzamiento](docs/releasing.md).
 
 Consulta [la guia de desarrollo](docs/development.md) para cambiar la fuente instalada y [el proceso de lanzamiento](docs/releasing.md) para las reglas de los canales development, prerelease y stable.
 
