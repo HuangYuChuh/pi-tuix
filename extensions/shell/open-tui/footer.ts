@@ -1,5 +1,6 @@
 import type { ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import type { SubagentActivityState } from "../../session/subagent-activity.ts";
 import type { OpenTuiConfig } from "./config.ts";
 import type { GitStatus } from "./git.ts";
 import type { IconGlyphs } from "./icons.ts";
@@ -203,6 +204,7 @@ function renderExtensionStatusLines(
 export interface FooterHooks {
   setRequestRender: (fn: (() => void) | undefined) => void;
   scheduleGitRefresh: () => void;
+  getSubagentActivity?: () => SubagentActivityState;
 }
 
 export function installFooter(
@@ -315,9 +317,23 @@ export function installFooter(
         const mainLines = [line1, line2].map((line) =>
           truncateToWidth(line, width, theme.fg("dim", "...")),
         );
+        const activity = hooks.getSubagentActivity?.();
+        const activityLines = activity?.available
+          ? activity.activities.map((item) => {
+              const marker =
+                item.status === "running" ? "*" : item.status === "completed" ? "+" : "!";
+              const label = `${marker} ${item.agent}: ${item.task}`;
+              return truncateToWidth(
+                theme.fg(item.status === "failed" ? "error" : "muted", label),
+                width,
+                theme.fg("dim", "..."),
+              );
+            })
+          : [];
         return segments.extensionStatuses
           ? [
               ...mainLines,
+              ...activityLines,
               ...renderExtensionStatusLines(
                 theme,
                 footerData.getExtensionStatuses(),
@@ -325,7 +341,7 @@ export function installFooter(
                 width,
               ),
             ]
-          : mainLines;
+          : [...mainLines, ...activityLines];
       },
     };
   });

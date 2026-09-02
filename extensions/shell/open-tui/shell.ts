@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { SubagentActivityObserver } from "../../session/subagent-activity.ts";
 import {
   DEFAULT_CONFIG,
   ensureConfigExists,
@@ -36,7 +37,10 @@ export interface OpenTuiShellRuntime {
   handleRefresh(ctx: ExtensionContext, project?: boolean): void;
 }
 
-export function createOpenTuiShellRuntime(pi: ExtensionAPI): OpenTuiShellRuntime {
+export function createOpenTuiShellRuntime(
+  pi: ExtensionAPI,
+  subagentActivity?: SubagentActivityObserver,
+): OpenTuiShellRuntime {
   const lifecycle = new SessionLifecycle();
   const state: FooterState = createInitialState();
   const telemetry = new TurnTelemetryTracker();
@@ -115,6 +119,7 @@ export function createOpenTuiShellRuntime(pi: ExtensionAPI): OpenTuiShellRuntime
         scheduleGitRefresh: () => {
           void refreshGit(ctx);
         },
+        getSubagentActivity: subagentActivity?.getState,
       },
     );
     editor = installEditor(pi, ctx, config.cursorStyle, config.fullscreen.wheelScrollLines);
@@ -146,6 +151,8 @@ export function createOpenTuiShellRuntime(pi: ExtensionAPI): OpenTuiShellRuntime
     remove,
     handleSessionStart(ctx) {
       lifecycle.start();
+      subagentActivity?.reset();
+      subagentActivity?.setOnChange(() => requestRender?.());
       context = ctx;
       state.sessionStartEpoch = Date.now();
       state.workingSince = undefined;
@@ -155,6 +162,7 @@ export function createOpenTuiShellRuntime(pi: ExtensionAPI): OpenTuiShellRuntime
     },
     handleSessionShutdown(ctx) {
       lifecycle.shutdown();
+      subagentActivity?.setOnChange(undefined);
       remove(ctx);
       context = undefined;
     },
