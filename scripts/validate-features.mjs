@@ -5,8 +5,8 @@
  * Run with: node scripts/validate-features.mjs
  */
 
-import { readFileSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,10 +35,7 @@ checks.push({
 checks.push({
   name: "ToolRenderConfig interface exists",
   test: () => {
-    const config = readFileSync(
-      resolve(rootDir, "extensions/shell/open-tui/config.ts"),
-      "utf-8",
-    );
+    const config = readFileSync(resolve(rootDir, "extensions/shell/open-tui/config.ts"), "utf-8");
     return (
       config.includes("export interface ToolRenderConfig") &&
       config.includes("defaultMode") &&
@@ -53,10 +50,7 @@ checks.push({
 checks.push({
   name: "ThreeLayerToolView accepts ThreeLayerConfig",
   test: () => {
-    const view = readFileSync(
-      resolve(rootDir, "extensions/tools/three-layer-view.ts"),
-      "utf-8",
-    );
+    const view = readFileSync(resolve(rootDir, "extensions/tools/three-layer-view.ts"), "utf-8");
     return (
       view.includes("export interface ThreeLayerConfig") &&
       view.includes("constructor(") &&
@@ -69,10 +63,7 @@ checks.push({
 checks.push({
   name: "Error auto-expansion implemented",
   test: () => {
-    const renderers = readFileSync(
-      resolve(rootDir, "extensions/tools/renderers-v2.ts"),
-      "utf-8",
-    );
+    const renderers = readFileSync(resolve(rootDir, "extensions/tools/renderers-v2.ts"), "utf-8");
     return (
       renderers.includes("mode.config.autoExpand") &&
       renderers.includes('displayMode === "collapsed"')
@@ -84,14 +75,8 @@ checks.push({
 checks.push({
   name: "Error highlighting implemented",
   test: () => {
-    const view = readFileSync(
-      resolve(rootDir, "extensions/tools/three-layer-view.ts"),
-      "utf-8",
-    );
-    return (
-      view.includes("this.config.highlightErrors") &&
-      view.includes('this.theme.fg("error"')
-    );
+    const view = readFileSync(resolve(rootDir, "extensions/tools/three-layer-view.ts"), "utf-8");
+    return view.includes("this.config.highlightErrors") && view.includes('this.theme.fg("error"');
   },
 });
 
@@ -99,10 +84,7 @@ checks.push({
 checks.push({
   name: "Preview lines configurable",
   test: () => {
-    const view = readFileSync(
-      resolve(rootDir, "extensions/tools/three-layer-view.ts"),
-      "utf-8",
-    );
+    const view = readFileSync(resolve(rootDir, "extensions/tools/three-layer-view.ts"), "utf-8");
     return (
       view.includes("this.config.maxPreviewLines") &&
       view.includes("headLines") &&
@@ -140,10 +122,7 @@ checks.push({
 checks.push({
   name: "Tests cover new features",
   test: () => {
-    const tests = readFileSync(
-      resolve(rootDir, "test/three-layer-renderers.test.ts"),
-      "utf-8",
-    );
+    const tests = readFileSync(resolve(rootDir, "test/three-layer-renderers.test.ts"), "utf-8");
     return (
       tests.includes("ToolRendererMode") &&
       tests.includes("maxPreviewLines") &&
@@ -156,10 +135,7 @@ checks.push({
 checks.push({
   name: "All tool renderers use config",
   test: () => {
-    const renderers = readFileSync(
-      resolve(rootDir, "extensions/tools/renderers-v2.ts"),
-      "utf-8",
-    );
+    const renderers = readFileSync(resolve(rootDir, "extensions/tools/renderers-v2.ts"), "utf-8");
     return (
       renderers.includes("createThreeLayerReadDefinition") &&
       renderers.includes("createThreeLayerBashDefinition") &&
