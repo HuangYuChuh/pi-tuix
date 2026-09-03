@@ -1,6 +1,6 @@
 {
   "name": "pi-tuix",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Open source terminal UI extension for Pi Coding Agent with a clearer Claude Code-inspired workflow.",
   "type": "module",
   "license": "MIT",
