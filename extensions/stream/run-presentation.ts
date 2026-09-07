@@ -90,7 +90,7 @@ export class RunPresentation {
               : "stopped";
   }
 
-  settle(now = Date.now()): void {
+  settle(now = Date.now()): RunCompletion | undefined {
     if (this.startedAt === undefined || this.settled) return;
     const finishedAt = this.endedAt ?? now;
     this.completion = {
@@ -100,6 +100,7 @@ export class RunPresentation {
       failedTools: this.failedTools.size,
     };
     this.settled = true;
+    return this.completion;
   }
 
   workingMessage(label: string, now = Date.now(), ascii = false): string {
@@ -124,7 +125,7 @@ export function renderRunCompletion(
     const text = ascii
       ? "  L  Interrupted | What should Pi do instead?"
       : "  ⎿  Interrupted · What should Pi do instead?";
-    return [truncateToWidth(theme.fg("dim", text), width), ""];
+    return [truncateToWidth(theme.fg("dim", text), width)];
   }
   const duration = formatDuration(completion.durationMs);
   const clock = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" })
@@ -146,5 +147,5 @@ export function renderRunCompletion(
         )
       : "";
   const line = `${theme.fg(color, `${ascii ? "*" : "✻"} ${description}`)}${failures}`;
-  return [truncateToWidth(ascii ? line.replaceAll(" · ", " | ") : line, width), ""];
+  return [truncateToWidth(ascii ? line.replaceAll(" · ", " | ") : line, width)];
 }

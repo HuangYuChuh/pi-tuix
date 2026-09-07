@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use public self-rendered tool shells and replace pending rows with results; preserve exact Pi tool execution functions.
 - Add result branches, compact Read counts, numbered Write previews, and Update diffs with Pi's public word-level highlighting.
 - Group adjacent successful Read/Bash calls into unique-file and shell-call counts, with individual expansion and read-only reconstruction when resuming sessions.
-- Add elapsed working feedback, reported output-token counts, and temporary settled-run completion/interruption lines; retain duration through automatic retries.
+- Add elapsed working feedback, reported output-token counts, and persisted display-only settled-run completion/interruption lines; retain duration through automatic retries.
 - Match observed user-message background/text and successful tool-marker colors through the public theme.
 - Add a searchable resume picker with public Pi session metadata, text previews, project scope switching, and host-delegated session restoration through `/pituix-resume`.
 - Match observed Edit row and changed-token backgrounds, gutter colors and right margin; preserve source characters, theme fallback, no-color mode and distinct 256-color fills.
@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hide duplicate footer hints during settings and restore them on close or failure; remove the unsupported wheel-speed control from settings.
 - Restore existing tool rows as well as new rows with `/pituix-default`; retain a stable public shell adapter and invalidate rows through their public callbacks.
 - Finish native running-renderer cleanup after a presentation-mode switch, and refresh collapsed/preview changes even when Pi's expansion flag stays unchanged.
+- Keep completion rows across requests, resume and reload using Pi's public custom-entry renderer; hide/restore them with the interface and include them in the snapshot reader without adding model-context messages.
 - Recognize Pi's error-form AbortError response as an interruption instead of reporting a failed completion.
 - Register each built-in tool once so `/pituix-compact` keeps reference-style summaries and `/pituix-three-layer` restores previews instead of routing to native rows.
 - Reapply the temporary reference theme through Pi's fresh `withSession` context after `/pituix-resume` switches sessions.

@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type {
+  CustomEntry,
+  EntryRenderer,
   ExtensionAPI,
   ExtensionContext,
   KeybindingsManager,
+  Theme,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -13,6 +16,7 @@ import {
   type TUI,
 } from "@earendil-works/pi-tui";
 import piTuix from "../extensions/index.ts";
+import { COMPLETION_ENTRY_TYPE } from "../extensions/stream/completion-entry.ts";
 
 test("Pi-TUIX installs and reverses its editor component in the active session", async () => {
   // biome-ignore lint/suspicious/noExplicitAny: Test mock types
@@ -20,8 +24,20 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   // biome-ignore lint/suspicious/noExplicitAny: Test mock types
   const commands = new Map<string, { handler: (...args: any[]) => Promise<void> }>();
   const tools: ToolDefinition[] = [];
+  const entries: CustomEntry[] = [];
+  const renderers = new Map<string, EntryRenderer>();
   const pi = {
     registerMarkdownTransformer: () => {},
+    registerEntryRenderer: (name: string, renderer: EntryRenderer) => renderers.set(name, renderer),
+    appendEntry: (customType: string, data: unknown) =>
+      entries.push({
+        type: "custom",
+        customType,
+        data,
+        id: String(entries.length),
+        parentId: entries.at(-1)?.id ?? null,
+        timestamp: new Date().toISOString(),
+      }),
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
     on: (event: string, handler: (...args: any[]) => any) => handlers.set(event, handler),
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
@@ -72,6 +88,21 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     getContextUsage: () => undefined,
   } as unknown as ExtensionContext;
 
+  assert.ok(
+    renderers.get(COMPLETION_ENTRY_TYPE)?.(
+      {
+        type: "custom",
+        customType: COMPLETION_ENTRY_TYPE,
+        id: "history",
+        parentId: null,
+        timestamp: new Date(0).toISOString(),
+        data: { version: 1, durationMs: 1000, finishedAt: 1000, outcome: "done", failedTools: 0 },
+      },
+      { expanded: false },
+      originalTheme as Theme,
+    ),
+    "Pi replays saved entries before session_start during resume/reload",
+  );
   await handlers.get("session_start")?.({ type: "session_start", reason: "startup" }, context);
   assert.equal(typeof editorFactories.at(-1), "function");
   assert.equal(ui.theme, referenceTheme);
@@ -117,11 +148,29 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
     context,
   );
-  assert.equal(widgets.get("pituix-completion"), undefined);
+  assert.equal(entries.length, 0);
   await handlers.get("agent_settled")?.({ type: "agent_settled" }, context);
-  const completion = widgets.get("pituix-completion") as () => { render(width: number): string[] };
-  assert.equal(typeof completion, "function");
-  assert.match(stripTerminalSequences(completion().render(100)[0]), /Worked for.*done/);
+  assert.equal(entries.length, 1);
+  const completionRenderer = renderers.get(COMPLETION_ENTRY_TYPE);
+  assert.ok(completionRenderer);
+  const renderCompletion = () =>
+    completionRenderer(entries[0], { expanded: false }, ui.theme as Theme);
+  const completed = renderCompletion();
+  assert.ok(completed);
+  assert.match(stripTerminalSequences(completed.render(100)[0]), /Worked for.*done/);
+  await handlers.get("agent_settled")?.({ type: "agent_settled" }, context);
+  assert.equal(entries.length, 1, "duplicate settlement must not append twice");
+  await handlers.get("agent_start")?.({ type: "agent_start" }, context);
+  assert.ok(renderCompletion(), "earlier completion remains visible during the next run");
+  await handlers.get("agent_end")?.(
+    { messages: [{ role: "assistant", stopReason: "aborted" }] },
+    context,
+  );
+  await handlers.get("agent_settled")?.({}, context);
+  assert.equal(entries.length, 2);
+  const interrupted = completionRenderer(entries[1], { expanded: false }, ui.theme as Theme);
+  assert.ok(interrupted);
+  assert.match(interrupted.render(100)[0], /Interrupted/);
   const read = tools.find((tool) => tool.name === "read");
   const readContext = {
     args: { path: "fixture.ts" },
@@ -165,15 +214,24 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   await commands.get("pituix-mode")?.handler("preview", context);
   assert.equal(toolRedraws, 2);
   await commands.get("pituix-default")?.handler("", context);
-  assert.equal(widgets.get("pituix-completion"), undefined);
+  assert.equal(renderCompletion(), undefined);
   assert.equal(toolRedraws, 3);
   assert.equal(editorFactories.at(-1), undefined);
   assert.equal(ui.theme, originalTheme);
   assert.equal(workingMessages.at(-1), undefined);
   assert.equal(commands.has("pituix-settings"), true);
+  await handlers.get("agent_start")?.({}, context);
+  await handlers.get("agent_end")?.(
+    { messages: [{ role: "assistant", stopReason: "stop" }] },
+    context,
+  );
+  await handlers.get("agent_settled")?.({}, context);
+  assert.equal(entries.length, 2, "default UI does not create Pi-TUIX entries");
+  await commands.get("pituix")?.handler("", context);
+  assert.ok(renderCompletion(), "historical completion restores when re-enabled");
   await handlers.get("session_shutdown")?.({ type: "session_shutdown" }, context);
   await commands.get("pituix-mode")?.handler("preview", context);
-  assert.equal(toolRedraws, 3);
+  assert.equal(toolRedraws, 4);
 });
 
 test("queue commands delegate steering and follow-ups to Pi", async () => {
@@ -184,6 +242,7 @@ test("queue commands delegate steering and follow-ups to Pi", async () => {
   const sent: unknown[] = [];
   const pi = {
     registerMarkdownTransformer: () => {},
+    registerEntryRenderer: () => {},
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
     on: (event: string, handler: (...args: any[]) => any) => handlers.set(event, handler),
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
@@ -217,6 +276,7 @@ test("plan panel follows Pi-TUIX enable and default lifecycle", async () => {
   const widgets: unknown[] = [];
   const pi = {
     registerMarkdownTransformer: () => {},
+    registerEntryRenderer: () => {},
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
     on: (event: string, handler: (...args: any[]) => any) => handlers.set(event, handler),
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types

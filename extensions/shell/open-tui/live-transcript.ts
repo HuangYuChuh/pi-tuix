@@ -287,6 +287,7 @@ export function createLiveTranscript(pi: ExtensionAPI) {
           return wrapper;
         });
         mounted.add(tui);
+        tui.invalidate();
         tui.requestRender();
       });
       return () => {
@@ -300,6 +301,7 @@ export function createLiveTranscript(pi: ExtensionAPI) {
           child instanceof LiveDocumentPresentation && wrappers.has(child) ? child.source : child,
         );
         wrappers.clear();
+        tui.invalidate();
         tui.requestRender();
       };
     },

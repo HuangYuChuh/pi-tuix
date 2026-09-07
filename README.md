@@ -58,7 +58,7 @@ Adjacent successful Read/Bash calls combine into a count summary, deduplicating 
 
 In the reference dark theme, Edit diffs use numbered `+/-` gutters, full-row backgrounds and stronger changed-word backgrounds. Added/context lines use Pi's syntax highlighter. Other themes retain Pi's diff styling; 256-color and no-color terminals have explicit fallbacks.
 
-The working line shows elapsed time and reported output tokens when available. After Pi settles, a temporary completion line shows duration and clock time, or an interruption prompt after cancellation. It clears on the next run or `/pituix-default` and does not add session messages.
+The working line shows elapsed time and reported output tokens when available. After Pi settles, a completion line shows duration and clock time, or an interruption prompt after cancellation. Pi saves one display-only entry per settled run, so these rows survive later requests and session resume/reload. They stay outside model context, hide with `/pituix-default`, and reappear with `/pituix`. Removing the package leaves ordinary Pi sessions usable; older runs without timing records are not backfilled.
 
 `/pituix-resume` searches saved Pi sessions and previews their public message text. Type to filter, press Enter to select a result, then Enter again to resume. Space opens a text preview; Ctrl+A switches between the current project and all projects. Pi performs the actual session switch. Native `/resume` and `/tree` remain available.
 

@@ -17,6 +17,8 @@ import {
   truncateToWidth,
 } from "@earendil-works/pi-tui";
 import { useAsciiChrome } from "../shell/open-tui/icons.ts";
+import { COMPLETION_ENTRY_TYPE, readCompletionEntry } from "../stream/completion-entry.ts";
+import { renderRunCompletion } from "../stream/run-presentation.ts";
 import {
   createThreeLayerBashDefinition,
   createThreeLayerEditDefinition,
@@ -186,7 +188,14 @@ export class TranscriptContent implements Component {
     };
     for (const entry of this.entries) {
       if (entry.type === "message") addMessage(entry.message);
-      else if (entry.type === "custom_message" && entry.display) {
+      else if (entry.type === "custom" && entry.customType === COMPLETION_ENTRY_TYPE) {
+        const completion = readCompletionEntry(entry.data);
+        if (completion)
+          this.components.push({
+            render: (width) => renderRunCompletion(completion, this.theme, width, this.ascii),
+            invalidate() {},
+          });
+      } else if (entry.type === "custom_message" && entry.display) {
         this.components.push(this.label(entry.customType));
         this.components.push(
           new ReferenceAssistantText(contentText(entry.content), this.theme, this.ascii),

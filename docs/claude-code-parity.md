@@ -128,7 +128,7 @@ broadly than the observed reference.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Searchable resume picker | Public `SessionManager.list`/`listAll`, `SessionInfo`, `ctx.switchSession` | Implemented in `/pituix-resume`; previews public message text and uses real message counts/time, without branch/file-size metadata or tool/media preview |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
-| Completion and interruption feedback | `agent_end`, `agent_settled`, `setWidget` | Latest completion duration/clock and interruption branch implemented; historical per-response rows are not reproduced |
+| Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
 | Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state`, public `renderDiff`/`highlightCode` | Result branches, compact Read counts, numbered Write previews and numbered Update diffs with row/word backgrounds implemented |
 | Adjacent Read/Bash summaries | Finalized message/tool events, public session branch, per-row invalidation | Implemented for adjacent successful calls; paths deduplicated, expanded calls retained, resumed sessions reconstructed |
@@ -207,6 +207,18 @@ remain a measured difference, rather than a claim of full syntax parity.
   handling. Actual Pi sessions verified working elapsed time, completion,
   default-UI cleanup and interruption of the arithmetic tool. Pi can also render
   its own aborted-operation error message; that host transcript row remains.
+- Completion-entry tests cover schema validation, unknown imports, default-UI
+  hiding/restoration, startup replay before `session_start`, and duplicate
+  settlement. Pi's public context builder confirms these entries add no model
+  messages. Snapshot tests preserve their order without mutating source entries.
+  Actual 0.85.1 fullscreen sessions at 80x24 preserve two completed runs through
+  `/new`, `/pituix-resume` and `/reload`; default/restore toggles hide and reveal
+  both records. Pi 0.84.4 regular mode at 100x32 reopens the same session, cancels
+  a real arithmetic Bash call, then preserves the interruption through reload
+  and the snapshot reader. The saved file contains exactly three completion
+  records with outcomes `done`, `done`, `cancelled`. Starting Pi with the package
+  disabled ignores those records and retains the conversation. Fixtures make
+  no model-network requests.
 - Concurrent-tool state tests cover repeated tool names, out-of-order completion,
   duplicated/late events and cancellation cleanup; lifecycle wiring verifies
   that the working message retains the remaining active tool.

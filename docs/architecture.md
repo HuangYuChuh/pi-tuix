@@ -48,11 +48,24 @@ Duplicate completions and late events after settlement cannot alter that count.
 Run presentation observes assistant usage and stop reasons. A one-second UI timer
 updates elapsed working feedback; unavailable token counts are omitted rather
 than estimated. Automatic continuations retain the start time until Pi emits
-`agent_settled`. The last settled completion is shown with `setWidget`, then
-cleared on the next run, session change or default-UI restoration. Cancellation
-has a separate interruption prompt, including Pi's error-form AbortError case.
-This widget does not append transcript/session entries. It does not reproduce
-Claude's persistent completion row for every historical response.
+`agent_settled`. Each newly settled TUI run appends one versioned
+`pi-tuix-run-completion` custom entry through `pi.appendEntry`; duplicate
+settlement events do not append again. `registerEntryRenderer` displays its
+elapsed time, end time, outcome and failed-tool count in the native document.
+These records are UI metadata, excluded by Pi's model-context builder. Pi owns
+storage, ordering, branching, compaction and restoration; Pi-TUIX neither writes
+session files nor modifies messages. Existing histories without these records
+are not backfilled. No records are added in the default UI or non-TUI modes.
+Cancellation has a separate interruption prompt, including Pi's error-form
+AbortError case. Imported records with invalid fields or unknown versions are
+ignored. The snapshot reader uses the same parser and formatter.
+
+Pi can replay custom entries before `session_start`, so renderer registration
+starts in the enabled state used by startup. Mode changes invalidate the public
+component tree when installing/removing the live document composition. This
+lets the host rebuild its custom-entry wrappers with or without their spacing;
+`/pituix-default` hides the rows and `/pituix` restores them. Without the extension,
+Pi ignores these unregistered custom entries and keeps the ordinary conversation.
 
 Stream status maps public assistant events to explicit `THINKING`, `RESPONDING`, and `TOOL` labels, includes the one-based turn number, and shows the active thinking level and context pressure. The plan adapter reads assistant text after a turn, recognizes a `Plan:` or localized plan heading with numbered or checkbox steps, and renders those steps through `setWidget()`. It is deliberately observational: it does not inject plan instructions, disable tools, or infer completion from tool execution.
 
@@ -102,7 +115,11 @@ Pi 0.84 reapplies its saved theme after `session_start` during replacement.
 The picker reapplies the reference Theme instance through the fresh public
 `withSession` context, without changing Pi's saved theme preference. Native
 session/reload commands can still reset an extension-applied temporary theme;
-their post-rebind sequence is not intercepted by Pi-TUIX.
+their post-rebind sequence is not intercepted by Pi-TUIX. The public extension
+context exposes no post-theme-rebind event or saved automatic-theme preference.
+Switching by theme name would persist a different Pi setting, so the adapter
+continues using a temporary Theme instance rather than silently replacing that
+preference.
 This text preview does not reproduce tool/media transcript rendering. Session
 files, migration, persistence and branching remain Pi-owned; native `/resume`
 and `/tree` are untouched.

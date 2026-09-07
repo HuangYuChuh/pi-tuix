@@ -18,6 +18,7 @@ import {
   TranscriptContent,
   TranscriptView,
 } from "../extensions/session/transcript-view.ts";
+import { COMPLETION_ENTRY_TYPE } from "../extensions/stream/completion-entry.ts";
 
 initTheme("dark", false);
 const theme = {
@@ -29,6 +30,62 @@ const tui = { requestRender() {} } as TUI;
 const plain = (component: { render(width: number): string[] }, width = 100) =>
   component.render(width).map(stripTerminalSequences).join("\n");
 const base = { timestamp: new Date(0).toISOString(), parentId: null };
+
+test("snapshot history retains completion rows in order and ignores invalid or foreign metadata", () => {
+  const history: SessionEntry[] = [
+    {
+      ...base,
+      id: "a",
+      type: "message",
+      message: { role: "user", content: "First request", timestamp: 0 },
+    },
+    {
+      ...base,
+      id: "b",
+      type: "custom",
+      customType: COMPLETION_ENTRY_TYPE,
+      data: {
+        version: 1,
+        durationMs: 2300,
+        finishedAt: 1700000000000,
+        outcome: "done",
+        failedTools: 0,
+      },
+    },
+    {
+      ...base,
+      id: "c",
+      type: "message",
+      message: { role: "user", content: "Second request", timestamp: 0 },
+    },
+    {
+      ...base,
+      id: "d",
+      type: "custom",
+      customType: COMPLETION_ENTRY_TYPE,
+      data: {
+        version: 1,
+        durationMs: 4100,
+        finishedAt: 1700000005000,
+        outcome: "cancelled",
+        failedTools: 0,
+      },
+    },
+    { ...base, id: "e", type: "custom", customType: COMPLETION_ENTRY_TYPE, data: { version: 999 } },
+    { ...base, id: "f", type: "custom", customType: "foreign", data: { secret: "never display" } },
+  ];
+  const original = structuredClone(history);
+  const content = new TranscriptContent(history, theme, tui, "/fixture");
+  const output = plain(content);
+  assert.match(output, /First request[\s\S]*Worked for 2s[\s\S]*Second request[\s\S]*Interrupted/);
+  assert.equal(output.match(/Worked for/g)?.length, 1);
+  assert.doesNotMatch(output, /never display|999/);
+  content.setExpanded(true);
+  assert.match(plain(content), /Worked for 2s[\s\S]*Interrupted/);
+  for (const width of [1, 4, 12, 40, 80, 100])
+    assert.ok(content.render(width).every((line) => visibleWidth(line) <= width));
+  assert.deepEqual(history, original);
+});
 const assistant = (
   content: AssistantMessage["content"],
   stopReason: AssistantMessage["stopReason"] = "stop",

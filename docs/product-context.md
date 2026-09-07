@@ -94,3 +94,8 @@ Live message presentation composes reversible wrappers through Pi's public
 component tree in both terminal modes. Pi still owns the original transcript
 containers, sessions, input, queue delivery and native scrolling/search state.
 Pi-TUIX owns the message styling and its disposable layout caches.
+
+Run completion history is presentation metadata delegated to Pi's public custom
+entry API. Pi-TUIX supplies a versioned payload and renderer; Pi retains session
+storage, ordering, branching and model-context construction. Disabling or removing
+the renderer requires no migration and does not delete or rewrite messages.
