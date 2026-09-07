@@ -50,6 +50,8 @@ The development shell follows observed Claude Code 2.1.263 terminal layout: comp
 
 The editor extends Pi's public `CustomEditor`, preserving submission, history, autocomplete, paste handling, and registered application shortcuts. Press `?` on an empty draft for help. `/pituix-default` restores native components and the previous theme in the active session.
 
+The effective thinking level appears above the prompt with Pi's configured shortcut. `/pituix-settings` opens searchable preference tabs: type to filter, press Enter to select a result, then Enter or Space to change it. Tab switches categories; Escape clears the query, leaves search, then closes the page.
+
 Each tool row keeps the action, target, state, and attention signal visible. The default preview shows the first and last two detail lines; collapsed mode keeps only the summary, and expanded mode reveals the full output or diff. Read and Bash results summarize output size, Edit reports diff statistics, and Write reports the written line count. All views use ANSI-aware width constraints.
 
 These commands are reversible:

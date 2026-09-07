@@ -53,6 +53,8 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 
 编辑器继承 Pi 公开的 `CustomEditor`，保留提交、历史、自动补全和粘贴行为。空输入时按 `?` 查看帮助；`/pituix-default` 恢复原生组件与之前的主题。工具执行仍原样委托给 Pi。
 
+输入框上方显示当前思考强度及 Pi 的实际快捷键。`/pituix-settings` 提供可搜索的设置页：输入关键词筛选，Enter 选中结果，再按 Enter 或空格修改；Tab 切换分类，Esc 依次清空搜索、离开搜索框、关闭页面。
+
 每个紧凑工具行都会明确显示动作、目标、状态和 `ATTENTION/CLEAR` 信号。Read 与 Bash 汇总输出规模，Edit 展示 diff 统计，Write 展示写入行数；展开后可查看经过 ANSI-aware 宽度约束的输出或 diff。
 
 以下命令均可逆：

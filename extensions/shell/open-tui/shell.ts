@@ -8,6 +8,7 @@ import {
   saveConfig,
 } from "./config.ts";
 import { installEditor } from "./editor.ts";
+import { type EffortState, renderEffortLine } from "./effort.ts";
 import { installFooter } from "./footer.ts";
 import { emptyGitStatus, readGitStatus } from "./git.ts";
 import { installHeader } from "./header.ts";
@@ -46,6 +47,13 @@ export function createOpenTuiShellRuntime(
   const state: FooterState = createInitialState();
   const telemetry = new TurnTelemetryTracker();
   let config: OpenTuiConfig = structuredClone(DEFAULT_CONFIG);
+  const effort: EffortState = { enabled: false, level: "off", ascii: false };
+  const syncEffort = (ctx: ExtensionContext) => {
+    effort.enabled = Boolean(ctx.model?.reasoning);
+    effort.level = effort.enabled ? (ctx.thinkingLevel ?? pi.getThinkingLevel()) : "off";
+    effort.ascii = useAsciiChrome(config.icons.mode);
+  };
+  let settingsOpen = false;
   let active = false;
   let context: ExtensionContext | undefined;
   let requestRender: (() => void) | undefined;
@@ -61,6 +69,7 @@ export function createOpenTuiShellRuntime(
   };
   const refresh = (ctx: ExtensionContext, project = false) => {
     if (!lifecycle.isCurrent() || !ctx.hasUI) return;
+    syncEffort(ctx);
     if (project) {
       void refreshGit(ctx);
       void refreshRuntime(ctx);
@@ -113,6 +122,7 @@ export function createOpenTuiShellRuntime(
   };
   const apply = (ctx: ExtensionContext) => {
     if (!isTuiContext(ctx) || active) return;
+    syncEffort(ctx);
     const referenceTheme = ctx.ui.getTheme?.("pi-tuix-dark");
     if (referenceTheme) {
       previousTheme = ctx.ui.theme;
@@ -140,6 +150,7 @@ export function createOpenTuiShellRuntime(
           void refreshGit(ctx);
         },
         getSubagentActivity: subagentActivity?.getState,
+        isSettingsOpen: () => settingsOpen,
       },
     );
     editor = installEditor(
@@ -148,6 +159,7 @@ export function createOpenTuiShellRuntime(
       config.cursorStyle,
       config.fullscreen.wheelScrollLines,
       config.icons.mode,
+      (width) => renderEffortLine(effort, ctx.ui.theme, width),
     );
     active = true;
   };
@@ -169,6 +181,10 @@ export function createOpenTuiShellRuntime(
   config = loadConfig();
   registerSettingsCommand(pi, {
     getConfig: () => config,
+    onOverlayOpened: () => {
+      settingsOpen = true;
+      requestRender?.();
+    },
     onConfigChanged: (next) => {
       const iconsChanged = config.icons.mode !== next.icons.mode;
       const cursorChanged = config.cursorStyle !== next.cursorStyle;
@@ -181,6 +197,8 @@ export function createOpenTuiShellRuntime(
       if (context) refresh(context, true);
     },
     onOverlayClosed: () => {
+      settingsOpen = false;
+      requestRender?.();
       if (!context) return;
       if (config.enabled) apply(context);
       else remove(context);

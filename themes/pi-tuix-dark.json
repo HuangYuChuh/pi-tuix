@@ -6,12 +6,13 @@
     "cyan": "#56d4dd",
     "mutedBlue": "#8b949e",
     "green": "#7ee787",
-    "red": "#ff7b72",
+    "red": "#ff6b80",
     "amber": "#d29922",
     "panel": "#161b22",
     "accent": "#d77757",
     "neutral": "#999999",
-    "rule": "#888888"
+    "rule": "#888888",
+    "selection": "#b1b9f9"
   },
   "colors": {
     "accent": "accent",
@@ -38,7 +39,7 @@
     "toolTitle": "",
     "toolOutput": "",
     "mdHeading": "cyan",
-    "mdLink": "blue",
+    "mdLink": "selection",
     "mdLinkUrl": "mutedBlue",
     "mdCode": "cyan",
     "mdCodeBlock": "",

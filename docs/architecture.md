@@ -64,6 +64,13 @@ reveals the existing detailed footer. The packaged dark theme is applied through
 `getTheme`/`setTheme`, and the previous theme is restored on disable if the user
 has not selected a different theme meanwhile.
 
+The effective thinking level is event-driven and rendered above the editor's
+upper rule. The settings page uses `ctx.ui.custom` and the public `Input`
+component for search editing. It adapts the input's two-cell prompt to a search
+marker, retaining host paste, cursor and horizontal-scroll handling. Its tabs
+contain Pi-TUIX preferences only. Footer chrome is hidden while settings are
+open and restored in a `finally` handler when the custom view closes.
+
 Tool definitions use the public `renderShell: "self"` option while enabled.
 Their call and result components share a small presentation flag through the
 public `context.state`: once a result is rendered, the pending call row becomes

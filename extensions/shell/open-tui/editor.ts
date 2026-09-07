@@ -61,6 +61,7 @@ export class OpenTuiEditor extends CustomEditor {
   private readonly getBorder: (s: string) => string;
   private cursorStyle: CursorStyle;
   private previewHardwareCursor = false;
+  private readonly getPromptStatus: (width: number) => string;
 
   constructor(
     tui: TUI,
@@ -68,10 +69,12 @@ export class OpenTuiEditor extends CustomEditor {
     keybindings: KeybindingsManager,
     cursorStyle: CursorStyle = "block",
     ascii = useAsciiChrome(),
+    getPromptStatus: (width: number) => string = () => "",
   ) {
     super(tui, editorTheme, keybindings, { paddingX: 0 });
     this.cursorStyle = cursorStyle;
     this.ascii = ascii;
+    this.getPromptStatus = getPromptStatus;
     configureCursor(tui, cursorStyle);
     // ponytail: route the frame through this.borderColor so Pi can recolor it
     // via updateEditorBorderColor() — bash mode ("! " prefix → green) and
@@ -161,6 +164,8 @@ export class OpenTuiEditor extends CustomEditor {
         "  ? or esc close help",
       );
     }
+    const status = this.getPromptStatus(width);
+    if (status) result.unshift(status);
     return result.map((line) => truncateToWidth(line, width, ""));
   }
 }
@@ -171,6 +176,7 @@ export function installEditor(
   cursorStyle: CursorStyle = "block",
   wheelScrollLines = DEFAULT_FULLSCREEN_WHEEL_SCROLL_LINES,
   iconMode: IconMode = "auto",
+  getPromptStatus: (width: number) => string = () => "",
 ) {
   let activeTui: TUI | undefined;
   let activeEditor: OpenTuiEditor | undefined;
@@ -189,6 +195,7 @@ export function installEditor(
       keybindings,
       currentCursorStyle,
       useAsciiChrome(currentIconMode),
+      getPromptStatus,
     );
     return activeEditor;
   });

@@ -25,6 +25,7 @@ import {
 } from "@earendil-works/pi-tui";
 import { DEFAULT_CONFIG } from "../extensions/shell/open-tui/config.ts";
 import { OpenTuiEditor, renderPromptRule } from "../extensions/shell/open-tui/editor.ts";
+import { renderEffortLine } from "../extensions/shell/open-tui/effort.ts";
 import { installFooter } from "../extensions/shell/open-tui/footer.ts";
 import { OpenTuiHeader } from "../extensions/shell/open-tui/header.ts";
 import { createInitialState } from "../extensions/shell/open-tui/state.ts";
@@ -41,6 +42,7 @@ const keys = new TuiKeybindingsManager({
   ...TUI_KEYBINDINGS,
   "app.tools.expand": { defaultKeys: "ctrl+o" },
   "app.interrupt": { defaultKeys: "escape" },
+  "app.thinking.cycle": { defaultKeys: "shift+tab" },
 });
 setKeybindings(keys);
 // npm may install a nested copy even at the same version. Initialize the public
@@ -118,6 +120,7 @@ test("empty-input help toggles without submitting text and ordinary question mar
 test("compact footer displays running hints and context pressure without width overflow", () => {
   let component: Component | undefined;
   let percent = 20;
+  let settingsOpen = false;
   const state = createInitialState();
   const ctx = {
     model: { contextWindow: 100000 },
@@ -136,11 +139,19 @@ test("compact footer displays running hints and context pressure without width o
     () => state,
     () => DEFAULT_CONFIG,
     () => ({ model: "test-model", provider: "test", effort: "high" }),
-    { setRequestRender: () => {}, scheduleGitRefresh: () => {} },
+    {
+      setRequestRender: () => {},
+      scheduleGitRefresh: () => {},
+      isSettingsOpen: () => settingsOpen,
+    },
   );
   assert.ok(component);
   assert.equal(component.render(100).length, 1);
   assert.match(stripTerminalSequences(component.render(100)[0] ?? ""), /\? for shortcuts/);
+  settingsOpen = true;
+  assert.deepEqual(component.render(100), []);
+  settingsOpen = false;
+  assert.equal(component.render(100).length, 1);
   state.workingSince = Date.now();
   assert.match(stripTerminalSequences(component.render(100)[0] ?? ""), /esc.*to interrupt/);
   assert.match(stripTerminalSequences(component.render(24)[0] ?? ""), /interrupt/);
@@ -170,4 +181,27 @@ test("extension loads through Pi's public loader with all presentation commands"
     else process.env.PI_CODING_AGENT_DIR = previous;
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("effective thinking level sits above the prompt rule and remains right aligned", () => {
+  const state = { enabled: true, level: "high", ascii: false };
+  const input = new OpenTuiEditor(
+    tui,
+    { borderColor: paint, selectList: {} } as EditorTheme,
+    keys as unknown as KeybindingsManager,
+    "block",
+    false,
+    (width) => renderEffortLine(state, theme, width),
+  );
+  const lines = input.render(100).map(stripTerminalSequences);
+  assert.match(lines[0], /◉ high · shift\+tab $/);
+  assert.match(lines[1], /^─+$/);
+  assert.equal(visibleWidth(lines[0]), 100);
+  state.level = "xhigh";
+  assert.match(stripTerminalSequences(input.render(100)[0]), /xhigh/);
+  for (const width of [0, 1, 4, 8, 12, 24, 80, 120]) {
+    assert.ok(input.render(width).every((line) => visibleWidth(line) <= width));
+  }
+  state.enabled = false;
+  assert.match(stripTerminalSequences(input.render(100)[0]), /^─+$/);
 });

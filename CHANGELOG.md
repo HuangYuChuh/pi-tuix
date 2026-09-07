@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Align startup, prompt rules, and compact footer with observed Claude Code 2.1.263 terminal layout; retain Pi-TUIX identity and Pi runtime ownership.
 - Apply the reference dark palette reversibly and expose detailed statistics through `/pituix-status`.
 - Add empty-input shortcut help and live working/thinking/responding labels.
+- Place effective thinking level above the prompt and add searchable settings tabs with reference spacing, focus navigation, and narrow/short terminal layouts.
 - Use public self-rendered tool shells and replace pending rows with results; preserve exact Pi tool execution functions.
 
 ### Fixed
 - Use configured tool expansion bindings instead of the unregistered E hint.
 - Guard tiny editor widths against host wide-character wrapping recursion.
+- Hide duplicate footer hints during settings and restore them on close or failure; remove the unsupported wheel-speed control from settings.
 
 ### Validation
 - Add shell, public extension loader, theme restoration, and shared tool-row regression tests.

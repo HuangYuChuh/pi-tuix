@@ -209,6 +209,7 @@ function renderExtensionStatusLines(
 export interface FooterHooks {
   setRequestRender: (fn: (() => void) | undefined) => void;
   scheduleGitRefresh: () => void;
+  isSettingsOpen?: () => boolean;
   getSubagentActivity?: () => SubagentActivityState;
 }
 
@@ -233,7 +234,7 @@ export function installFooter(
       },
       invalidate() {},
       render(width: number): string[] {
-        if (width <= 0) return [""];
+        if (width <= 0 || hooks.isSettingsOpen?.()) return [];
         const state = getState();
         const config = getConfig();
         const glyphs = resolveGlyphs(config.icons.mode);
@@ -257,12 +258,7 @@ export function installFooter(
                 )
               : width < 60
                 ? ""
-                : theme.fg(
-                    "dim",
-                    !meta.effort || meta.effort === "off"
-                      ? meta.model
-                      : `${meta.model} · ${meta.effort}`,
-                  );
+                : theme.fg("dim", meta.model);
           const lines = [truncateToWidth(alignRight(left, right, width, theme), width, "")];
           const activity = hooks.getSubagentActivity?.();
           if (activity?.available) {

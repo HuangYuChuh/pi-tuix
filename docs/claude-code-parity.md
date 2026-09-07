@@ -27,15 +27,19 @@ is included in Pi-TUIX. The reference mascot is replaced with an original ASCII
 - Editor: full-width horizontal rules above and below the prompt, no vertical
   rails; a prompt marker in column 1 and text starting in column 3.
 - Idle footer: contextual hints. Effort appears above the input on the right.
-  Pi-TUIX keeps model/effort in its footer because public host layout differs.
+  Pi-TUIX now places the effective thinking level and Pi's configured cycle
+  binding above the input rule; model information stays in the compact footer.
 - Empty-input `?`: help replaces the compact hint area. Commands, file mentions,
   shell mode, interruption, expansion, and editing shortcuts are grouped below
   the editor. A question mark within an existing draft remains input.
 - `/model`: a selected row, descriptions, current-model marker, effort control,
   and an explicit cancel hint. This remains Pi's native model selector.
 - `/config`: a top separator, tab strip, settings search input, aligned setting
-  names and values, and navigation hints. Pi-TUIX retains its own settings UI;
-  the Claude settings tabs are not reproduced in this change.
+  names and values, and navigation hints. At 100 columns, the search box spans
+  columns 4-97, search text starts in column 8, labels in column 6, and values
+  in column 49. Search initially has focus; Enter selects a result before a
+  second Enter changes it. Escape clears a query, leaves search, then closes.
+  Pi-TUIX uses this frame and interaction with its own preference categories.
 - Shell mode: a leading `!`, an indented result branch, running text replaced by
   output, and an interruption hint during execution.
 - A model request failed with an expired-login message. A completion-duration
@@ -52,7 +56,7 @@ Observed dark-theme colors:
 | Selected command/settings accent | `#b1b9f9` |
 | Login error | `#ff6b80` |
 
-Only the first three colors are applied by this change. Other syntax and status
+These five colors are applied to corresponding theme roles. Other syntax and status
 colors retain Pi-TUIX's existing accessible palette.
 
 ## Implementation and remaining gaps
@@ -63,6 +67,8 @@ colors retain Pi-TUIX's existing accessible palette.
 | Horizontal prompt rules | `CustomEditor`, `setEditorComponent` | Implemented; Pi input and autocomplete retained |
 | Contextual help | Custom editor input handling | Implemented for Pi's actual commands and bindings |
 | Compact status and detailed statistics | `setFooter` | Implemented; `/pituix-status` toggles details |
+| Effort above the prompt | Custom editor, `thinking_level_select`, `model_select` | Implemented; displays Pi's effective level and actual cycle binding |
+| Searchable settings page | `ctx.ui.custom`, public `Input` | Reference frame, filtering, focus navigation and value alignment implemented for Pi-TUIX settings |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented; spinner frames are an approximation |
 | Queued follow-up count | `input` events, `setStatus` | Observational count; Pi owns delivery |
 | Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state` | Compact adaptation implemented; full reference comparison awaits login |
@@ -72,7 +78,7 @@ colors retain Pi-TUIX's existing accessible palette.
 | Built-in user/assistant transcript chrome | No general replacement hook in the declared extension contract | Host-owned; not pixel-identical |
 | Model menu, transcript navigation, resume | Native Pi commands/components | Retained; command and key semantics differ |
 | Claude permission modes and approval dialogs | Pi trust/permission semantics differ | Not emulated |
-| Claude settings tabs | Extension-specific settings available | Not reproduced |
+| Claude-specific settings tabs and preferences | Extension-specific settings available | Pi-TUIX categories retained; Claude account/runtime controls are not emulated |
 | MCP group summaries and cross-session agents | No universal renderer hook for other extensions | Not reproduced |
 | Claude checkpoint/rewind behavior | Pi owns sessions, branches, tool execution | Not reproduced |
 | Fullscreen layout and wheel behavior | Pi owns its terminal layout | Use host `--tui-mode fullscreen`; no private-field patch |
@@ -88,9 +94,15 @@ They do not provide a replacement renderer for all host permission decisions.
   ANSI styling, Chinese input, Unicode and ASCII prompt fallbacks, and cursor
   preservation. A minimum internal editor width works around Pi 0.84's wide-glyph
   wrapping recursion without modifying the host.
+- Settings tests cover search, two-step selection, per-tab selection memory,
+  Chinese input, ASCII fallback, 1-40 terminal rows, footer restoration, and
+  cleanup when the custom view fails. Unsupported wheel-speed UI is removed;
+  its stored preference remains for compatibility and has no host effect.
 - Exact execution-function identity tests for all four overridden tools, plus
   running/success/error/cancellation, expansion, and shared-row replacement tests.
 - Interactive Pi full-screen smoke test at 100x40 with an isolated agent directory.
+  An isolated display-only provider fixture exposes a reasoning model for effort
+  rendering; it sends no requests and is not part of the package.
 - Successful Claude model-driven tool calls, streaming, approval dialogs, and
   full cross-product visual parity remain unverified because login expired.
 
@@ -107,7 +119,9 @@ In Pi, use `/pituix-status` for detailed statistics, `?` on an empty draft for
 help, and `/pituix-default` to restore the native UI and previous theme. Pi-TUIX
 respects a different theme chosen by the user before disabling it.
 
-Continue the reference study after authenticating Claude Code with `/login`.
+Continue the reference study after authenticating Claude Code with `/login` or
+configuring a compatible third-party gateway locally. Credentials and gateway
+configuration belong to Claude Code, never to this extension or its repository.
 Use only disposable fixture files for tool/approval/diff tests. Until that work
 and the host-owned gaps above are resolved, this is a partial visual adaptation,
 not a complete reproduction.
