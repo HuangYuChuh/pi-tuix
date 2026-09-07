@@ -218,3 +218,5 @@ Public references: [Claude interactive mode](https://code.claude.com/docs/en/int
 contracts/examples shipped with the supported Pi package.
 
 This split adds elapsed working feedback, reported token counts and saved completion/interruption rows. Tests cover duplicate settlement, retry duration, concurrent tool IDs, cancellation, disabled rendering and unchanged model context. The original reference and host observations remain available in the integration branch; whole-product parity is still incomplete.
+
+This split adds the live message layout in both native terminal modes and the current-branch transcript reader. Tests cover ANSI/CJK width limits, Markdown rendering, original component identity, cancellation, snapshot tools, completion rows, native search/prompt navigation and default restoration. Saved-session catalogue controls are deferred to the next split.

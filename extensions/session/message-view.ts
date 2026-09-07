@@ -1,0 +1,96 @@
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
+import {
+  type Component,
+  Markdown,
+  stripTerminalSequences,
+  truncateToWidth,
+  visibleWidth,
+  wrapTextWithAnsi,
+} from "@earendil-works/pi-tui";
+
+/** Session text is data: terminal controls must not become viewport commands. */
+export function messageText(text: string): string {
+  return stripTerminalSequences(text).replace(/\p{Cc}/gu, (char) =>
+    char === "\n" ? "\n" : char === "\t" ? "  " : "",
+  );
+}
+
+function userMarker(text: string, theme: Theme): string {
+  const noColor = Boolean(process.env.NO_COLOR);
+  const forced = Boolean(process.env.FORCE_COLOR) && process.env.FORCE_COLOR !== "0";
+  if (theme.name !== "pi-tuix-dark" || (noColor && !forced)) return theme.fg("borderMuted", text);
+  const color = theme.getColorMode() === "truecolor" ? "2;80;80;80" : "5;239";
+  return `\x1b[38;${color}m${text}\x1b[39m`;
+}
+
+export class ReferenceUserMessage implements Component {
+  private readonly text: string;
+  private readonly theme: Theme;
+  private readonly ascii: boolean;
+
+  constructor(text: string, theme: Theme, ascii = false) {
+    this.text = messageText(text);
+    this.theme = theme;
+    this.ascii = ascii;
+  }
+
+  render(width: number): string[] {
+    if (width <= 0) return [];
+    const prefixWidth = width >= 4 ? 2 : 0;
+    const bodyWidth = Math.max(1, width - prefixWidth - (width >= 4 ? 1 : 0));
+    const body = this.text.split("\n").flatMap((line) => wrapTextWithAnsi(line, bodyWidth));
+    return body.map((line, index) => {
+      const prefix = prefixWidth
+        ? index === 0
+          ? userMarker(`${this.ascii ? ">" : "❯"} `, this.theme)
+          : "  "
+        : "";
+      const content = truncateToWidth(prefix + this.theme.fg("userMessageText", line), width, "");
+      return this.theme.bg("userMessageBg", content + " ".repeat(width - visibleWidth(content)));
+    });
+  }
+
+  invalidate(): void {}
+}
+
+/** Prefix the rendered Markdown, keeping headings, lists and code fences intact. */
+export class ReferenceAssistantText implements Component {
+  private readonly markdown: Markdown;
+  private readonly theme: Theme;
+  private readonly ascii: boolean;
+  private readonly thinking: boolean;
+
+  constructor(text: string, theme: Theme, ascii = false, thinking = false) {
+    this.theme = theme;
+    this.ascii = ascii;
+    this.thinking = thinking;
+    this.markdown = new Markdown(
+      messageText(text),
+      0,
+      0,
+      getMarkdownTheme(),
+      thinking ? { color: (text) => theme.fg("thinkingText", text), italic: true } : undefined,
+    );
+  }
+
+  render(width: number): string[] {
+    if (width <= 0) return [];
+    const inset = width >= 4 ? 2 : 0;
+    // Pi's Markdown wrapper needs room for a wide glyph even in one-cell views.
+    const lines = this.markdown.render(Math.max(4, width - inset));
+    return lines.map((line, index) => {
+      const marker = this.thinking ? (this.ascii ? "~" : "∴") : this.ascii ? "*" : "⏺";
+      const prefix = inset
+        ? index === 0
+          ? `${this.theme.fg(this.thinking ? "thinkingText" : "userMessageText", marker)} `
+          : "  "
+        : "";
+      return truncateToWidth(prefix + line, width, "");
+    });
+  }
+
+  invalidate(): void {
+    this.markdown.invalidate();
+  }
+}

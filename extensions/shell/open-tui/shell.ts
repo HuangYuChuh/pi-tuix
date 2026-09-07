@@ -14,6 +14,7 @@ import { installFooter } from "./footer.ts";
 import { emptyGitStatus, readGitStatus } from "./git.ts";
 import { installHeader } from "./header.ts";
 import { useAsciiChrome } from "./icons.ts";
+import { createLiveTranscript } from "./live-transcript.ts";
 import { readRuntimeInfo } from "./runtime.ts";
 import { SessionLifecycle } from "./session-lifecycle.ts";
 import { registerSettingsCommand } from "./settings-command.ts";
@@ -47,6 +48,7 @@ export function createOpenTuiShellRuntime(
   const lifecycle = new SessionLifecycle();
   const state: FooterState = createInitialState();
   const telemetry = new TurnTelemetryTracker();
+  const liveTranscript = createLiveTranscript(pi);
   let config: OpenTuiConfig = structuredClone(DEFAULT_CONFIG);
   const effort: EffortState = { enabled: false, level: "off", ascii: false };
   const syncEffort = (ctx: ExtensionContext) => {
@@ -161,6 +163,8 @@ export function createOpenTuiShellRuntime(
       config.fullscreen.wheelScrollLines,
       config.icons.mode,
       (width) => renderEffortLine(effort, ctx.ui.theme, width),
+      (tui, activeEditor) =>
+        liveTranscript.mount(tui, activeEditor, ctx, () => useAsciiChrome(config.icons.mode)),
     );
     active = true;
   };
@@ -237,6 +241,7 @@ export function createOpenTuiShellRuntime(
     },
     handleAgentStart() {
       if (!lifecycle.isCurrent()) return;
+      liveTranscript.followLatest();
       state.workingSince = Date.now();
       state.lastDoneIn = undefined;
       stopTimer();

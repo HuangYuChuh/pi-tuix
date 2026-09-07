@@ -142,3 +142,5 @@ UI changes should be checked at narrow and normal terminal widths, including idl
 Pi-TUIX is released under the [MIT License](LICENSE).
 
 The working line shows elapsed time and reported output tokens. Pi stores one display-only completion or interruption record per settled run through its public custom-entry API. Historical records remain outside model context, and default mode hides their rendering.
+
+Live conversations now share reversible reference message styling in regular and fullscreen modes. Pi retains its document, editor, scrolling, search and prompt navigation. `/pituix-transcript` opens a read-only current-branch snapshot with Markdown, tools, diffs and completion rows; Esc returns to the editor.
