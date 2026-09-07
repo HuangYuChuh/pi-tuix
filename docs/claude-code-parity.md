@@ -216,3 +216,5 @@ not a complete reproduction.
 Public references: [Claude interactive mode](https://code.claude.com/docs/en/interactive-mode),
 [Claude installation](https://code.claude.com/docs/en/setup), and the extension
 contracts/examples shipped with the supported Pi package.
+
+This split adds elapsed working feedback, reported token counts and saved completion/interruption rows. Tests cover duplicate settlement, retry duration, concurrent tool IDs, cancellation, disabled rendering and unchanged model context. The original reference and host observations remain available in the integration branch; whole-product parity is still incomplete.

@@ -115,3 +115,5 @@ rows are invalidated after completion; no message or session entry is rewritten.
 Execution functions, argument schemas, and permission behavior are
 unchanged. Other extensions' MCP tools and built-in transcript components remain
 host-owned. No new runtime dependency or private host patch is introduced.
+
+RunPresentation observes public message and tool events, keeping elapsed time across retries and tracking concurrent tools by call ID. On agent_settled the extension appends one versioned pi-tuix-run-completion custom entry through Pi. The entry renderer reads validated metadata and hides it in default mode. Pi owns storage, ordering, branching and model context; these display-only entries do not become model messages. Timers clear on shutdown and duplicate settlement cannot append twice.

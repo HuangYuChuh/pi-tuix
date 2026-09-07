@@ -90,3 +90,5 @@ provider, permission, transcript, or session ownership to Pi-TUIX. Successful
 reference tool workflows have now been observed through a separately configured
 Claude Code gateway. The model picker reads Pi's scoped/available models and
 delegates selection to Pi; it does not maintain a separate model catalogue.
+
+Run-completion and interruption records improve scanning across past turns. Pi-TUIX owns their display payload and renderer, while Pi owns session storage and excludes these plain custom entries from model context.
