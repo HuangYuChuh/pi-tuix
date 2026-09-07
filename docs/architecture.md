@@ -38,7 +38,7 @@ The prototype intentionally uses only public hooks:
 - `ctx.ui.setTitle()` for terminal identity;
 - `pi.registerCommand()` for reversible toggles.
 
-Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` delegation pattern. Pi-TUIX retains each original public tool definition and exact `execute()` function while replacing only `renderCall()` and `renderResult()` when its UI mode is active. `/pituix-default` switches future tool rendering back to the original Pi renderer in the same session.
+Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` delegation pattern. Pi-TUIX retains each original public tool definition and exact `execute()` function while replacing only presentation. `/pituix-default` restores existing and future tool rows using the original Pi renderers in the same session.
 
 Workflow status shows the current phase, active tool, completed and failed tool counts, and queued follow-up messages. It resets for each agent run and never changes Pi's queue, tool inputs, or execution behavior.
 
@@ -78,9 +78,40 @@ then `pi.setModel` and `pi.setThinkingLevel` apply them. Authentication, model
 availability, effective effort and persistence remain Pi-owned. The native
 `/model` command is preserved.
 
-Tool definitions use the public `renderShell: "self"` option while enabled.
+Tool definitions keep the public `renderShell: "self"` option stable.
+Each built-in tool is registered once. `/pituix-compact` selects collapsed
+summaries and `/pituix-three-layer` selects previews in the same renderer;
+both reset Pi's expansion flag. Native rendering is selected by
+`/pituix-default`, without competing registrations for the same tool names.
 Their call and result components share a small presentation flag through the
 public `context.state`: once a result is rendered, the pending call row becomes
-empty. Execution functions, argument schemas, and permission behavior are
+empty. Pi 0.84 retains the shell container attached at tool-row creation, so
+changing `renderShell` alone leaves stale rows. When disabled, the adapter calls
+the original renderers and composes their default frame with the public `Box`
+component; native self-rendered tools retain their own frame. Mode changes use
+each row's public `context.invalidate` callback, tracked by tool-call ID and
+cleared at session start/shutdown. A native partial renderer still receives its
+final result after a mode switch so its own timers can settle.
+
+Read previews show a count, Write previews add line numbers, and Edit uses the
+public `renderDiff` formatter for word highlights. A guarded presentation
+adapter moves recognized diff line numbers before the change marker while
+preserving ANSI sequences; unrecognized formats pass through unchanged.
+For the reference dark theme, `diff-view` reads inverse-video token ranges from
+that public output, then paints row and token backgrounds at the available
+width. Added/context lines use public `highlightCode`; removed lines stay plain.
+The tool view accepts pure width-dependent detail-line callbacks so backgrounds
+can fill the observed code pane without rendering side effects. Color resets,
+256-color fallback and `NO_COLOR` handling stay in this adapter. Other themes
+continue using the original public diff styling. Syntax token categories remain
+Pi-owned and are not yet identical to the reference. No new dependency is added.
+Adjacent successful Read/Bash calls share a compact count summary. The grouping
+adapter observes public finalized messages and tool completion events, and
+rehydrates metadata from `sessionManager.getBranch()` on startup/navigation.
+It deduplicates lexically normalized file paths, counts every Bash call, and
+keeps failures, images, truncation, visible text and other tools as boundaries.
+Group members use their individual tool views when expanded. Only affected tool
+rows are invalidated after completion; no message or session entry is rewritten.
+Execution functions, argument schemas, and permission behavior are
 unchanged. Other extensions' MCP tools and built-in transcript components remain
 host-owned. No new runtime dependency or private host patch is introduced.

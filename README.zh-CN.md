@@ -55,7 +55,11 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 
 输入框上方显示当前思考强度及 Pi 的实际快捷键。`/pituix-settings` 提供可搜索的设置页：输入关键词筛选，Enter 选中结果，再按 Enter 或空格修改；Tab 切换分类，Esc 依次清空搜索、离开搜索框、关闭页面。
 
-每个紧凑工具行都会明确显示动作、目标、状态和 `ATTENTION/CLEAR` 信号。Read 与 Bash 汇总输出规模，Edit 展示 diff 统计，Write 展示写入行数；展开后可查看经过 ANSI-aware 宽度约束的输出或 diff。
+每个紧凑工具行都会显示动作、目标、状态，并用 `ATTENTION` 标出需要关注的错误。Read 默认只显示行数摘要，Bash 显示输出，Edit 使用 `Update` 标题和带行号的 diff，Write 预览带行号的正文。长预览保留前后各两行；collapsed 仅保留摘要，expanded 展示完整输出或 diff，也可以展开 Read 正文。错误保留详情，所有视图均使用 ANSI-aware 宽度约束。
+
+连续成功的 Read/Bash 调用会合并为数量摘要：文件路径去重，Bash 按调用次数计数。展开工具后可查看每一次调用。错误、取消、图片和截断结果单独显示；助手正文和其他工具会分隔摘要。恢复会话时通过 Pi 的公开会话分支重建分组。
+
+参考深色主题中的 Edit diff 使用带行号的 `+/-` 标记、整行底色和更深的改动词底色。新增行与上下文行沿用 Pi 的语法解析器，其他主题保留 Pi 的 diff 样式，并支持 256 色和无色终端。
 
 以下命令均可逆：
 
@@ -63,8 +67,8 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 | --- | --- |
 | `/pituix` | 启用或恢复 Pi-TUIX shell |
 | `/pituix-default` | 恢复 Pi 默认 TUI 组件 |
-| `/pituix-compact` | 使用原有紧凑工具展示 |
-| `/pituix-three-layer` | 使用三层工具展示 |
+| `/pituix-compact` | 将参考样式的工具展示收起为摘要行 |
+| `/pituix-three-layer` | 显示参考样式的工具预览，保留展开能力 |
 | `/pituix-mode <collapsed\|preview\|expanded>` | 设置工具详情模式，默认是 preview |
 | `/pituix-status` | 切换简洁底栏和详细统计 |
 | `/pituix-model` | 在编号列表中选择 Pi 模型，并调整思考强度 |

@@ -14,11 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Place effective thinking level above the prompt and add searchable settings tabs with reference spacing, focus navigation, and narrow/short terminal layouts.
 - Add a numbered model picker with draft effort adjustment, Pi model scope and capability checks, and cancellation through `/pituix-model`.
 - Use public self-rendered tool shells and replace pending rows with results; preserve exact Pi tool execution functions.
+- Add result branches, compact Read counts, numbered Write previews, and Update diffs with Pi's public word-level highlighting.
+- Group adjacent successful Read/Bash calls into unique-file and shell-call counts, with individual expansion and read-only reconstruction when resuming sessions.
+- Match observed Edit row and changed-token backgrounds, gutter colors and right margin; preserve source characters, theme fallback, no-color mode and distinct 256-color fills.
+- Use the reference syntax palette with Pi's public highlighter for added/context diff lines; retain the documented differences in token categories.
 
 ### Fixed
 - Use configured tool expansion bindings instead of the unregistered E hint.
 - Guard tiny editor widths against host wide-character wrapping recursion.
 - Hide duplicate footer hints during settings and restore them on close or failure; remove the unsupported wheel-speed control from settings.
+- Restore existing tool rows as well as new rows with `/pituix-default`; retain a stable public shell adapter and invalidate rows through their public callbacks.
+- Finish native running-renderer cleanup after a presentation-mode switch, and refresh collapsed/preview changes even when Pi's expansion flag stays unchanged.
+- Register each built-in tool once so compact summaries and previews share the same renderer.
 
 ### Validation
 - Add shell, public extension loader, theme restoration, and shared tool-row regression tests.
