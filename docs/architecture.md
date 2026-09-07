@@ -87,6 +87,23 @@ then `pi.setModel` and `pi.setThinkingLevel` apply them. Authentication, model
 availability, effective effort and persistence remain Pi-owned. The native
 `/model` command is preserved.
 
+`/pituix-resume` lists sessions through the public `SessionManager.list` and
+loads `listAll` only when the user chooses all projects. The current custom
+session directory is included through the public overload. The component
+filters `SessionInfo` records and previews `allMessagesText`, with no I/O from
+rendering. It shows message counts and modification times rather than guessing
+unavailable branch or file-size metadata. The custom view closes before
+`ctx.switchSession(path)` replaces the runtime; late load callbacks are ignored,
+and no captured session-bound object is used after a successful replacement.
+Pi 0.84 reapplies its saved theme after `session_start` during replacement.
+The picker reapplies the reference Theme instance through the fresh public
+`withSession` context, without changing Pi's saved theme preference. Native
+session/reload commands can still reset an extension-applied temporary theme;
+their post-rebind sequence is not intercepted by Pi-TUIX.
+This text preview does not reproduce tool/media transcript rendering. Session
+files, migration, persistence and branching remain Pi-owned; native `/resume`
+and `/tree` are untouched.
+
 Tool definitions keep the public `renderShell: "self"` option stable.
 Each built-in tool is registered once. `/pituix-compact` selects collapsed
 summaries and `/pituix-three-layer` selects previews in the same renderer;

@@ -33,6 +33,7 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   piTuix(pi);
   assert.ok(commands.has("pituix-settings"));
   assert.ok(commands.has("pituix-session"));
+  assert.ok(commands.has("pituix-resume"));
   assert.ok(!commands.has("open-tui"));
   assert.deepEqual(
     tools.map((tool) => tool.name),

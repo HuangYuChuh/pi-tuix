@@ -61,6 +61,8 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 
 工作行显示实际耗时，以及 Pi 已上报的输出 token 数。任务完全结束后，临时完成行显示耗时和结束时间；取消时显示中断提示。下一次运行或 `/pituix-default` 会清除该提示，不会向会话中添加消息。
 
+`/pituix-resume` 可搜索已保存的 Pi 会话，并预览公开接口提供的消息文本。输入关键词筛选，按 Enter 选中结果，再按 Enter 恢复；空格打开文本预览，Ctrl+A 切换当前项目和所有项目。实际会话切换由 Pi 完成，原生 `/resume` 和 `/tree` 仍可使用。
+
 以下命令均可逆：
 
 | 命令 | 用途 |
@@ -72,6 +74,8 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 | `/pituix-mode <collapsed\|preview\|expanded>` | 设置工具详情模式，默认是 preview |
 | `/pituix-status` | 切换简洁底栏和详细统计 |
 | `/pituix-model` | 在编号列表中选择 Pi 模型，并调整思考强度 |
+| `/pituix-resume` | 搜索、预览和恢复已保存的 Pi 会话 |
+| `/pituix-session` | 浏览当前 Pi 会话树并跳转到已有条目 |
 | `/pituix-settings` | 配置界面、底栏、图标和统计 |
 | `/pituix-about` | 查看 package 与兼容的 Pi 版本 |
 | `/pituix-steer <消息>` | 立即纠偏当前执行中的任务 |

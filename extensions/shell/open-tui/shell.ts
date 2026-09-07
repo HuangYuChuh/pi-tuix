@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { registerModelPicker } from "../../control/model-picker.ts";
+import { registerResumePicker } from "../../session/resume-picker.ts";
 import type { SubagentActivityObserver } from "../../session/subagent-activity.ts";
 import {
   DEFAULT_CONFIG,
@@ -192,6 +193,17 @@ export function createOpenTuiShellRuntime(
     ascii: () => useAsciiChrome(config.icons.mode),
     onOpen: onPanelOpened,
     onClose: onPanelClosed,
+  });
+  registerResumePicker(pi, {
+    ascii: () => useAsciiChrome(config.icons.mode),
+    onOpen: onPanelOpened,
+    onClose: onPanelClosed,
+    onResume: (replacement) => {
+      // Pi 0.84 reapplies its saved theme after session_start. The public
+      // post-switch callback is bound to the fresh session, after that reset.
+      const referenceTheme = replacement.ui.getTheme("pi-tuix-dark");
+      if (referenceTheme) replacement.ui.setTheme(referenceTheme);
+    },
   });
   registerSettingsCommand(pi, {
     getConfig: () => config,

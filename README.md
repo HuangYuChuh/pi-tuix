@@ -58,6 +58,8 @@ Adjacent successful Read/Bash calls combine into a count summary, deduplicating 
 
 The working line shows elapsed time and reported output tokens when available. After Pi settles, a temporary completion line shows duration and clock time, or an interruption prompt after cancellation. It clears on the next run or `/pituix-default` and does not add session messages.
 
+`/pituix-resume` searches saved Pi sessions and previews their public message text. Type to filter, press Enter to select a result, then Enter again to resume. Space opens a text preview; Ctrl+A switches between the current project and all projects. Pi performs the actual session switch. Native `/resume` and `/tree` remain available.
+
 These commands are reversible:
 
 | Command | Purpose |
@@ -70,6 +72,8 @@ These commands are reversible:
 | `/pituix-about` | Show the package and compatible Pi version |
 | `/pituix-status` | Toggle compact hints and detailed session statistics |
 | `/pituix-model` | Choose a Pi model and thinking level in the numbered picker |
+| `/pituix-resume` | Search, preview and resume saved Pi sessions |
+| `/pituix-session` | Navigate entries in the current Pi session tree |
 | `/pituix-settings` | Open shell, footer, icon, and telemetry settings |
 | `/pituix-steer <message>` | Interrupt the current run with an immediate correction |
 | `/pituix-followup <message>` | Queue work to start after the current run |

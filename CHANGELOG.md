@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Group adjacent successful Read/Bash calls into unique-file and shell-call counts, with individual expansion and read-only reconstruction when resuming sessions.
 - Add elapsed working feedback, reported output-token counts, and temporary settled-run completion/interruption lines; retain duration through automatic retries.
 - Match observed user-message background/text and successful tool-marker colors through the public theme.
+- Add a searchable resume picker with public Pi session metadata, text previews, project scope switching, and host-delegated session restoration through `/pituix-resume`.
 
 ### Fixed
 - Use configured tool expansion bindings instead of the unregistered E hint.
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Finish native running-renderer cleanup after a presentation-mode switch, and refresh collapsed/preview changes even when Pi's expansion flag stays unchanged.
 - Recognize Pi's error-form AbortError response as an interruption instead of reporting a failed completion.
 - Register each built-in tool once so `/pituix-compact` keeps reference-style summaries and `/pituix-three-layer` restores previews instead of routing to native rows.
+- Reapply the temporary reference theme through Pi's fresh `withSession` context after `/pituix-resume` switches sessions.
 
 ### Validation
 - Add shell, public extension loader, theme restoration, and shared tool-row regression tests.

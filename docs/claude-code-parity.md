@@ -45,6 +45,11 @@ is included in Pi-TUIX. The reference mascot is replaced with an original ASCII
   Pi-TUIX uses this frame and interaction with its own preference categories.
 - Shell mode: a leading `!`, an indented result branch, running text replaced by
   output, and an interruption hint during execution.
+- `/resume`: a top separator, search frame, selected session title and muted
+  relative time/branch/file-size row. Typing focuses search, Enter selects a
+  result before a second Enter resumes, and Space previews the conversation.
+  Escape returns from preview to the list, clears active search, or cancels the
+  picker. The observed picker also exposes project/branch filters and rename.
 - A model request failed with an expired-login message. A completion-duration
   line was still rendered for that failed attempt. This is not evidence of a
   successful model turn or of model-driven Read/Edit/Write rendering.
@@ -114,6 +119,7 @@ colors retain Pi-TUIX's existing accessible palette.
 | Effort above the prompt | Custom editor, `thinking_level_select`, `model_select` | Implemented; displays Pi's effective level and actual cycle binding |
 | Searchable settings page | `ctx.ui.custom`, public `Input` | Reference frame, filtering, focus navigation and value alignment implemented for Pi-TUIX settings |
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
+| Searchable resume picker | Public `SessionManager.list`/`listAll`, `SessionInfo`, `ctx.switchSession` | Implemented in `/pituix-resume`; previews public message text and uses real message counts/time, without branch/file-size metadata or tool/media preview |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `setWidget` | Latest completion duration/clock and interruption branch implemented; historical per-response rows are not reproduced |
 | Queued follow-up count | `input` events, `setStatus` | Observational count; Pi owns delivery |
@@ -123,7 +129,7 @@ colors retain Pi-TUIX's existing accessible palette.
 | Execution, errors, cancellation | Original tool `execute` functions | Delegated unchanged |
 | Default UI restoration | Public unset/reset methods | Implemented and tested |
 | Built-in user/assistant transcript chrome | No general replacement hook in the declared extension contract | Host-owned; not pixel-identical |
-| Native model command, transcript navigation, resume | Native Pi commands/components | Retained; `/pituix-model` provides the custom model surface |
+| Native model command, transcript navigation, resume | Native Pi commands/components | Retained; `/pituix-model` and `/pituix-resume` provide custom selection surfaces |
 | Claude permission modes and approval dialogs | Pi trust/permission semantics differ | Not emulated |
 | Claude-specific settings tabs and preferences | Extension-specific settings available | Pi-TUIX categories retained; Claude account/runtime controls are not emulated |
 | MCP group summaries and cross-session agents | No universal renderer hook for other extensions | Not reproduced |
@@ -182,6 +188,16 @@ than reproducing Claude's syntax palette exactly.
 - Successful Claude Read/Bash/Edit/Write calls and approval dialogs are now
   observed. Full cross-product visual parity remains incomplete; the tool
   presentation gaps above are based on these authenticated observations.
+- Resume-picker tests cover public session scope, filtering, native input paste,
+  preview navigation, two-step selection, loading failures, late callback
+  cleanup, single switch delegation, and ANSI/CJK width/height bounds. Actual
+  Claude `/resume` list, search and preview screens were captured in the
+  disposable reference project without switching or sending a model request.
+  The local-path installed package was tested by searching, previewing and
+  actually switching to a saved fixture session. The resumed tool grouping,
+  reference palette and default-UI restoration were verified. A public
+  `withSession` callback reapplies the temporary theme after Pi 0.84's saved-theme
+  reset; native session/reload commands retain that host behavior.
 
 ## Reproduce locally
 
