@@ -185,6 +185,9 @@ than reproducing Claude's syntax palette exactly.
   handling. Actual Pi sessions verified working elapsed time, completion,
   default-UI cleanup and interruption of the arithmetic tool. Pi can also render
   its own aborted-operation error message; that host transcript row remains.
+- Concurrent-tool state tests cover repeated tool names, out-of-order completion,
+  duplicated/late events and cancellation cleanup; lifecycle wiring verifies
+  that the working message retains the remaining active tool.
 - Successful Claude Read/Bash/Edit/Write calls and approval dialogs are now
   observed. Full cross-product visual parity remains incomplete; the tool
   presentation gaps above are based on these authenticated observations.

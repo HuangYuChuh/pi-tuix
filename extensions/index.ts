@@ -23,6 +23,7 @@ import {
   settleAgent,
   startTool,
   startTurn,
+  workflowWorkingLabel,
 } from "./stream/workflow-status.ts";
 import { registerThreeLayerToolRenderers, type ToolRendererMode } from "./tools/renderers-v2.ts";
 import type { DisplayMode } from "./tools/three-layer-view.ts";
@@ -96,15 +97,8 @@ export default function piTuix(pi: ExtensionAPI): void {
     applyPiTuix(ctx, toolMode, shell, plan);
     workflow.requestRender = () => {
       if (ctx.mode !== "tui" || !toolMode.enabled) return;
-      const activity = workflow.currentTool
-        ? `Running ${workflow.currentTool}`
-        : workflow.activity === "THINKING"
-          ? "Thinking"
-          : workflow.activity === "RESPONDING"
-            ? "Responding"
-            : "Working";
       ctx.ui.setWorkingMessage?.(
-        run.workingMessage(`${activity}...`, Date.now(), useAsciiChrome()),
+        run.workingMessage(`${workflowWorkingLabel(workflow)}...`, Date.now(), useAsciiChrome()),
       );
       ctx.ui.setStatus?.(
         "pituix-queue",
@@ -160,12 +154,12 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.on("input", (event) => {
     if (event.streamingBehavior === "followUp") queueMessage(workflow);
   });
-  pi.on("tool_execution_start", (event) => startTool(workflow, event.toolName));
+  pi.on("tool_execution_start", (event) => startTool(workflow, event.toolCallId, event.toolName));
   pi.on("tool_execution_end", (event, ctx) => {
     run.observeTool(event.toolCallId, event.result, event.isError);
     const affected = groups.complete(event.toolCallId, event.result, event.isError);
     if (toolMode.enabled && affected.length) toolRenderers.invalidate(affected);
-    finishTool(workflow, event.isError);
+    finishTool(workflow, event.toolCallId, event.isError);
     shell.handleRefresh(ctx);
   });
   pi.on("message_end", (event, ctx) => {

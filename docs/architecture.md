@@ -41,6 +41,9 @@ The prototype intentionally uses only public hooks:
 Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` delegation pattern. Pi-TUIX retains each original public tool definition and exact `execute()` function while replacing only presentation. `/pituix-default` restores existing and future tool rows using the original Pi renderers in the same session.
 
 Workflow status shows the current phase, active tool, completed and failed tool counts, and queued follow-up messages. It resets for each agent run and never changes Pi's queue, tool inputs, or execution behavior.
+Active calls are keyed by public tool-call ID, including simultaneous calls of
+the same tool. The working line reports the active count until one call remains.
+Duplicate completions and late events after settlement cannot alter that count.
 
 Run presentation observes assistant usage and stop reasons. A one-second UI timer
 updates elapsed working feedback; unavailable token counts are omitted rather

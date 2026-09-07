@@ -98,6 +98,19 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     context,
   );
   assert.equal(workingMessages.at(-1), "Thinking...");
+  await handlers.get("tool_execution_start")?.({ toolCallId: "read-a", toolName: "Read" }, context);
+  await handlers.get("tool_execution_start")?.({ toolCallId: "read-b", toolName: "Read" }, context);
+  assert.match(workingMessages.at(-1) ?? "", /^Running 2 tools/);
+  await handlers.get("tool_execution_end")?.(
+    { toolCallId: "read-a", result: { content: [] }, isError: false },
+    context,
+  );
+  assert.match(workingMessages.at(-1) ?? "", /^Running Read/);
+  await handlers.get("tool_execution_end")?.(
+    { toolCallId: "read-b", result: { content: [] }, isError: false },
+    context,
+  );
+  assert.equal(workingMessages.at(-1), "Working...");
   await handlers.get("agent_end")?.(
     { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
     context,

@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recognize Pi's error-form AbortError response as an interruption instead of reporting a failed completion.
 - Register each built-in tool once so `/pituix-compact` keeps reference-style summaries and `/pituix-three-layer` restores previews instead of routing to native rows.
 - Reapply the temporary reference theme through Pi's fresh `withSession` context after `/pituix-resume` switches sessions.
+- Track concurrent tool activity by call ID so one completed tool cannot clear another running tool; ignore duplicate and late completion events.
 
 ### Validation
 - Add shell, public extension loader, theme restoration, and shared tool-row regression tests.
