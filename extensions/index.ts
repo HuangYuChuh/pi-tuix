@@ -74,12 +74,12 @@ export default function piTuix(pi: ExtensionAPI): void {
   registerTranscriptCommand(pi, shell.useAscii, prepareImages);
 
   const toolRenderers = registerThreeLayerToolRenderers(pi, toolMode);
-  const syncInterface = (ctx: ExtensionContext) => {
+  const syncInterface = (ctx: ExtensionContext, restoreTheme = false) => {
     if (ctx.mode !== "tui") return;
     toolMode.enabled = shell.isEnabled();
     // Pi owns the dynamic terminal title, including session/project identity.
     if (toolMode.enabled) {
-      shell.apply(ctx);
+      shell.apply(ctx, restoreTheme);
       syncPlanWidget(ctx, plan);
       refreshWorkflow(workflow);
     } else {
@@ -90,10 +90,10 @@ export default function piTuix(pi: ExtensionAPI): void {
     toolRenderers.invalidate();
     completions.refresh();
   };
-  const enableInterface = (ctx: ExtensionContext) => {
+  const enableInterface = (ctx: ExtensionContext, restoreTheme = false) => {
     if (ctx.mode !== "tui") return;
     shell.setEnabled(true);
-    syncInterface(ctx);
+    syncInterface(ctx, restoreTheme);
   };
   const hydrateGroups = (ctx: ExtensionContext) => {
     groups.reset(ctx.cwd);
@@ -235,9 +235,9 @@ export default function piTuix(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("pituix", {
-    description: "Show Pi-TUIX status and restore its interface",
+    description: "Restore the Pi-TUIX interface and reference theme",
     handler: async (_args, ctx) => {
-      enableInterface(ctx);
+      enableInterface(ctx, true);
       ctx.ui.notify(`${PACKAGE_NAME} interface enabled (${toolMode.defaultMode} tools)`, "info");
     },
   });

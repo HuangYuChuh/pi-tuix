@@ -38,7 +38,7 @@ export interface OpenTuiShellRuntime {
   isEnabled(): boolean;
   useAscii(): boolean;
   setEnabled(enabled: boolean): void;
-  apply(ctx: ExtensionContext): void;
+  apply(ctx: ExtensionContext, restoreTheme?: boolean): void;
   remove(ctx: ExtensionContext): void;
   handleSessionStart(ctx: ExtensionContext): void;
   handleSessionShutdown(ctx: ExtensionContext): void;
@@ -154,18 +154,21 @@ export function createOpenTuiShellRuntime(
       intervalMs: 120,
     });
   };
-  const apply = (ctx: ExtensionContext) => {
+  const apply = (ctx: ExtensionContext, restoreTheme = false) => {
     if (!isTuiContext(ctx)) return;
     syncEffort(ctx);
+    // Only explicit recovery overrides a theme selected while the shell is active.
+    if (!active || restoreTheme) {
+      const referenceTheme = ctx.ui.getTheme?.("pi-tuix-dark");
+      if (referenceTheme && ctx.ui.theme.name !== referenceTheme.name) {
+        const currentTheme = ctx.ui.theme;
+        if (ctx.ui.setTheme(referenceTheme).success) previousTheme = currentTheme;
+      }
+    }
     if (active) {
       applyIndicator(ctx);
       requestRender?.();
       return;
-    }
-    const referenceTheme = ctx.ui.getTheme?.("pi-tuix-dark");
-    if (referenceTheme) {
-      previousTheme = ctx.ui.theme;
-      ctx.ui.setTheme(referenceTheme);
     }
     applyIndicator(ctx);
     ctx.ui.setHiddenThinkingLabel("Thinking (expand to view)");

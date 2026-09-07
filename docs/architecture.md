@@ -170,6 +170,12 @@ context exposes no post-theme-rebind event or saved automatic-theme preference.
 Switching by theme name would persist a different Pi setting, so the adapter
 continues using a temporary Theme instance rather than silently replacing that
 preference.
+Explicit `/pituix` recovery reapplies that instance even when the shell is already
+active. A successful change remembers the theme it replaced for later disable;
+repeated recovery while the reference theme is current does not overwrite that
+return value. Ordinary settings synchronization and tool-mode commands preserve
+themes selected while active. Recovery keeps the existing editor and transcript
+mount rather than removing and reinstalling them.
 The preview shares the pure startup header and snapshot transcript components.
 It shows individual tool results (without live Read/Bash grouping), diffs,
 completion records and recorded assistant time/model above text responses.
