@@ -21,6 +21,7 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   const commands = new Map<string, { handler: (...args: any[]) => Promise<void> }>();
   const tools: ToolDefinition[] = [];
   const pi = {
+    registerMarkdownTransformer: () => {},
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
     on: (event: string, handler: (...args: any[]) => any) => handlers.set(event, handler),
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
@@ -182,6 +183,7 @@ test("queue commands delegate steering and follow-ups to Pi", async () => {
   const commands = new Map<string, { handler: (...args: any[]) => Promise<void> }>();
   const sent: unknown[] = [];
   const pi = {
+    registerMarkdownTransformer: () => {},
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
     on: (event: string, handler: (...args: any[]) => any) => handlers.set(event, handler),
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
@@ -214,6 +216,7 @@ test("plan panel follows Pi-TUIX enable and default lifecycle", async () => {
   const commands = new Map<string, { handler: (...args: any[]) => Promise<void> }>();
   const widgets: unknown[] = [];
   const pi = {
+    registerMarkdownTransformer: () => {},
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
     on: (event: string, handler: (...args: any[]) => any) => handlers.set(event, handler),
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types

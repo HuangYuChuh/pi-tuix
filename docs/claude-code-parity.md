@@ -129,28 +129,34 @@ broadly than the observed reference.
 | Searchable resume picker | Public `SessionManager.list`/`listAll`, `SessionInfo`, `ctx.switchSession` | Implemented in `/pituix-resume`; previews public message text and uses real message counts/time, without branch/file-size metadata or tool/media preview |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `setWidget` | Latest completion duration/clock and interruption branch implemented; historical per-response rows are not reproduced |
-| Queued follow-up count | `input` events, `setStatus` | Observational count; Pi owns delivery |
+| Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
 | Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state`, public `renderDiff`/`highlightCode` | Result branches, compact Read counts, numbered Write previews and numbered Update diffs with row/word backgrounds implemented |
 | Adjacent Read/Bash summaries | Finalized message/tool events, public session branch, per-row invalidation | Implemented for adjacent successful calls; paths deduplicated, expanded calls retained, resumed sessions reconstructed |
 | Tool expansion | `options.expanded`, configured `app.tools.expand` | Implemented; no invented E binding |
 | Execution, errors, cancellation | Original tool `execute` functions | Delegated unchanged |
 | Default UI restoration | Public unset/reset methods | Implemented and tested |
-| User/assistant transcript chrome | Read-only public branch, Markdown and custom overlay | Reference rows implemented in `/pituix-transcript`; live native transcript still differs |
+| User/assistant transcript chrome | Public message components, identity Markdown transformer, editor focus, custom overlay | Implemented in the fullscreen live view and `/pituix-transcript`; regular mode stays native |
 | Native model command, transcript navigation, resume | Native Pi commands/components | Retained; `/pituix-model` and `/pituix-resume` provide custom selection surfaces |
 | Claude permission modes and approval dialogs | Pi trust/permission semantics differ | Not emulated |
 | Claude-specific settings tabs and preferences | Extension-specific settings available | Pi-TUIX categories retained; Claude account/runtime controls are not emulated |
 | MCP group summaries and cross-session agents | No universal renderer hook for other extensions | Not reproduced |
 | Claude checkpoint/rewind behavior | Pi owns sessions, branches, tool execution | Not reproduced |
-| Fullscreen layout and wheel behavior | Pi owns its terminal layout | Use host `--tui-mode fullscreen`; no private-field patch |
+| Fullscreen layout and wheel behavior | Public overlay, `ScrollView`, component tree and keybindings | Live document/dock projection with page, prompt and vertical wheel scrolling; narrow cursor protected; no private-field patch |
 
 Pi exposes `ui_prompt_start` and `ui_prompt_end` for blocking extension prompts.
 They do not provide a replacement renderer for all host permission decisions.
-An actual command-context confirmation did not emit those events in the
-capturing-overlay probe and appeared behind it. A separate noncapturing overlay
-using the native editor's public focus state correctly yielded to confirmations
-and `/model`, and retained normal tool execution and input. This proves a
-possible public route for a live transcript projection; it is not integrated
-until notification, widget, queue, scroll and replacement behavior is verified.
+An initial command-context confirmation probe did not emit those events and
+appeared behind the overlay. The integrated view instead observes the owned
+editor's public focus property, yielding to native confirmations and selectors.
+It resumes after the host returns focus and forwards normal input to that same
+editor. Notifications, foreign widgets, pending messages, tool execution,
+cancellation and session replacement were verified through actual Pi sessions.
+Unrecognized public component shapes render natively. Fullscreen search also
+temporarily displays Pi's transcript and keeps its own scroll position; closing
+search returns to the live view's prior position. Regular-mode message chrome,
+mouse-copy fidelity, large-history performance and mode transitions are still
+outside the validated live-view coverage. Later user Markdown transformers
+are not reflected in raw user chrome; assistant rendering preserves the chain.
 
 Tool headings retain explicit status and attention text for accessibility.
 Group summaries also retain a compact target list and explicit success status;
@@ -224,12 +230,24 @@ remain a measured difference, rather than a claim of full syntax parity.
   and scroll/close behavior. The reader clones public branch data and invokes
   no tool execution or session mutation. Actual Pi 100x40 and 80x24 sessions
   check grouped/expanded recorded tools, page navigation, editor return and
-  `/pituix-default`. The live transcript and resume text preview are unchanged.
+  `/pituix-default`. Resume text previews remain separate.
   At 100 columns, the sampled plain assistant line matches all cell text,
   foreground, background and inverse values in the reference. The sampled
   two-line user message matches text and background; one automatically wrapped
   whitespace cell retains a different foreground. Complex Markdown and media
   are not claimed to match fully.
+- Live-view tests cover public component fallback, streamed Markdown cache
+  updates, preservation of opaque tools/notifications, queue/status/footer
+  composition, focus teardown, page/prompt/wheel navigation, following behavior,
+  ANSI/CJK width and crowded docks from 1 to 40 rows. Actual 100x40 runs verify
+  original Read/Bash/Edit/Write execution, errors, partial output, queue display
+  and delivery, foreign widgets, confirmation cancellation, settings/model
+  selectors, tool expansion and native restoration. An 80x24 session actually
+  resumes a saved fixture, scrolls grouped results and search matches, and
+  cancels a running arithmetic tool while retaining the interruption prompt.
+  New-session and reload commands preserve the live view, but retain the host's
+  temporary-theme reset described below. The deterministic provider fixtures
+  are excluded from the package and make no model-network requests.
 - Resume-picker tests cover public session scope, filtering, native input paste,
   preview navigation, two-step selection, loading failures, late callback
   cleanup, single switch delegation, and ANSI/CJK width/height bounds. Actual

@@ -62,7 +62,9 @@ The working line shows elapsed time and reported output tokens when available. A
 
 `/pituix-resume` searches saved Pi sessions and previews their public message text. Type to filter, press Enter to select a result, then Enter again to resume. Space opens a text preview; Ctrl+A switches between the current project and all projects. Pi performs the actual session switch. Native `/resume` and `/tree` remain available.
 
-`/pituix-transcript` opens a read-only snapshot of the current conversation, with reference-style user/assistant rows and recorded tool results. Use Page Up/Down or Home/End to scroll, the configured tool-expansion key to reveal details and thinking, and Esc to return to the same editor. It does not rerun tools or change session data. Media is labelled; other extensions' tools use a generic public Pi view. This reader is separate from the live transcript.
+In `pi --tui-mode fullscreen`, the main conversation uses reference-style user and assistant rows while retaining Pi's editor, streaming output, tools, notifications, widgets and queue. Page Up/Down, Home/End, prompt navigation and vertical wheel input scroll the conversation. Native dialogs and transcript search temporarily show Pi's view; closing them restores the presentation. Search and the main view currently retain separate scroll positions. Regular terminal mode retains Pi's message chrome. `/pituix-default` restores the native interface in the same session.
+
+`/pituix-transcript` also opens a read-only snapshot of the current conversation and recorded tool results. Use Page Up/Down or Home/End to scroll, the configured tool-expansion key to reveal details and thinking, and Esc to return to the same editor. It does not rerun tools or change session data. Snapshot media is labelled; other extensions' tools use a generic public Pi view.
 
 These commands are reversible:
 

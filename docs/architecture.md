@@ -116,18 +116,38 @@ No executor is invoked or newly registered. Missing calls, failed/aborted
 responses, visible custom messages and compaction summaries remain explicit.
 Binary attachments receive type labels; foreign tool renderers are not copied.
 Rendering performs no I/O. The reader owns only scroll/expansion state, returns
-to the same editor, and does not replace the live transcript or resume preview.
+to the same editor, and remains separate from the live view and resume preview.
 
-A disposable native-terminal probe also demonstrated that a public
-`TUI.showOverlay({ ... }, { nonCapturing: true, visible: ... })` projection can
-reuse the installed editor while showing the native UI whenever that editor
-loses focus. Tool runs, extension confirmation cancellation and native `/model`
-navigation worked. This is an implementation route for future live message
-chrome, not a shipped full-screen mode. A capturing overlay hid a native
-confirmation because that command-context prompt did not emit the expected
-prompt lifecycle events in the probe. Live notification/widget visibility,
-queue presentation, scrolling and session replacement still need validation
-before applying a projection to the main conversation.
+The fullscreen main view uses a public `TUI.showOverlay` presentation over the
+host's unchanged component tree. A version-local adapter recognizes public
+`Container.children`, `UserMessageComponent` and `AssistantMessageComponent`
+instances. It traverses only plain concatenating containers. Opaque components,
+including tools, media and notifications, retain their native render methods.
+An identity `registerMarkdownTransformer` callback observes source/context while
+the public Markdown component renders; it returns source unchanged. Raw user
+text receives prompt chrome. Assistant Markdown is prefixed after rendering,
+preserving the host's Markdown parsing, highlighting and transformer chain.
+Unknown layouts or missing callbacks fall back to native rendering. Package
+imports go through Pi's extension loader so component identities share the host
+UI runtime. No host children, fields, methods or prototypes are replaced.
+
+The overlay forwards editing to the same installed `OpenTuiEditor`. An observer
+on that owned editor's public `focused` property hides the view for native
+dialogs, settings, model selection and search. Focus returns through a queued
+callback, with teardown guards for disable, reload and session replacement.
+The view renders native dock components, retaining queue messages, working
+status, foreign widgets and footer; cramped docks prioritize the active cursor.
+Its public `ScrollView` tracks page, prompt and vertical wheel navigation.
+Streaming follows the end until the user scrolls away; a new agent run resumes
+following. Pi still owns message creation, queue delivery and tool execution.
+The mirror has no provider, session-file or shell I/O.
+
+This adapter is enabled for fullscreen mode. Regular-mode scrollback stays
+native. Native search remains usable, with its own scroll position; closing it
+returns to the mirror's previous position. Mouse-copy fidelity, large-history
+performance and terminal-mode transitions still need broader validation. User
+chrome observes the source at this extension's position in the transformer
+chain, so later user-text transformers are not reflected in that raw-text view.
 
 Tool definitions keep the public `renderShell: "self"` option stable.
 Each built-in tool is registered once. `/pituix-compact` selects collapsed
