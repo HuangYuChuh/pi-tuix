@@ -37,6 +37,7 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
 
   const editorFactories: unknown[] = [];
   const workingMessages: (string | undefined)[] = [];
+  const widgets = new Map<string, unknown>();
   const originalTheme = { name: "original", fg: (_color: string, text: string) => text };
   const referenceTheme = { ...originalTheme, name: "pi-tuix-dark" };
   const ui = {
@@ -52,7 +53,7 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     setFooter: () => {},
     setWorkingIndicator: () => {},
     setHiddenThinkingLabel: () => {},
-    setWidget: () => {},
+    setWidget: (key: string, value: unknown) => widgets.set(key, value),
     setEditorComponent: (factory: unknown) => editorFactories.push(factory),
     notify: () => {},
   };
@@ -92,7 +93,15 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     context,
   );
   assert.equal(workingMessages.at(-1), "Thinking...");
-  await handlers.get("agent_end")?.({ type: "agent_end" }, context);
+  await handlers.get("agent_end")?.(
+    { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+    context,
+  );
+  assert.equal(widgets.get("pituix-completion"), undefined);
+  await handlers.get("agent_settled")?.({ type: "agent_settled" }, context);
+  const completion = widgets.get("pituix-completion") as () => { render(width: number): string[] };
+  assert.equal(typeof completion, "function");
+  assert.match(stripTerminalSequences(completion().render(100)[0]), /Worked for.*done/);
   assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /^[-─]+$/);
 
   let toolRedraws = 0;
@@ -107,6 +116,7 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   await commands.get("pituix-mode")?.handler("preview", context);
   assert.equal(toolRedraws, 2);
   await commands.get("pituix-default")?.handler("", context);
+  assert.equal(widgets.get("pituix-completion"), undefined);
   assert.equal(toolRedraws, 3);
   assert.equal(editorFactories.at(-1), undefined);
   assert.equal(ui.theme, originalTheme);

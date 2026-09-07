@@ -80,7 +80,12 @@ permission mode was not relaxed.
   reliable for every request.
 - Interrupting a direct `!sleep 30` command removed its running row and restored
   the command draft in shell mode. This is evidence for direct shell-mode
-  cancellation; it is not a model-tool cancellation capture.
+  cancellation.
+- A later model-driven, read-only Python arithmetic command was approved once
+  and interrupted while running. Claude replaced the working animation with
+  an `Interrupted` branch asking what to do next, without a normal completion
+  clock. A standalone model-driven `sleep 30` had been rejected by Claude's
+  Bash tool, so the arithmetic command provided the actual cancellation capture.
 
 Observed dark-theme colors:
 
@@ -91,8 +96,11 @@ Observed dark-theme colors:
 | Input rules | `#888888` |
 | Selected command/settings accent | `#b1b9f9` |
 | Login error | `#ff6b80` |
+| Successful tool marker | `#4eba65` |
+| User-message background | `#373737` |
+| User-message text | `#ffffff` |
 
-These five colors are applied to corresponding theme roles. Other syntax and status
+These colors are applied to corresponding theme roles. Other syntax and status
 colors retain Pi-TUIX's existing accessible palette.
 
 ## Implementation and remaining gaps
@@ -106,7 +114,8 @@ colors retain Pi-TUIX's existing accessible palette.
 | Effort above the prompt | Custom editor, `thinking_level_select`, `model_select` | Implemented; displays Pi's effective level and actual cycle binding |
 | Searchable settings page | `ctx.ui.custom`, public `Input` | Reference frame, filtering, focus navigation and value alignment implemented for Pi-TUIX settings |
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
-| Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented; spinner frames are an approximation |
+| Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
+| Completion and interruption feedback | `agent_end`, `agent_settled`, `setWidget` | Latest completion duration/clock and interruption branch implemented; historical per-response rows are not reproduced |
 | Queued follow-up count | `input` events, `setStatus` | Observational count; Pi owns delivery |
 | Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state`, public `renderDiff` | Result branches, compact Read counts, numbered Write previews and Update diffs implemented |
 | Adjacent Read/Bash summaries | Finalized message/tool events, public session branch, per-row invalidation | Implemented for adjacent successful calls; paths deduplicated, expanded calls retained, resumed sessions reconstructed |
@@ -165,6 +174,11 @@ than reproducing Claude's syntax palette exactly.
   boundaries, pending results, ANSI/CJK widths, individual expansion and native
   restoration. A saved interactive Pi session was reopened through `--session`
   and retained the expected `Read 1 file, ran 2 shell commands` summary.
+- Run-presentation tests cover elapsed time, reported usage without duplicate
+  counting, retry duration, settlement, failures, cancellation and ASCII/width
+  handling. Actual Pi sessions verified working elapsed time, completion,
+  default-UI cleanup and interruption of the arithmetic tool. Pi can also render
+  its own aborted-operation error message; that host transcript row remains.
 - Successful Claude Read/Bash/Edit/Write calls and approval dialogs are now
   observed. Full cross-product visual parity remains incomplete; the tool
   presentation gaps above are based on these authenticated observations.

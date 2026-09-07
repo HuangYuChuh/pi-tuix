@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use public self-rendered tool shells and replace pending rows with results; preserve exact Pi tool execution functions.
 - Add result branches, compact Read counts, numbered Write previews, and Update diffs with Pi's public word-level highlighting.
 - Group adjacent successful Read/Bash calls into unique-file and shell-call counts, with individual expansion and read-only reconstruction when resuming sessions.
+- Add elapsed working feedback, reported output-token counts, and temporary settled-run completion/interruption lines; retain duration through automatic retries.
+- Match observed user-message background/text and successful tool-marker colors through the public theme.
 
 ### Fixed
 - Use configured tool expansion bindings instead of the unregistered E hint.
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hide duplicate footer hints during settings and restore them on close or failure; remove the unsupported wheel-speed control from settings.
 - Restore existing tool rows as well as new rows with `/pituix-default`; retain a stable public shell adapter and invalidate rows through their public callbacks.
 - Finish native running-renderer cleanup after a presentation-mode switch, and refresh collapsed/preview changes even when Pi's expansion flag stays unchanged.
+- Recognize Pi's error-form AbortError response as an interruption instead of reporting a failed completion.
 
 ### Validation
 - Add shell, public extension loader, theme restoration, and shared tool-row regression tests.

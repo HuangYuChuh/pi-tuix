@@ -56,6 +56,8 @@ Each tool row keeps the action, target, state, and attention signal visible. Rea
 
 Adjacent successful Read/Bash calls combine into a count summary, deduplicating file paths while counting each shell call. Expand tools to reveal every call. Errors, cancellation, images, and truncated results remain separate; assistant text and other tools separate groups. Grouping is reconstructed from Pi's public session branch when resuming.
 
+The working line shows elapsed time and reported output tokens when available. After Pi settles, a temporary completion line shows duration and clock time, or an interruption prompt after cancellation. It clears on the next run or `/pituix-default` and does not add session messages.
+
 These commands are reversible:
 
 | Command | Purpose |

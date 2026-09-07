@@ -9,7 +9,9 @@ import {
 } from "./control/plan.ts";
 import { registerSessionTreeCommand } from "./session/session-tree.ts";
 import { createSubagentActivityObserver } from "./session/subagent-activity.ts";
+import { useAsciiChrome } from "./shell/open-tui/icons.ts";
 import { createOpenTuiShellRuntime } from "./shell/open-tui/shell.ts";
+import { RunPresentation, renderRunCompletion } from "./stream/run-presentation.ts";
 import {
   beginAgentRun,
   createWorkflowRuntime,
@@ -68,6 +70,23 @@ export default function piTuix(pi: ExtensionAPI): void {
   const subagentActivity = createSubagentActivityObserver(pi);
   const shell = createOpenTuiShellRuntime(pi, subagentActivity);
   const workflow = createWorkflowRuntime();
+  const run = new RunPresentation();
+  let runTimer: ReturnType<typeof setInterval> | undefined;
+  const stopRunTimer = () => {
+    if (runTimer) clearInterval(runTimer);
+    runTimer = undefined;
+  };
+  const showCompletion = (ctx: ExtensionContext) => {
+    const completion = run.completion;
+    if (ctx.mode !== "tui" || (!toolMode.enabled && !threeLayerMode.enabled) || !completion) {
+      ctx.ui.setWidget("pituix-completion", undefined);
+      return;
+    }
+    ctx.ui.setWidget("pituix-completion", () => ({
+      render: (width) => renderRunCompletion(completion, ctx.ui.theme, width, useAsciiChrome()),
+      invalidate() {},
+    }));
+  };
   const plan = createPlanRuntime();
   registerSessionTreeCommand(pi);
 
@@ -82,6 +101,9 @@ export default function piTuix(pi: ExtensionAPI): void {
   };
 
   pi.on("session_start", (_event, ctx) => {
+    stopRunTimer();
+    run.reset();
+    showCompletion(ctx);
     toolRenderers.clear();
     hydrateGroups(ctx);
     shell.handleSessionStart(ctx);
@@ -97,7 +119,9 @@ export default function piTuix(pi: ExtensionAPI): void {
           : workflow.activity === "RESPONDING"
             ? "Responding"
             : "Working";
-      ctx.ui.setWorkingMessage?.(`${activity}...`);
+      ctx.ui.setWorkingMessage?.(
+        run.workingMessage(`${activity}...`, Date.now(), useAsciiChrome()),
+      );
       ctx.ui.setStatus?.(
         "pituix-queue",
         workflow.queuedMessages > 0 ? `${workflow.queuedMessages} follow-up queued` : undefined,
@@ -105,15 +129,27 @@ export default function piTuix(pi: ExtensionAPI): void {
     };
     shell.handleRefresh(ctx, true);
   });
-  pi.on("agent_start", () => {
+  pi.on("agent_start", (_event, ctx) => {
+    run.begin();
+    showCompletion(ctx);
+    stopRunTimer();
+    if (ctx.mode === "tui") {
+      runTimer = setInterval(() => refreshWorkflow(workflow), 1000);
+      runTimer.unref?.();
+    }
     beginAgentRun(workflow);
     shell.handleAgentStart();
   });
-  pi.on("agent_end", () => {
+  pi.on("agent_end", (event) => {
+    stopRunTimer();
+    run.end(event.messages ?? []);
     finishAgentRun(workflow);
     shell.handleAgentEnd();
   });
   pi.on("agent_settled", (event, ctx) => {
+    stopRunTimer();
+    run.settle();
+    showCompletion(ctx);
     settleAgent(workflow);
     shell.handleAgentSettled(event, ctx);
   });
@@ -125,6 +161,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     refreshWorkflow(workflow);
   });
   pi.on("message_update", (event) => {
+    run.observeMessage(event.message);
     const type = event.assistantMessageEvent.type;
     if (type === "thinking_start" || type === "thinking_delta")
       setStreamActivity(workflow, "THINKING");
@@ -141,12 +178,14 @@ export default function piTuix(pi: ExtensionAPI): void {
   });
   pi.on("tool_execution_start", (event) => startTool(workflow, event.toolName));
   pi.on("tool_execution_end", (event, ctx) => {
+    run.observeTool(event.toolCallId, event.result, event.isError);
     const affected = groups.complete(event.toolCallId, event.result, event.isError);
     if (threeLayerMode.enabled && affected.length) toolRenderers.invalidate(affected);
     finishTool(workflow, event.isError);
     shell.handleRefresh(ctx);
   });
   pi.on("message_end", (event, ctx) => {
+    run.observeMessage(event.message);
     if (ctx.mode === "tui") {
       const affected = groups.recordMessage(event.message);
       if (threeLayerMode.enabled && affected.length) toolRenderers.invalidate(affected);
@@ -159,11 +198,16 @@ export default function piTuix(pi: ExtensionAPI): void {
     shell.handleRefresh(ctx);
   });
   pi.on("session_tree", (_event, ctx) => {
+    run.completion = undefined;
+    showCompletion(ctx);
     hydrateGroups(ctx);
     toolRenderers.invalidate();
     shell.handleRefresh(ctx);
   });
   pi.on("session_shutdown", (_event, ctx) => {
+    stopRunTimer();
+    run.reset();
+    showCompletion(ctx);
     toolRenderers.clear();
     groups.reset(ctx.cwd);
     shell.handleSessionShutdown(ctx);
@@ -174,6 +218,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     handler: async (_args, ctx) => {
       applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, true);
       toolRenderers.invalidate();
+      showCompletion(ctx);
       ctx.ui.notify(`${PACKAGE_NAME} interface enabled (three-layer mode)`, "info");
     },
   });
@@ -183,6 +228,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     handler: async (_args, ctx) => {
       toolMode.enabled = false;
       threeLayerMode.enabled = false;
+      showCompletion(ctx);
       ctx.ui.setTitle("pi");
       shell.remove(ctx);
       toolRenderers.invalidate();
@@ -197,6 +243,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     handler: async (_args, ctx) => {
       applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, false);
       toolRenderers.invalidate();
+      showCompletion(ctx);
       ctx.ui.notify(`${PACKAGE_NAME} compact mode enabled`, "info");
     },
   });
@@ -206,6 +253,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     handler: async (_args, ctx) => {
       applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, true);
       toolRenderers.invalidate();
+      showCompletion(ctx);
       ctx.ui.notify(`${PACKAGE_NAME} three-layer mode enabled`, "info");
     },
   });

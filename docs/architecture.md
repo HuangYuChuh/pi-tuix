@@ -42,6 +42,15 @@ Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` dele
 
 Workflow status shows the current phase, active tool, completed and failed tool counts, and queued follow-up messages. It resets for each agent run and never changes Pi's queue, tool inputs, or execution behavior.
 
+Run presentation observes assistant usage and stop reasons. A one-second UI timer
+updates elapsed working feedback; unavailable token counts are omitted rather
+than estimated. Automatic continuations retain the start time until Pi emits
+`agent_settled`. The last settled completion is shown with `setWidget`, then
+cleared on the next run, session change or default-UI restoration. Cancellation
+has a separate interruption prompt, including Pi's error-form AbortError case.
+This widget does not append transcript/session entries. It does not reproduce
+Claude's persistent completion row for every historical response.
+
 Stream status maps public assistant events to explicit `THINKING`, `RESPONDING`, and `TOOL` labels, includes the one-based turn number, and shows the active thinking level and context pressure. The plan adapter reads assistant text after a turn, recognizes a `Plan:` or localized plan heading with numbered or checkbox steps, and renders those steps through `setWidget()`. It is deliberately observational: it does not inject plan instructions, disable tools, or infer completion from tool execution.
 
 Queue controls use Pi's public `sendUserMessage()` contract: `/pituix-steer` sends an immediate steering message, `/pituix-followup` queues a message for the next continuation, and `/pituix-queue` reports the host queue. Pi-TUIX does not inspect or mutate private queue storage.
