@@ -46,9 +46,11 @@ See [Using the development version](docs/development.md) for local installation 
 
 ## Current Development
 
-The `feat/open-tui-pituix` development branch combines an adapted `pi-open-tui` shell with Pi-TUIX three-layer Read/Bash/Edit/Write presentation. The shell supplies the responsive header, footer, framed editor, Git/runtime/context/cost indicators, settings UI, and turn telemetry. Tool execution remains delegated to Pi unchanged.
+The development shell follows observed Claude Code 2.1.263 terminal layout: compact startup information, horizontal prompt rules, contextual shortcut help, and a one-line footer. `/pituix-status` reveals detailed Git/runtime/context/cost statistics. This is a partial visual adaptation; see the [reference observations and remaining gaps](docs/claude-code-parity.md).
 
-The framed editor extends Pi's public `CustomEditor`, preserving submission, history, autocomplete, paste handling, and registered application shortcuts. `/pituix-default` removes the Pi-TUIX shell and restores Pi's native components in the active session.
+The editor extends Pi's public `CustomEditor`, preserving submission, history, autocomplete, paste handling, and registered application shortcuts. Press `?` on an empty draft for help. `/pituix-default` restores native components and the previous theme in the active session.
+
+The effective thinking level appears above the prompt with Pi's configured shortcut. `/pituix-settings` opens searchable preference tabs: type to filter, press Enter to select a result, then Enter or Space to change it. Tab switches categories; Escape clears the query, leaves search, then closes the page.
 
 Each tool row keeps the action, target, state, and attention signal visible. The default preview shows the first and last two detail lines; collapsed mode keeps only the summary, and expanded mode reveals the full output or diff. Read and Bash results summarize output size, Edit reports diff statistics, and Write reports the written line count. All views use ANSI-aware width constraints.
 
@@ -62,13 +64,15 @@ These commands are reversible:
 | `/pituix-three-layer` | Use the three-layer tool renderer |
 | `/pituix-mode <collapsed\|preview\|expanded>` | Set the tool detail display mode; preview is the default |
 | `/pituix-about` | Show the package and compatible Pi version |
+| `/pituix-status` | Toggle compact hints and detailed session statistics |
+| `/pituix-model` | Choose a Pi model and thinking level in the numbered picker |
 | `/pituix-settings` | Open shell, footer, icon, and telemetry settings |
 | `/pituix-steer <message>` | Interrupt the current run with an immediate correction |
 | `/pituix-followup <message>` | Queue work to start after the current run |
 | `/pituix-queue` | Show whether Pi has queued follow-up messages |
 | `/pituix-plan [show\|hide\|clear]` | Control the detected read-only plan panel |
 
-The bundled `pi-tuix-dark` theme is available from Pi's `/settings` screen. This branch includes adapted MIT-licensed code from [OldSuns/pi-open-tui](https://github.com/OldSuns/pi-open-tui); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The bundled `pi-tuix-dark` theme is applied with the shell and remains available from Pi's `/settings` screen. The project includes adapted MIT-licensed code from [OldSuns/pi-open-tui](https://github.com/OldSuns/pi-open-tui); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## How It Works
 

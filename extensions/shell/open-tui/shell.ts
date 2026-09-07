@@ -1,4 +1,5 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import { registerModelPicker } from "../../control/model-picker.ts";
 import type { SubagentActivityObserver } from "../../session/subagent-activity.ts";
 import {
   DEFAULT_CONFIG,
@@ -8,9 +9,11 @@ import {
   saveConfig,
 } from "./config.ts";
 import { installEditor } from "./editor.ts";
+import { type EffortState, renderEffortLine } from "./effort.ts";
 import { installFooter } from "./footer.ts";
 import { emptyGitStatus, readGitStatus } from "./git.ts";
 import { installHeader } from "./header.ts";
+import { useAsciiChrome } from "./icons.ts";
 import { readRuntimeInfo } from "./runtime.ts";
 import { SessionLifecycle } from "./session-lifecycle.ts";
 import { registerSettingsCommand } from "./settings-command.ts";
@@ -45,10 +48,18 @@ export function createOpenTuiShellRuntime(
   const state: FooterState = createInitialState();
   const telemetry = new TurnTelemetryTracker();
   let config: OpenTuiConfig = structuredClone(DEFAULT_CONFIG);
+  const effort: EffortState = { enabled: false, level: "off", ascii: false };
+  const syncEffort = (ctx: ExtensionContext) => {
+    effort.enabled = Boolean(ctx.model?.reasoning);
+    effort.level = effort.enabled ? (ctx.thinkingLevel ?? pi.getThinkingLevel()) : "off";
+    effort.ascii = useAsciiChrome(config.icons.mode);
+  };
+  let panelOpen = false;
   let active = false;
   let context: ExtensionContext | undefined;
   let requestRender: (() => void) | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
+  let previousTheme: Theme | undefined;
   let disposeHeader: (() => void) | undefined;
   let disposeFooter: (() => void) | undefined;
   let editor: ReturnType<typeof installEditor> | undefined;
@@ -59,6 +70,7 @@ export function createOpenTuiShellRuntime(
   };
   const refresh = (ctx: ExtensionContext, project = false) => {
     if (!lifecycle.isCurrent() || !ctx.hasUI) return;
+    syncEffort(ctx);
     if (project) {
       void refreshGit(ctx);
       void refreshRuntime(ctx);
@@ -95,6 +107,11 @@ export function createOpenTuiShellRuntime(
   const remove = (ctx: ExtensionContext) => {
     if (!active || !isTuiContext(ctx)) return;
     stopTimer();
+    ctx.ui.setWorkingIndicator();
+    ctx.ui.setWorkingMessage?.();
+    ctx.ui.setHiddenThinkingLabel();
+    if (previousTheme && ctx.ui.theme.name === "pi-tuix-dark") ctx.ui.setTheme(previousTheme);
+    previousTheme = undefined;
     disposeHeader?.();
     disposeFooter?.();
     editor?.cleanup();
@@ -106,6 +123,20 @@ export function createOpenTuiShellRuntime(
   };
   const apply = (ctx: ExtensionContext) => {
     if (!isTuiContext(ctx) || active) return;
+    syncEffort(ctx);
+    const referenceTheme = ctx.ui.getTheme?.("pi-tuix-dark");
+    if (referenceTheme) {
+      previousTheme = ctx.ui.theme;
+      ctx.ui.setTheme(referenceTheme);
+    }
+    ctx.ui.setWorkingIndicator({
+      frames: (useAsciiChrome(config.icons.mode)
+        ? [".", "*", "+", "*"]
+        : ["·", "✻", "✽", "✶", "✳", "✢"]
+      ).map((frame) => ctx.ui.theme.fg("accent", frame)),
+      intervalMs: 120,
+    });
+    ctx.ui.setHiddenThinkingLabel("Thinking (expand to view)");
     disposeHeader = installHeader(pi, ctx);
     disposeFooter = installFooter(
       ctx,
@@ -120,26 +151,64 @@ export function createOpenTuiShellRuntime(
           void refreshGit(ctx);
         },
         getSubagentActivity: subagentActivity?.getState,
+        isPanelOpen: () => panelOpen,
       },
     );
-    editor = installEditor(pi, ctx, config.cursorStyle, config.fullscreen.wheelScrollLines);
+    editor = installEditor(
+      pi,
+      ctx,
+      config.cursorStyle,
+      config.fullscreen.wheelScrollLines,
+      config.icons.mode,
+      (width) => renderEffortLine(effort, ctx.ui.theme, width),
+    );
     active = true;
   };
 
+  pi.registerCommand("pituix-status", {
+    description: "Toggle compact hints and detailed session statistics",
+    handler: async (_args, ctx) => {
+      if (!active) {
+        ctx.ui.notify("Enable Pi-TUIX with /pituix before showing session statistics", "info");
+        return;
+      }
+      config.footerStyle = config.footerStyle === "compact" ? "detailed" : "compact";
+      saveConfig(config);
+      requestRender?.();
+    },
+  });
+
   ensureConfigExists();
   config = loadConfig();
+  const onPanelOpened = () => {
+    panelOpen = true;
+    requestRender?.();
+  };
+  const onPanelClosed = () => {
+    panelOpen = false;
+    requestRender?.();
+  };
+  registerModelPicker(pi, {
+    ascii: () => useAsciiChrome(config.icons.mode),
+    onOpen: onPanelOpened,
+    onClose: onPanelClosed,
+  });
   registerSettingsCommand(pi, {
     getConfig: () => config,
+    onOverlayOpened: onPanelOpened,
     onConfigChanged: (next) => {
+      const iconsChanged = config.icons.mode !== next.icons.mode;
       const cursorChanged = config.cursorStyle !== next.cursorStyle;
       const wheelChanged = config.fullscreen.wheelScrollLines !== next.fullscreen.wheelScrollLines;
       config = next;
       saveConfig(config);
+      if (iconsChanged) editor?.setIconMode(config.icons.mode);
       if (cursorChanged) editor?.setCursorStyle(config.cursorStyle);
       if (wheelChanged) editor?.setWheelScrollLines(config.fullscreen.wheelScrollLines);
       if (context) refresh(context, true);
     },
     onOverlayClosed: () => {
+      onPanelClosed();
       if (!context) return;
       if (config.enabled) apply(context);
       else remove(context);

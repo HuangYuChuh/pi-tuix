@@ -51,3 +51,11 @@ Users can install Pi-TUIX globally or per project, switch back to the default Pi
 ## Naming
 
 The product name is **Pi-TUIX**. The npm package and repository use lowercase `pi-tuix`. `TUIX` means an extended terminal experience, not a replacement for the official `pi-tui` component library.
+
+## Visual reference fidelity
+
+Versioned observations now guide shell layout and spacing, starting with Claude
+Code 2.1.263. Fidelity is tracked per surface in the
+[parity report](claude-code-parity.md). Pi-TUIX preserves its identity and Pi's
+actual controls; it does not claim complete reproduction while reference flows
+remain unverified or the public host APIs leave rendering gaps.
