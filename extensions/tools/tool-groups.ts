@@ -13,6 +13,7 @@ interface ToolRow {
   target: string;
   identity: string;
   ready: boolean;
+  image: boolean;
 }
 
 export interface ToolGroup {
@@ -87,6 +88,7 @@ export class ToolGroupRuntime {
           target: displayTarget(target),
           identity: part.name === "read" ? resolve(this.cwd, target) : target,
           ready: false,
+          image: false,
         };
         this.rows.push(row);
         this.byId.set(row.id, row);
@@ -105,10 +107,12 @@ export class ToolGroupRuntime {
     const images =
       Array.isArray(result?.content) &&
       result.content.some((part) => object(part)?.type === "image");
-    const ready = !!result && !isError && !truncated && !images;
-    if (row.ready === ready) return [];
+    const ready = !!result && !isError && !truncated && (!images || row.name === "read");
+    const image = images && row.name === "read";
+    if (row.ready === ready && row.image === image) return [];
     const before = this.get(id)?.members ?? [id];
     row.ready = ready;
+    row.image = image;
     this.dirty = true;
     const after = this.get(id)?.members ?? [id];
     return [...new Set([...before, ...after])];
@@ -124,7 +128,7 @@ export class ToolGroupRuntime {
     this.dirty = false;
     let run: ToolRow[] = [];
     const finish = () => {
-      if (run.length >= 2) {
+      if (run.length >= 2 || run[0]?.image) {
         const files = new Set(run.filter((row) => row.name === "read").map((row) => row.identity));
         const commands = run.filter((row) => row.name === "bash").length;
         const counts: string[] = [];

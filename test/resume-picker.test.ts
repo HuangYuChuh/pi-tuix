@@ -14,6 +14,7 @@ import {
   TuiMainScreen,
   visibleWidth,
 } from "@earendil-works/pi-tui";
+import type { PrepareImages } from "../extensions/session/image-attachments.ts";
 import type { renameSession } from "../extensions/session/rename-session.ts";
 import {
   formatSessionSize,
@@ -43,6 +44,7 @@ function session(index: number, overrides: Partial<SessionInfo> = {}): SessionIn
 const sessions = [session(1), session(2), session(3)];
 const theme = {
   fg: (_color: string, text: string) => `\x1b[36m${text}\x1b[39m`,
+  bg: (_color: string, text: string) => `\x1b[48;5;236m${text}\x1b[49m`,
   inverse: (text: string) => `\x1b[7m${text}\x1b[27m`,
   bold: (text: string) => text,
 } as Theme;
@@ -167,6 +169,7 @@ function harness(
     readMetadata?: (session: SessionInfo, signal: AbortSignal) => Promise<SessionMetadata>;
     readBranch?: (cwd: string, signal?: AbortSignal) => Promise<string | undefined>;
     rename?: typeof renameSession;
+    prepareImages?: PrepareImages;
   } = {},
 ) {
   let handler: ((args: string, ctx: ExtensionCommandContext) => Promise<void>) | undefined;
@@ -194,6 +197,7 @@ function harness(
     } as ExtensionAPI,
     {
       ascii: () => false,
+      prepareImages: options.prepareImages,
       onOpen: () => calls.push("open"),
       onClose: () => calls.push("close"),
       onResume: (fresh) => {
@@ -841,6 +845,65 @@ test("preview result ordering follows the selected session, not pending read com
   await pending;
   assert.deepEqual(h.calls, ["open", "close", sessions[1].path]);
   assert.ok(h.previewReads.every((read) => read.signal.aborted));
+});
+
+test("preview image preparation updates only the active snapshot and ignores late completion after closing", async () => {
+  const requests: { signal: AbortSignal; resolve: (links: ReadonlyMap<string, string>) => void }[] =
+    [];
+  const h = harness({
+    readPreview: async (session) => ({
+      cwd: session.cwd,
+      model: session.name ?? "fixture",
+      effort: "off",
+      entries: [
+        {
+          type: "message",
+          id: "image",
+          parentId: null,
+          timestamp: new Date(0).toISOString(),
+          message: {
+            role: "user",
+            timestamp: 0,
+            content: [{ type: "image", data: "fixture", mimeType: "image/png" }],
+          },
+        },
+      ],
+    }),
+    prepareImages: (_entries, signal) =>
+      new Promise((resolve) => requests.push({ signal, resolve })),
+  });
+  const pending = h.run();
+  await tick();
+  h.views[0].handleInput(" ");
+  await tick();
+  assert.match(
+    h.views[0].render(100).map(stripTerminalSequences).join("\n"),
+    /\[Image #1\] \(loading\.\.\.\)/,
+  );
+  h.views[0].handleInput("\x1b");
+  h.views[0].handleInput("\x1b[B");
+  h.views[0].handleInput(" ");
+  await tick();
+  requests[1].resolve(new Map([["image:0", "file:///tmp/second.png"]]));
+  await tick();
+  requests[0].resolve(new Map([["image:0", "file:///tmp/stale.png"]]));
+  await tick();
+  const output = h.views[0].render(100).join("\n");
+  assert.match(output, /file:\/\/\/tmp\/second.png/);
+  assert.doesNotMatch(output, /stale.png|loading|unavailable/);
+  assert.ok(requests[0].signal.aborted);
+  h.views[0].handleInput("\x1b");
+  h.views[0].handleInput(" ");
+  await tick();
+  h.views[0].handleInput("\x1b");
+  h.views[0].handleInput("\x1b");
+  await pending;
+  const renders = h.renders;
+  requests[2].resolve(new Map([["image:0", "file:///tmp/closed.png"]]));
+  await tick();
+  assert.equal(h.renders, renders);
+  assert.ok(requests.every(({ signal }) => signal.aborted));
+  assert.deepEqual(h.calls, ["open", "close"]);
 });
 
 test("preview errors are recoverable and Enter during loading closes before resuming", async () => {

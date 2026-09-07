@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { VERSION } from "@earendil-works/pi-coding-agent";
 import { clearPlan, createPlanRuntime, syncPlanWidget, updatePlan } from "./control/plan.ts";
 import { readGitBranch } from "./session/git-branch.ts";
+import { type PrepareImages, SessionImageCache } from "./session/image-attachments.ts";
 import { registerSessionTreeCommand } from "./session/session-tree.ts";
 import { createSubagentActivityObserver } from "./session/subagent-activity.ts";
 import { registerTranscriptCommand } from "./session/transcript-view.ts";
@@ -33,7 +34,14 @@ const PACKAGE_NAME = "Pi-TUIX";
 
 export default function piTuix(pi: ExtensionAPI): void {
   const subagentActivity = createSubagentActivityObserver(pi);
-  const shell = createOpenTuiShellRuntime(pi, subagentActivity, (ctx) => syncInterface(ctx));
+  let imageCache = new SessionImageCache();
+  const prepareImages: PrepareImages = (entries, signal) => imageCache.prepare(entries, signal);
+  const shell = createOpenTuiShellRuntime(
+    pi,
+    subagentActivity,
+    (ctx) => syncInterface(ctx),
+    prepareImages,
+  );
   // 工具渲染模式配置
   const groups = new ToolGroupRuntime();
   const toolMode: ToolRendererMode = {
@@ -57,7 +65,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   };
   const plan = createPlanRuntime();
   registerSessionTreeCommand(pi);
-  registerTranscriptCommand(pi, shell.useAscii);
+  registerTranscriptCommand(pi, shell.useAscii, prepareImages);
 
   const toolRenderers = registerThreeLayerToolRenderers(pi, toolMode);
   const syncInterface = (ctx: ExtensionContext) => {
@@ -206,7 +214,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     toolRenderers.invalidate();
     shell.handleRefresh(ctx);
   });
-  pi.on("session_shutdown", (_event, ctx) => {
+  pi.on("session_shutdown", async (_event, ctx) => {
     completionRead?.abort();
     completionRead = undefined;
     stopRunTimer();
@@ -215,6 +223,9 @@ export default function piTuix(pi: ExtensionAPI): void {
     groups.reset(ctx.cwd);
     shell.handleSessionShutdown(ctx);
     completions.detach(ctx);
+    const previousImages = imageCache;
+    imageCache = new SessionImageCache();
+    await previousImages.dispose();
   });
 
   pi.registerCommand("pituix", {
