@@ -117,6 +117,74 @@ test("empty-input help toggles without submitting text and ordinary question mar
   assert.equal(input.getText(), "why?");
 });
 
+test("image-paste help follows host bindings and leaves clipboard handling with Pi", () => {
+  try {
+    for (const binding of ["ctrl+v", "ctrl+y", undefined] as const) {
+      const configured = new TuiKeybindingsManager({
+        ...TUI_KEYBINDINGS,
+        "app.clipboard.pasteImage": { defaultKeys: binding ? [binding] : [] },
+      });
+      setKeybindings(configured);
+      hostTui.setKeybindings(configured);
+      const input = new OpenTuiEditor(
+        tui,
+        { borderColor: paint, selectList: {} } as EditorTheme,
+        configured as unknown as KeybindingsManager,
+      );
+      let clipboardCalls = 0;
+      input.onPasteImage = () => clipboardCalls++;
+      input.handleInput("?");
+      const help = input.render(100).map(stripTerminalSequences).join("\n");
+      assert.ok(help.includes("paste image path to attach"));
+      if (binding) assert.ok(help.includes(`${binding} paste image`));
+      else assert.doesNotMatch(help, /ctrl\+v paste image/);
+      for (const width of [0, 1, 4, 12, 24, 40, 80, 100])
+        assert.ok(input.render(width).every((line) => visibleWidth(line) <= width));
+      assert.equal(clipboardCalls, 0, "rendering must not read the clipboard");
+      input.handleInput("\x1b");
+      input.handleInput(binding === "ctrl+y" ? "\x19" : "\x16");
+      assert.equal(clipboardCalls, binding ? 1 : 0);
+      assert.equal(input.getText(), "");
+    }
+  } finally {
+    setKeybindings(keys);
+    hostTui.setKeybindings(keys);
+  }
+});
+
+test("encoded and fullwidth question keys toggle help while escape and draft text stay native", () => {
+  for (const question of [
+    "\x1b[63u",
+    "\x1b[63;2u",
+    "\x1b[47:63;2u",
+    "\x1b[27;1;63~",
+    "\x1b[27;2;63~",
+    "\uff1f",
+    "\x1b[65311u",
+  ]) {
+    const input = editor();
+    let interrupted = false;
+    input.onEscape = () => {
+      interrupted = true;
+    };
+    input.handleInput(question);
+    assert.equal(input.getText(), "");
+    assert.match(input.render(100).map(stripTerminalSequences).join("\n"), /close help/);
+    input.handleInput(question);
+    assert.doesNotMatch(input.render(100).map(stripTerminalSequences).join("\n"), /close help/);
+    input.handleInput(question);
+    input.handleInput("\x1b[27u");
+    assert.doesNotMatch(input.render(100).map(stripTerminalSequences).join("\n"), /close help/);
+    assert.equal(interrupted, false);
+    input.setText("why");
+    input.handleInput(question);
+    assert.equal(
+      input.getText(),
+      question === "\uff1f" || question === "\x1b[65311u" ? "why\uff1f" : "why?",
+    );
+  }
+});
+
 test("compact footer displays running hints and context pressure without width overflow", () => {
   let component: Component | undefined;
   let percent = 20;
