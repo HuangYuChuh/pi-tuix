@@ -65,6 +65,7 @@ These commands are reversible:
 | `/pituix-mode <collapsed\|preview\|expanded>` | Set the tool detail display mode; preview is the default |
 | `/pituix-about` | Show the package and compatible Pi version |
 | `/pituix-status` | Toggle compact hints and detailed session statistics |
+| `/pituix-model` | Choose a Pi model and thinking level in the numbered picker |
 | `/pituix-settings` | Open shell, footer, icon, and telemetry settings |
 | `/pituix-steer <message>` | Interrupt the current run with an immediate correction |
 | `/pituix-followup <message>` | Queue work to start after the current run |

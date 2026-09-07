@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import { registerModelPicker } from "../../control/model-picker.ts";
 import type { SubagentActivityObserver } from "../../session/subagent-activity.ts";
 import {
   DEFAULT_CONFIG,
@@ -53,7 +54,7 @@ export function createOpenTuiShellRuntime(
     effort.level = effort.enabled ? (ctx.thinkingLevel ?? pi.getThinkingLevel()) : "off";
     effort.ascii = useAsciiChrome(config.icons.mode);
   };
-  let settingsOpen = false;
+  let panelOpen = false;
   let active = false;
   let context: ExtensionContext | undefined;
   let requestRender: (() => void) | undefined;
@@ -150,7 +151,7 @@ export function createOpenTuiShellRuntime(
           void refreshGit(ctx);
         },
         getSubagentActivity: subagentActivity?.getState,
-        isSettingsOpen: () => settingsOpen,
+        isPanelOpen: () => panelOpen,
       },
     );
     editor = installEditor(
@@ -179,12 +180,22 @@ export function createOpenTuiShellRuntime(
 
   ensureConfigExists();
   config = loadConfig();
+  const onPanelOpened = () => {
+    panelOpen = true;
+    requestRender?.();
+  };
+  const onPanelClosed = () => {
+    panelOpen = false;
+    requestRender?.();
+  };
+  registerModelPicker(pi, {
+    ascii: () => useAsciiChrome(config.icons.mode),
+    onOpen: onPanelOpened,
+    onClose: onPanelClosed,
+  });
   registerSettingsCommand(pi, {
     getConfig: () => config,
-    onOverlayOpened: () => {
-      settingsOpen = true;
-      requestRender?.();
-    },
+    onOverlayOpened: onPanelOpened,
     onConfigChanged: (next) => {
       const iconsChanged = config.icons.mode !== next.icons.mode;
       const cursorChanged = config.cursorStyle !== next.cursorStyle;
@@ -197,8 +208,7 @@ export function createOpenTuiShellRuntime(
       if (context) refresh(context, true);
     },
     onOverlayClosed: () => {
-      settingsOpen = false;
-      requestRender?.();
+      onPanelClosed();
       if (!context) return;
       if (config.enabled) apply(context);
       else remove(context);

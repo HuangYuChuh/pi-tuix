@@ -67,6 +67,7 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 | `/pituix-three-layer` | 使用三层工具展示 |
 | `/pituix-mode <collapsed\|preview\|expanded>` | 设置工具详情模式，默认是 preview |
 | `/pituix-status` | 切换简洁底栏和详细统计 |
+| `/pituix-model` | 在编号列表中选择 Pi 模型，并调整思考强度 |
 | `/pituix-settings` | 配置界面、底栏、图标和统计 |
 | `/pituix-about` | 查看 package 与兼容的 Pi 版本 |
 | `/pituix-steer <消息>` | 立即纠偏当前执行中的任务 |

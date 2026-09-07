@@ -209,7 +209,7 @@ function renderExtensionStatusLines(
 export interface FooterHooks {
   setRequestRender: (fn: (() => void) | undefined) => void;
   scheduleGitRefresh: () => void;
-  isSettingsOpen?: () => boolean;
+  isPanelOpen?: () => boolean;
   getSubagentActivity?: () => SubagentActivityState;
 }
 
@@ -234,7 +234,7 @@ export function installFooter(
       },
       invalidate() {},
       render(width: number): string[] {
-        if (width <= 0 || hooks.isSettingsOpen?.()) return [];
+        if (width <= 0 || hooks.isPanelOpen?.()) return [];
         const state = getState();
         const config = getConfig();
         const glyphs = resolveGlyphs(config.icons.mode);

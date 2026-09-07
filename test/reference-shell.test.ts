@@ -142,7 +142,7 @@ test("compact footer displays running hints and context pressure without width o
     {
       setRequestRender: () => {},
       scheduleGitRefresh: () => {},
-      isSettingsOpen: () => settingsOpen,
+      isPanelOpen: () => settingsOpen,
     },
   );
   assert.ok(component);
@@ -174,6 +174,7 @@ test("extension loads through Pi's public loader with all presentation commands"
     assert.equal(result.extensions.length, 1);
     const extension = result.extensions[0];
     assert.ok(extension?.commands.has("pituix-status"));
+    assert.ok(extension?.commands.has("pituix-model"));
     assert.ok(extension?.commands.has("pituix-default"));
     assert.equal(extension?.tools.size, 4);
   } finally {

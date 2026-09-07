@@ -86,6 +86,7 @@ Context pressure, resume references, and subagent status where Pi exposes reliab
 The next validation target is measured visual alignment with Claude Code 2.1.263
 for startup, input, working state, compact tool rows, and progressive disclosure.
 See the [parity report](claude-code-parity.md). This target does not transfer
-provider, permission, transcript, or session ownership to Pi-TUIX. A working
-Claude Code login or compatible gateway credential is still required to finish
-observing successful reference tool workflows.
+provider, permission, transcript, or session ownership to Pi-TUIX. Successful
+reference tool workflows have now been observed through a separately configured
+Claude Code gateway. The model picker reads Pi's scoped/available models and
+delegates selection to Pi; it does not maintain a separate model catalogue.

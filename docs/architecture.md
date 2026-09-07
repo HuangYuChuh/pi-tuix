@@ -71,6 +71,13 @@ marker, retaining host paste, cursor and horizontal-scroll handling. Its tabs
 contain Pi-TUIX preferences only. Footer chrome is hidden while settings are
 open and restored in a `finally` handler when the custom view closes.
 
+`/pituix-model` presents Pi's scoped models, falling back to its available model
+registry when no scope is configured. Public pi-ai helpers determine supported
+thinking levels. Arrow-key adjustments remain draft UI state until confirmation;
+then `pi.setModel` and `pi.setThinkingLevel` apply them. Authentication, model
+availability, effective effort and persistence remain Pi-owned. The native
+`/model` command is preserved.
+
 Tool definitions use the public `renderShell: "self"` option while enabled.
 Their call and result components share a small presentation flag through the
 public `context.state`: once a result is rendered, the pending call row becomes

@@ -32,8 +32,11 @@ is included in Pi-TUIX. The reference mascot is replaced with an original ASCII
 - Empty-input `?`: help replaces the compact hint area. Commands, file mentions,
   shell mode, interruption, expansion, and editing shortcuts are grouped below
   the editor. A question mark within an existing draft remains input.
-- `/model`: a selected row, descriptions, current-model marker, effort control,
-  and an explicit cancel hint. This remains Pi's native model selector.
+- `/model`: a numbered list, descriptions starting in column 32 at 100 columns,
+  current-model check mark, and draft effort changed with Left/Right. Enter
+  confirms; Escape leaves the model unchanged. Pi-TUIX exposes this layout in
+  `/pituix-model` using Pi's available/scoped models and supported thinking
+  levels. The native `/model` command remains available.
 - `/config`: a top separator, tab strip, settings search input, aligned setting
   names and values, and navigation hints. At 100 columns, the search box spans
   columns 4-97, search text starts in column 8, labels in column 6, and values
@@ -45,6 +48,36 @@ is included in Pi-TUIX. The reference mascot is replaced with an original ASCII
 - A model request failed with an expired-login message. A completion-duration
   line was still rendered for that failed attempt. This is not evidence of a
   successful model turn or of model-driven Read/Edit/Write rendering.
+
+### Authenticated tool workflow
+
+After configuring a compatible gateway outside the repository, an actual
+`claude-opus-5` session completed a disposable fixture workflow: Read a
+three-line TypeScript file, run a Bash printf command, Edit subtraction to
+addition, and Write a one-line notes file. The final files were verified on
+disk. Edit and Write confirmations were observed and approved individually;
+permission mode was not relaxed.
+
+- Compact transcript combines adjacent completed Read/Bash calls into an
+  indented count summary. Detailed transcript (`Ctrl+O`) separates the calls.
+- Detailed Read shows a `Read(path)` heading and a result branch with the line
+  count. It does not print the file body in the observed detailed transcript.
+- Bash prints output under a result branch; a deliberately failing command
+  showed `Error: Exit code 7` and its stderr after individual approval.
+- Edit uses `Update(path)`, an added/removed-line count, and a numbered diff.
+  Changed tokens have stronger highlights within colored added/removed rows.
+- Write uses `Write(path)`, a written-line count, and a numbered content preview.
+- Edit and Write confirmations show the file, a diff/content preview, one-time
+  approval, a separate permission-mode option, rejection, and amend/cancel hints.
+- A completion line shows elapsed time and a completion clock time. The
+  working row includes an animated glyph, activity text, elapsed time and tokens.
+- One subsequent gateway response ended before any complete streaming data;
+  Claude displayed a retry notice and successfully retried without streaming.
+  The successful tool workflow is verified; gateway streaming is not assumed
+  reliable for every request.
+- Interrupting a direct `!sleep 30` command removed its running row and restored
+  the command draft in shell mode. This is evidence for direct shell-mode
+  cancellation; it is not a model-tool cancellation capture.
 
 Observed dark-theme colors:
 
@@ -69,14 +102,15 @@ colors retain Pi-TUIX's existing accessible palette.
 | Compact status and detailed statistics | `setFooter` | Implemented; `/pituix-status` toggles details |
 | Effort above the prompt | Custom editor, `thinking_level_select`, `model_select` | Implemented; displays Pi's effective level and actual cycle binding |
 | Searchable settings page | `ctx.ui.custom`, public `Input` | Reference frame, filtering, focus navigation and value alignment implemented for Pi-TUIX settings |
+| Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented; spinner frames are an approximation |
 | Queued follow-up count | `input` events, `setStatus` | Observational count; Pi owns delivery |
-| Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state` | Compact adaptation implemented; full reference comparison awaits login |
+| Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state` | Earlier compact adaptation implemented; observed grouping, result branches, write preview and diff details still need alignment |
 | Tool expansion | `options.expanded`, configured `app.tools.expand` | Implemented; no invented E binding |
 | Execution, errors, cancellation | Original tool `execute` functions | Delegated unchanged |
 | Default UI restoration | Public unset/reset methods | Implemented and tested |
 | Built-in user/assistant transcript chrome | No general replacement hook in the declared extension contract | Host-owned; not pixel-identical |
-| Model menu, transcript navigation, resume | Native Pi commands/components | Retained; command and key semantics differ |
+| Native model command, transcript navigation, resume | Native Pi commands/components | Retained; `/pituix-model` provides the custom model surface |
 | Claude permission modes and approval dialogs | Pi trust/permission semantics differ | Not emulated |
 | Claude-specific settings tabs and preferences | Extension-specific settings available | Pi-TUIX categories retained; Claude account/runtime controls are not emulated |
 | MCP group summaries and cross-session agents | No universal renderer hook for other extensions | Not reproduced |
@@ -98,13 +132,18 @@ They do not provide a replacement renderer for all host permission decisions.
   Chinese input, ASCII fallback, 1-40 terminal rows, footer restoration, and
   cleanup when the custom view fails. Unsupported wheel-speed UI is removed;
   its stored preference remains for compatibility and has no host effect.
+- Model picker tests cover host scope, capability clamping, draft effort,
+  cancellation, selection failures, exact public setter delegation, ANSI/CJK
+  rendering and selected-row visibility in short terminals. An interactive Pi
+  check verified that confirming medium effort updates the prompt indicator.
 - Exact execution-function identity tests for all four overridden tools, plus
   running/success/error/cancellation, expansion, and shared-row replacement tests.
 - Interactive Pi full-screen smoke test at 100x40 with an isolated agent directory.
   An isolated display-only provider fixture exposes a reasoning model for effort
   rendering; it sends no requests and is not part of the package.
-- Successful Claude model-driven tool calls, streaming, approval dialogs, and
-  full cross-product visual parity remain unverified because login expired.
+- Successful Claude Read/Bash/Edit/Write calls and approval dialogs are now
+  observed. Full cross-product visual parity remains incomplete; the tool
+  presentation gaps above are based on these authenticated observations.
 
 ## Reproduce locally
 
@@ -119,11 +158,11 @@ In Pi, use `/pituix-status` for detailed statistics, `?` on an empty draft for
 help, and `/pituix-default` to restore the native UI and previous theme. Pi-TUIX
 respects a different theme chosen by the user before disabling it.
 
-Continue the reference study after authenticating Claude Code with `/login` or
-configuring a compatible third-party gateway locally. Credentials and gateway
-configuration belong to Claude Code, never to this extension or its repository.
-Use only disposable fixture files for tool/approval/diff tests. Until that work
-and the host-owned gaps above are resolved, this is a partial visual adaptation,
+Reference study requires a working Claude Code login or compatible gateway.
+Credentials and gateway configuration belong to Claude Code, never to this
+extension or its repository. Use only disposable fixture files for tool,
+approval and diff tests. Until the presentation and host-owned gaps above are
+resolved, this is a partial visual adaptation,
 not a complete reproduction.
 
 Public references: [Claude interactive mode](https://code.claude.com/docs/en/interactive-mode),
