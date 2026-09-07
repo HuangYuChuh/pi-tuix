@@ -256,9 +256,20 @@ shows captured bytes even if the source file changes. Late preparation cancels
 on shutdown. No draft identity is saved separately in a session file.
 
 The native follow-up action reads unresolved editor content so image data reaches
-the input event. The public dequeue action restores known queued labels to chips. After it
-returns, a clear public `hasPendingMessages()` result resets the presentation
-queue count, so removed messages do not leave a stale badge.
+the input event. Disposable input observations record original/displayed text,
+steering/follow-up lane and image fingerprints. They neither submit nor execute
+messages. Public user-message events retire observations using text and image
+payloads; a clear `hasPendingMessages()` result discards stale observations.
+The public dequeue and interrupt actions restore chips only when the complete
+native take-back text matches those observations in steering/follow-up order.
+The current draft is captured separately, including expanded native paste data,
+so literal labels never acquire attachments from matching numbers. A mismatch
+keeps the host text and warns when owned images could not be restored. Records
+are bounded to 256 inputs and 8 MiB of text; overflow disables matching until
+cleared. Disposal clears all observations. An empty public queue also resets the
+presentation badge after take-back. Later input handlers can still change image
+payloads without changing text; Pi exposes no accepted-queue payload event to
+verify that case. Unobserved compaction queues also lack complete public metadata.
 The native external-editor action receives readable labels; its public `setText`
 callback restores surviving known labels to their image identities. Disabling the
 extension expands remaining draft chips to readable source paths before restoring
@@ -272,7 +283,7 @@ handling. When expanded text differs from the editor buffer, deletion stays
 native: `setText` would otherwise clear the host's collapsed-paste registry.
 History remains Pi-owned and no display token or image data is inserted for a
 literal label. Collapsed-paste deletion, native commands consuming arguments
-before the input event, and queue restoration of literal/owned label collisions
+before the input event, and external-editor literal/owned label collisions
 need further work. Quoted path-list acceptance and retaining unavailable paths
 are documented differences from the sampled reference parser.
 

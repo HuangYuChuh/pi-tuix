@@ -33,6 +33,7 @@ const keys = new TuiKeys({
   "app.editor.external": { defaultKeys: "ctrl+g" },
   "app.message.followUp": { defaultKeys: "alt+enter" },
   "app.message.dequeue": { defaultKeys: "alt+up" },
+  "app.interrupt": { defaultKeys: "escape" },
 });
 setKeybindings(keys);
 hostTui.setKeybindings(keys);
@@ -384,7 +385,12 @@ test("taking back a native queue restores owned chips and leaves literal labels 
   try {
     h.paste();
     const original = h.editor.getText();
-    const input = h.images.transform({ type: "input", text: original, source: "interactive" });
+    const input = h.images.transform({
+      type: "input",
+      text: original,
+      source: "interactive",
+      streamingBehavior: "followUp",
+    });
     assert.equal(input.action, "transform");
     if (input.action !== "transform") assert.fail();
     h.editor.setText("");
@@ -431,6 +437,225 @@ test("incoming user media reserves numbers before persistence without advancing 
     });
     h.paste();
     assert.match(plain(h.editor), /Image #2.*Image #3/);
+  } finally {
+    h.close();
+  }
+});
+
+test("queue take-back never reattaches a literal label matching an older draft image", () => {
+  const h = fixture();
+  try {
+    h.paste();
+    h.editor.setText("");
+    const literal = "[Image #1]";
+    const event = {
+      type: "input" as const,
+      text: literal,
+      source: "interactive" as const,
+      streamingBehavior: "followUp" as const,
+    };
+    assert.equal(h.images.transform(event, false).action, "continue");
+    h.editor.onAction("app.message.dequeue", () => h.editor.setText(literal));
+    h.editor.handleInput("\x1b[1;3A");
+    assert.equal(h.editor.getText(), literal);
+    assert.equal(
+      h.images.transform({ ...event, text: h.editor.getExpandedText() }, false).action,
+      "continue",
+    );
+  } finally {
+    h.close();
+  }
+});
+
+test("queue take-back preserves lane order and real/literal collisions through editing and requeue", () => {
+  const h = fixture();
+  try {
+    h.paste();
+    const token = h.editor.getText();
+    const literal = "[Image #1]";
+    h.images.transform(
+      { type: "input", text: token, source: "interactive", streamingBehavior: "followUp" },
+      false,
+    );
+    h.images.transform(
+      { type: "input", text: literal, source: "interactive", streamingBehavior: "steer" },
+      true,
+    );
+    h.images.transform(
+      {
+        type: "input",
+        text: `paragraph\n\n${token} ${literal}`,
+        source: "interactive",
+        streamingBehavior: "followUp",
+      },
+      true,
+    );
+    h.editor.setText(`draft ${literal}`);
+    const visible = [
+      literal,
+      literal,
+      `paragraph\n\n${literal} ${literal}`,
+      h.editor.getText(),
+    ].join("\n\n");
+    h.editor.onAction("app.message.dequeue", () => h.editor.setText(visible));
+    h.editor.handleInput("\x1b[1;3A");
+    const expected = [literal, token, `paragraph\n\n${token} ${literal}`, `draft ${literal}`].join(
+      "\n\n",
+    );
+    assert.equal(h.editor.getText(), expected);
+    h.editor.handleInput(" edited");
+    const input = h.images.transform(
+      {
+        type: "input",
+        text: h.editor.getExpandedText(),
+        source: "interactive",
+        streamingBehavior: "followUp",
+      },
+      false,
+    );
+    assert.equal(input.action, "transform");
+    if (input.action !== "transform") assert.fail();
+    assert.equal(input.images?.length, 2);
+    assert.ok(input.images?.every((image) => image.data === png));
+    h.editor.setText("");
+    h.editor.onAction("app.message.dequeue", () => h.editor.setText(input.text));
+    h.editor.handleInput("\x1b[1;3A");
+    assert.equal(h.editor.getText(), `${expected} edited`);
+  } finally {
+    h.close();
+  }
+});
+
+test("delivered messages remove the matching image payload observation, even with identical labels", () => {
+  for (const deliverImage of [true, false]) {
+    const h = fixture();
+    try {
+      h.paste();
+      const token = h.editor.getText();
+      const literal = "[Image #1]";
+      h.images.transform(
+        { type: "input", text: literal, source: "interactive", streamingBehavior: "followUp" },
+        false,
+      );
+      h.images.transform(
+        { type: "input", text: token, source: "interactive", streamingBehavior: "steer" },
+        true,
+      );
+      h.images.reserve(
+        {
+          role: "user",
+          content: [
+            { type: "text", text: literal },
+            ...(deliverImage ? [{ type: "image" as const, data: png, mimeType: "image/png" }] : []),
+          ],
+          timestamp: 0,
+        },
+        true,
+      );
+      h.editor.setText("");
+      h.editor.onAction("app.message.dequeue", () => h.editor.setText(literal));
+      h.editor.handleInput("\x1b[1;3A");
+      assert.equal(h.editor.getText(), deliverImage ? literal : token);
+    } finally {
+      h.close();
+    }
+  }
+});
+
+test("take-back expands the current native collapsed paste without attaching its literal labels", () => {
+  const h = fixture();
+  try {
+    h.paste();
+    const token = h.editor.getText();
+    h.images.transform(
+      { type: "input", text: token, source: "interactive", streamingBehavior: "followUp" },
+      false,
+    );
+    h.editor.setText("");
+    const large = "line 中文 [Image #1]\n".repeat(100);
+    h.paste(large);
+    h.paste();
+    const expanded = h.editor.getExpandedText();
+    assert.notEqual(expanded, h.editor.getText());
+    h.editor.onAction("app.message.dequeue", () =>
+      h.editor.setText(`[Image #1]\n\n${h.editor.getText()}`),
+    );
+    h.editor.handleInput("\x1b[1;3A");
+    assert.equal(h.editor.getExpandedText(), `${token}\n\n${expanded}`);
+    const result = h.images.transform(
+      { type: "input", text: h.editor.getExpandedText(), source: "interactive" },
+      false,
+    );
+    assert.equal(result.action, "transform");
+    if (result.action !== "transform") assert.fail();
+    assert.equal(result.images?.length, 2);
+    assert.ok(result.text.includes(large));
+  } finally {
+    h.close();
+  }
+});
+
+test("unknown transformed queued text stays text and reports missing image recovery once", () => {
+  const h = fixture();
+  try {
+    h.paste();
+    h.images.transform(
+      {
+        type: "input",
+        text: h.editor.getText(),
+        source: "interactive",
+        streamingBehavior: "followUp",
+      },
+      false,
+    );
+    h.editor.setText("");
+    const large = "retained current draft\n".repeat(100);
+    h.paste(large);
+    const expanded = h.editor.getExpandedText();
+    let warnings = 0;
+    h.editor.onQueueRestoreUnmatched = () => {
+      warnings++;
+    };
+    h.editor.onAction("app.message.dequeue", () =>
+      h.editor.setText(`changed [Image #1]\n\n${h.editor.getText()}`),
+    );
+    h.editor.handleInput("\x1b[1;3A");
+    assert.equal(h.editor.getExpandedText(), `changed [Image #1]\n\n${expanded}`);
+    assert.equal(h.images.has(h.editor.getText()), false);
+    assert.equal(warnings, 1);
+    h.editor.setText("");
+    h.editor.onAction("app.message.dequeue", () => h.editor.setText("[Image #1]"));
+    h.editor.handleInput("\x1b[1;3A");
+    assert.equal(warnings, 1);
+    assert.equal(h.editor.getText(), "[Image #1]");
+  } finally {
+    h.close();
+  }
+});
+
+test("interrupt delegates the native escape handler and restores queued chips, while help only closes", () => {
+  const h = fixture();
+  try {
+    h.paste();
+    const token = h.editor.getText();
+    h.images.transform(
+      { type: "input", text: token, source: "interactive", streamingBehavior: "followUp" },
+      false,
+    );
+    h.editor.setText("");
+    let aborted = 0;
+    h.editor.onEscape = () => {
+      h.editor.setText("[Image #1]");
+      aborted++;
+    };
+    h.editor.handleInput("?");
+    h.editor.handleInput("\x1b");
+    assert.equal(aborted, 0);
+    h.editor.handleInput("\x1b");
+    assert.equal(aborted, 1);
+    assert.equal(h.editor.getText(), token);
+    for (const width of [12, 40, 80, 100])
+      assert.ok(h.editor.render(width).every((line) => visibleWidth(line) <= width));
   } finally {
     h.close();
   }

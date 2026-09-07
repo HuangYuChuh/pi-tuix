@@ -182,7 +182,7 @@ broadly than the observed reference.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Old runs without branch observations stay unknown |
 | Main/snapshot/preview image attachments | Public message/context entries, component composition, `hyperlink`, native URL activation | User-only numbering, image-only prompts and openable temporary raster files implemented; Read images use file/byte summaries, other tool/custom images use unnumbered links |
-| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation | Multi-path chips, literal/history label editing, captured-image links and positional submission implemented; collapsed-paste deletion, queue-label ambiguity and parser edge cases still differ |
+| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation | Multi-path chips, literal/history label editing, captured-image links and positional submission implemented; observed queue take-back distinguishes literal labels; collapsed-paste deletion, external-editor collisions and parser edge cases still differ |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -297,11 +297,26 @@ remain a measured difference, rather than a claim of full syntax parity.
   without new images. `/pituix-default` restored native character deletion in
   the active fullscreen session, and both runtime caches were removed on quit.
   Literal-label deletion retains native behavior when collapsed paste data is
-  present, because public `setText` would clear that registry. Another verified
-  gap is queue take-back: its current number-based restoration can mistake a
-  literal label for an owned image with the same number. Submission before
-  take-back correctly leaves that literal as text; restoration must use the
-  observed input identity instead of the number alone.
+  present, because public `setText` would clear that registry.
+- Queue take-back now compares complete observed input text in native steering /
+  follow-up order, with current draft text kept separate. Regression tests cover
+  identical literal/owned labels, delivered image fingerprints, mixed paragraphs,
+  editing/requeue, current collapsed pastes, stale/overflow observations and native
+  interrupt delegation. Unknown transformed text stays text, with a warning if
+  owned images cannot be recovered. Actual Pi 0.84.4 at 80x24 took back a real
+  image follow-up and same-label steering message, retained a same-label current
+  draft, edited and requeued them, and delivered exactly one unchanged PNG hash.
+  A separate literal-only take-back delivered text without an image. Pi 0.85.1 at
+  100x40 restored a queued image through native Esc and retained all 100 lines of
+  a current collapsed text paste. Resubmission delivered one original image and
+  100 literal labels without extra image payloads. Native abort invocation is
+  covered by the editor regression; this display fixture waits for its timer
+  even after cancellation. Default-UI restoration passed, both hosts removed all
+  four temporary assets, and saved sessions contain no internal draft tokens.
+  Native take-back collapsed queued messages into one input as expected. Later
+  handlers changing image payloads without changing text and unobserved compaction
+  queues remain public-API limitations. External-editor label collisions are
+  separate remaining work.
 - Resume controls tests cover branch indexing beyond the visible window,
   selection stability, search/scope combinations, unavailable Git, unreadable
   files, queue replacement, aborts and stale results. Rename tests cover native

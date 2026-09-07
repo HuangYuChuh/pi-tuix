@@ -59,8 +59,10 @@ export function createOpenTuiShellRuntime(
   const telemetry = new TurnTelemetryTracker();
   const liveTranscript = createLiveTranscript(pi, prepareImages);
   let draftImages = new DraftImages(prepareImages, () => requestRender?.());
-  pi.on("input", (event) => draftImages.transform(event));
-  pi.on("message_start", (event) => draftImages.reserve(event.message));
+  pi.on("input", (event, ctx) => draftImages.transform(event, ctx.hasPendingMessages()));
+  pi.on("message_start", (event, ctx) =>
+    draftImages.reserve(event.message, ctx.hasPendingMessages()),
+  );
   pi.on("message_end", (_event, ctx) => draftImages.observe(ctx.sessionManager.getBranch()));
   let config: OpenTuiConfig = structuredClone(DEFAULT_CONFIG);
   const effort: EffortState = { enabled: false, level: "off", ascii: false };
@@ -191,6 +193,11 @@ export function createOpenTuiShellRuntime(
       (width) => renderEffortLine(effort, ctx.ui.theme, width),
       (tui, activeEditor) => {
         activeEditor.onQueueRestored = () => onQueueRestored?.(ctx);
+        activeEditor.onQueueRestoreUnmatched = () =>
+          ctx.ui.notify(
+            "Could not verify restored image attachments. Check the draft and reattach missing images.",
+            "warning",
+          );
         return liveTranscript.mount(tui, activeEditor, ctx, () =>
           useAsciiChrome(config.icons.mode),
         );

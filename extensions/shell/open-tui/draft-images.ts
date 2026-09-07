@@ -6,6 +6,7 @@ import type { ImageContent } from "@earendil-works/pi-ai";
 import type { InputEvent, InputEventResult, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { getImageDimensions } from "@earendil-works/pi-tui";
 import { collectImages, type PrepareImages } from "../../session/image-attachments.ts";
+import { DraftQueue, type QueueDraft } from "./draft-queue.ts";
 import { splitPastedPaths } from "./image-paths.ts";
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -87,6 +88,7 @@ function readImagePath(
 /** One native grapheme per chip preserves Pi's own editing and undo snapshots. */
 export class DraftImages {
   private readonly images = new Map<string, DraftImage>();
+  private readonly queue = new DraftQueue();
   private nextNumber = 0;
   private nextToken = 0;
   private bytes = 0;
@@ -104,8 +106,20 @@ export class DraftImages {
       this.nextNumber = Math.max(this.nextNumber, image.number ?? 0);
   }
 
-  reserve(message: Extract<SessionEntry, { type: "message" }>["message"]): void {
+  reserve(message: Extract<SessionEntry, { type: "message" }>["message"], pending = true): void {
     if (message.role !== "user") return;
+    const content =
+      typeof message.content === "string"
+        ? [{ type: "text" as const, text: message.content }]
+        : message.content;
+    this.queue.delivered(
+      content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join(""),
+      content.filter((block) => block.type === "image"),
+      pending,
+    );
     const images = collectImages([
       {
         type: "message",
@@ -204,20 +218,23 @@ export class DraftImages {
     return text.replace(/\[Image #\d+\]/g, (label) => known.get(label) ?? label);
   }
 
-  restoreQueuedLabels(text: string): string {
-    return this.restoreLabels(text, [...this.images.keys()].join(""));
+  restoreQueuedDraft(text: string, draft: QueueDraft): { text: string; unmatched: boolean } {
+    return this.queue.restore(text, draft);
   }
 
-  transform(event: InputEvent): InputEventResult {
+  transform(event: InputEvent, pending = true): InputEventResult {
     const attached = [...event.text].flatMap((character) => {
       const image = this.images.get(character);
       return image ? [{ ...image.image }] : [];
     });
+    const text = attached.length ? this.display(event.text) : event.text;
+    const images = [...(event.images ?? []), ...attached];
+    this.queue.observe(event, text, images, pending);
     return attached.length
       ? {
           action: "transform",
-          text: this.display(event.text),
-          images: [...(event.images ?? []), ...attached],
+          text,
+          images,
         }
       : { action: "continue" };
   }
@@ -227,6 +244,7 @@ export class DraftImages {
     for (const request of this.requests) request.abort();
     this.requests.clear();
     this.images.clear();
+    this.queue.clear();
     this.bytes = 0;
   }
 }

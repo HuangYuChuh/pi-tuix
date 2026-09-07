@@ -16,6 +16,7 @@ import {
 import type { CursorStyle } from "./config.ts";
 import { layoutDraftImages } from "./draft-image-layout.ts";
 import type { DraftImages } from "./draft-images.ts";
+import type { QueueDraft } from "./draft-queue.ts";
 import {
   applyFullscreenWheelScrollLines,
   DEFAULT_FULLSCREEN_WHEEL_SCROLL_LINES,
@@ -76,6 +77,7 @@ export function renderPromptRule(
 
 export class OpenTuiEditor extends CustomEditor {
   onQueueRestored?: () => void;
+  onQueueRestoreUnmatched?: () => void;
   private helpVisible = false;
   private ascii: boolean;
   private readonly getBorder: (s: string) => string;
@@ -90,7 +92,7 @@ export class OpenTuiEditor extends CustomEditor {
   private readonly appKeys: KeybindingsManager;
   private externalImages = false;
   private externalDraft: string | undefined;
-  private restoringQueuedImages = false;
+  private restoringQueuedDraft: QueueDraft | undefined;
 
   constructor(
     tui: TUI,
@@ -170,12 +172,17 @@ export class OpenTuiEditor extends CustomEditor {
       }
       return;
     }
-    if (this.appKeys.matches(data, "app.message.dequeue")) {
-      this.restoringQueuedImages = true;
+    if (
+      this.appKeys.matches(data, "app.message.dequeue") ||
+      (this.appKeys.matches(data, "app.interrupt") &&
+        !this.isShowingAutocomplete() &&
+        !this.helpVisible)
+    ) {
+      this.restoringQueuedDraft = { raw: super.getText(), expanded: super.getExpandedText() };
       try {
         super.handleInput(data);
       } finally {
-        this.restoringQueuedImages = false;
+        this.restoringQueuedDraft = undefined;
         this.onQueueRestored?.();
       }
       return;
@@ -337,7 +344,12 @@ export class OpenTuiEditor extends CustomEditor {
   }
 
   override setText(text: string): void {
-    if (this.restoringQueuedImages && this.images) text = this.images.restoreQueuedLabels(text);
+    if (this.restoringQueuedDraft && this.images) {
+      const restored = this.images.restoreQueuedDraft(text, this.restoringQueuedDraft);
+      text = restored.text;
+      this.restoringQueuedDraft = undefined;
+      if (restored.unmatched) this.onQueueRestoreUnmatched?.();
+    }
     if (this.externalDraft !== undefined && this.images) {
       text = this.images.restoreLabels(text, this.externalDraft);
       this.externalDraft = undefined;
