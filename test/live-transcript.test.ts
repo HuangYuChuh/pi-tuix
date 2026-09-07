@@ -95,6 +95,20 @@ function fixture(transform?: MarkdownTransformer, outputPad = 1) {
   return { observation, mirror, user, userMarkdown, assistant, responseMarkdown, document };
 }
 
+const copyMarkdown = [
+  "## Copied response 中文🙂",
+  "",
+  "```ts",
+  'const message = "CJK 中文";',
+  "```",
+  "",
+  "| Item | Result |",
+  "| --- | --- |",
+  "| emoji | READY 🙂 |",
+  "",
+  "[attachment link](file:///tmp/pi-tuix-copy-fixture.png)",
+].join("\n");
+
 function editor(tui?: TUI) {
   const input = new OpenTuiEditor(
     tui ??
@@ -258,7 +272,7 @@ test("unknown message shapes and absent Markdown callbacks fall back to original
   assert.match(plain(f.mirror.render(custom, 40)), /Extension-owned/);
 });
 
-function harness(mode: "regular" | "fullscreen" = "fullscreen", rows = 24) {
+function harness(mode: "regular" | "fullscreen" = "fullscreen", rows = 24, columns = 80) {
   let transform: MarkdownTransformer | undefined;
   const runtime = createLiveTranscript({
     registerMarkdownTransformer(value) {
@@ -273,8 +287,11 @@ function harness(mode: "regular" | "fullscreen" = "fullscreen", rows = 24) {
   let receive = (_data: string) => {};
   let copied = "";
   const writes: string[] = [];
+  let terminalColumns = columns;
   const terminal: Terminal = {
-    columns: 80,
+    get columns() {
+      return terminalColumns;
+    },
     rows,
     kittyProtocolActive: false,
     start(onInput) {
@@ -348,6 +365,10 @@ function harness(mode: "regular" | "fullscreen" = "fullscreen", rows = 24) {
     dispose,
     writes,
     copied: () => copied,
+    resize(columns: number) {
+      terminalColumns = columns;
+      tui.renderNow();
+    },
     send(data: string) {
       receive(data);
       tui.renderNow();
@@ -401,6 +422,16 @@ test("both native modes share live message presentation without changing dock, f
   }
 });
 
+function dragSelect(
+  h: ReturnType<typeof harness>,
+  start: { column: number; row: number },
+  end: { column: number; row: number },
+): void {
+  h.send(`\x1b[<0;${start.column + 1};${start.row + 1}M`);
+  h.send(`\x1b[<32;${end.column + 1};${end.row + 1}M`);
+  h.send(`\x1b[<0;${end.column + 1};${end.row + 1}m`);
+}
+
 test("native search retains its selected location after closing and mouse copy uses the decorated document", async () => {
   const h = harness();
   assert.ok(h.tui instanceof TuiAltScreen);
@@ -424,11 +455,51 @@ test("native search retains its selected location after closing and mouse copy u
     const target = documentLines.findIndex((line) => line.trim() === "Line 31");
     const row = target - h.tui.viewportTop + 1;
     assert.ok(row > 0 && row <= h.terminal.rows - h.dock.render(80).length);
-    h.send(`\x1b[<0;3;${row}M`);
-    h.send(`\x1b[<32;10;${row}M`);
-    h.send(`\x1b[<0;10;${row}m`);
+    dragSelect(h, { column: 2, row: row - 1 }, { column: 9, row: row - 1 });
     assert.equal(await h.tui.copyActiveSelectionToClipboard(), true);
     assert.equal(h.copied().trim(), "Line 31");
+  } finally {
+    h.close();
+  }
+});
+
+test("fullscreen native selection copies decorated Markdown without terminal controls", async () => {
+  const h = harness("fullscreen", 80, 40);
+  assert.ok(h.tui instanceof TuiAltScreen);
+  h.userMarkdown.setText("Request with CJK 中文🙂 and a prompt marker.");
+  h.responseMarkdown.setText(copyMarkdown);
+  await Promise.resolve();
+  h.tui.start();
+  h.tui.renderNow();
+  try {
+    for (const columns of [40, 80]) {
+      h.resize(columns);
+      const lines = h.document.render(columns);
+      const visible = lines.map(stripTerminalSequences);
+      const userRow = visible.findIndex((line) => line.includes("Request with CJK 中文🙂"));
+      const attachmentRow = visible.findIndex((line) => line.includes("attachment link"));
+      assert.ok(userRow >= 0 && attachmentRow > userRow);
+      assert.ok(attachmentRow < h.terminal.rows - h.dock.render(columns).length);
+
+      dragSelect(
+        h,
+        { column: 0, row: userRow },
+        {
+          column: visible[attachmentRow].indexOf("attachment link") + "attachment link".length - 1,
+          row: attachmentRow,
+        },
+      );
+      assert.equal(await h.tui.copyActiveSelectionToClipboard(), true);
+
+      const copied = h.copied();
+      assert.match(copied, /❯ Request with CJK 中文🙂 and a prompt\s+marker\./);
+      assert.match(copied, /⏺ Copied response 中文🙂/);
+      assert.match(copied, /const message = "CJK 中文";/);
+      assert.match(copied, /emoji.*READY 🙂/);
+      assert.match(copied, /attachment link/);
+      assert.equal(copied.includes(String.fromCharCode(0x1b)), false);
+      assert.equal(copied.includes(String.fromCharCode(0x07)), false);
+    }
   } finally {
     h.close();
   }

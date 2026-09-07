@@ -234,6 +234,37 @@ Expected:
 Record the original and selected theme names, Pi version, renderer mode, terminal
 dimensions and any visible delay before the new colors appear.
 
+### Scenario 13: Native transcript selection and copy
+
+**Test:** Verify copying a decorated multi-line response in fullscreen mode
+
+1. Start Pi-TUIX in fullscreen mode with a terminal that supports mouse selection.
+2. Send or display a disposable response containing a user prompt, a fenced code
+   block, a table, CJK text, emoji, and a local attachment link.
+3. Drag from the first user row through the final assistant row, including a
+   wrapped line when the terminal is narrow.
+4. Paste into a plain-text editor.
+
+Expected:
+
+✅ User and assistant text is copied in visible reading order
+✅ Prompt markers and assistant markers do not add duplicated text
+✅ Code and table rows remain present, including CJK and emoji characters
+✅ OSC 8 attachment links remain clickable in the terminal and do not add URL
+   escape sequences to copied text
+✅ Copied text contains no ANSI SGR controls, OSC sequences, or BEL characters
+✅ Selection still works after resizing between normal and narrow widths
+✅ Regular mode keeps native terminal selection behavior; fullscreen mode uses
+   Pi's public selection and clipboard callbacks
+
+The automated regression is in `test/live-transcript.test.ts`. It drives the
+public SGR mouse input path and `TuiAltScreen.copyActiveSelectionToClipboard()`;
+it does not replace Pi's viewport or clipboard implementation.
+
+For actual-terminal evidence, record the terminal name/version, Pi version,
+mode, terminal dimensions, the fixture text, and the pasted output. Do not use
+real credentials, private files, or production attachment URLs.
+
 ## Verification Checklist
 
 After testing, verify:
