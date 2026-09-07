@@ -9,6 +9,8 @@ export interface WorkflowRuntime {
   activity: WorkflowActivity;
   turn: number;
   currentTool: string | undefined;
+  activeTools: Map<string, string>;
+  finishedToolIds: Set<string>;
   completedTools: number;
   failedTools: number;
   queuedMessages: number;
@@ -29,6 +31,8 @@ export function createWorkflowRuntime(): WorkflowRuntime {
     activity: "IDLE",
     turn: 0,
     currentTool: undefined,
+    activeTools: new Map(),
+    finishedToolIds: new Set(),
     completedTools: 0,
     failedTools: 0,
     queuedMessages: 0,
@@ -40,6 +44,8 @@ export function beginAgentRun(runtime: WorkflowRuntime): void {
   runtime.activity = "WORKING";
   runtime.turn = 0;
   runtime.currentTool = undefined;
+  runtime.activeTools.clear();
+  runtime.finishedToolIds.clear();
   runtime.completedTools = 0;
   runtime.failedTools = 0;
   if (runtime.queuedMessages > 0) runtime.queuedMessages -= 1;
@@ -48,13 +54,13 @@ export function beginAgentRun(runtime: WorkflowRuntime): void {
 
 export function startTurn(runtime: WorkflowRuntime, turnIndex: number): void {
   runtime.turn = turnIndex + 1;
-  runtime.activity = "WORKING";
+  runtime.activity = runtime.activeTools.size ? "TOOL" : "WORKING";
   redraw(runtime);
 }
 
 export function setStreamActivity(runtime: WorkflowRuntime, activity: WorkflowActivity): void {
   if (runtime.phase !== "WORKING") return;
-  runtime.activity = activity;
+  runtime.activity = runtime.activeTools.size ? "TOOL" : activity;
   redraw(runtime);
 }
 
@@ -63,18 +69,22 @@ export function queueMessage(runtime: WorkflowRuntime): void {
   redraw(runtime);
 }
 
-export function startTool(runtime: WorkflowRuntime, toolName: string): void {
+export function startTool(runtime: WorkflowRuntime, toolCallId: string, toolName: string): void {
+  if (runtime.finishedToolIds.has(toolCallId)) return;
+  runtime.activeTools.set(toolCallId, toolName);
   runtime.phase = "WORKING";
   runtime.activity = "TOOL";
   runtime.currentTool = toolName;
   redraw(runtime);
 }
 
-export function finishTool(runtime: WorkflowRuntime, isError: boolean): void {
+export function finishTool(runtime: WorkflowRuntime, toolCallId: string, isError: boolean): void {
+  if (!runtime.activeTools.delete(toolCallId)) return;
+  runtime.finishedToolIds.add(toolCallId);
   runtime.completedTools += 1;
   if (isError) runtime.failedTools += 1;
-  runtime.currentTool = undefined;
-  runtime.activity = "WORKING";
+  runtime.currentTool = [...runtime.activeTools.values()].at(-1);
+  runtime.activity = runtime.activeTools.size ? "TOOL" : "WORKING";
   redraw(runtime);
 }
 
@@ -82,7 +92,16 @@ export function finishAgentRun(runtime: WorkflowRuntime): void {
   runtime.phase = runtime.failedTools > 0 ? "ERROR" : "DONE";
   runtime.activity = "IDLE";
   runtime.currentTool = undefined;
+  runtime.activeTools.clear();
   redraw(runtime);
+}
+
+export function workflowWorkingLabel(runtime: WorkflowRuntime): string {
+  if (runtime.activeTools.size > 1) return `Running ${runtime.activeTools.size} tools`;
+  if (runtime.currentTool) return `Running ${runtime.currentTool}`;
+  if (runtime.activity === "THINKING") return "Thinking";
+  if (runtime.activity === "RESPONDING") return "Responding";
+  return "Working";
 }
 
 export function settleAgent(runtime: WorkflowRuntime): void {
@@ -98,14 +117,19 @@ function phaseText(theme: Theme, phase: WorkflowPhase): string {
 }
 
 export function formatWorkflowStatus(runtime: WorkflowRuntime, theme: Theme, width = 120): string {
-  const tool = runtime.currentTool ? ` ${runtime.currentTool}` : "";
+  const tool =
+    runtime.activeTools.size > 1
+      ? ` (${runtime.activeTools.size} active)`
+      : runtime.currentTool
+        ? ` ${runtime.currentTool}`
+        : "";
   const activity = runtime.phase === "WORKING" ? ` | ${runtime.activity}${tool}` : tool;
   const turn = runtime.turn > 0 ? ` | TURN ${runtime.turn}` : "";
   const queue = runtime.queuedMessages > 0 ? ` | QUEUED ${runtime.queuedMessages}` : "";
   const failed = runtime.failedTools > 0 ? ` | FAILED ${runtime.failedTools}` : "";
   return truncateToWidth(
     `${phaseText(theme, runtime.phase)}${activity}${turn} | TOOLS ${runtime.completedTools}${failed}${queue}`,
-    Math.max(1, width),
+    Math.max(0, width),
   );
 }
 

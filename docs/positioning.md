@@ -59,3 +59,5 @@ Code 2.1.263. Fidelity is tracked per surface in the
 [parity report](claude-code-parity.md). Pi-TUIX preserves its identity and Pi's
 actual controls; it does not claim complete reproduction while reference flows
 remain unverified or the public host APIs leave rendering gaps.
+
+Completion metadata is a display-only payload saved by Pi through public custom entries. Pi owns persistence and branching; removing the extension needs no migration and leaves model messages intact.

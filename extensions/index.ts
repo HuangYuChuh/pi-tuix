@@ -9,7 +9,14 @@ import {
 } from "./control/plan.ts";
 import { registerSessionTreeCommand } from "./session/session-tree.ts";
 import { createSubagentActivityObserver } from "./session/subagent-activity.ts";
+import { useAsciiChrome } from "./shell/open-tui/icons.ts";
 import { createOpenTuiShellRuntime } from "./shell/open-tui/shell.ts";
+import {
+  COMPLETION_ENTRY_TYPE,
+  type CompletionEntryData,
+  registerCompletionEntries,
+} from "./stream/completion-entry.ts";
+import { RunPresentation } from "./stream/run-presentation.ts";
 import {
   beginAgentRun,
   createWorkflowRuntime,
@@ -21,6 +28,7 @@ import {
   settleAgent,
   startTool,
   startTurn,
+  workflowWorkingLabel,
 } from "./stream/workflow-status.ts";
 import { registerThreeLayerToolRenderers, type ToolRendererMode } from "./tools/renderers-v2.ts";
 import type { DisplayMode } from "./tools/three-layer-view.ts";
@@ -46,7 +54,9 @@ export default function piTuix(pi: ExtensionAPI): void {
   // 工具渲染模式配置
   const groups = new ToolGroupRuntime();
   const toolMode: ToolRendererMode = {
-    enabled: false,
+    // Pi replays persisted UI entries before session_start on resume/reload.
+    // Initial rendering must match the interface installed by that event.
+    enabled: true,
     defaultMode: "preview" as DisplayMode, // collapsed | preview | expanded
     groups,
   };
@@ -54,6 +64,13 @@ export default function piTuix(pi: ExtensionAPI): void {
   const subagentActivity = createSubagentActivityObserver(pi);
   const shell = createOpenTuiShellRuntime(pi, subagentActivity);
   const workflow = createWorkflowRuntime();
+  const run = new RunPresentation();
+  registerCompletionEntries(pi, () => toolMode.enabled, useAsciiChrome);
+  let runTimer: ReturnType<typeof setInterval> | undefined;
+  const stopRunTimer = () => {
+    if (runTimer) clearInterval(runTimer);
+    runTimer = undefined;
+  };
   const plan = createPlanRuntime();
   registerSessionTreeCommand(pi);
 
@@ -66,6 +83,9 @@ export default function piTuix(pi: ExtensionAPI): void {
   };
 
   pi.on("session_start", (_event, ctx) => {
+    stopRunTimer();
+    run.reset();
+    ctx.ui.setWidget("pituix-completion", undefined);
     toolRenderers.clear();
     hydrateGroups(ctx);
     shell.handleSessionStart(ctx);
@@ -74,14 +94,9 @@ export default function piTuix(pi: ExtensionAPI): void {
     applyPiTuix(ctx, toolMode, shell, plan);
     workflow.requestRender = () => {
       if (ctx.mode !== "tui" || !toolMode.enabled) return;
-      const activity = workflow.currentTool
-        ? `Running ${workflow.currentTool}`
-        : workflow.activity === "THINKING"
-          ? "Thinking"
-          : workflow.activity === "RESPONDING"
-            ? "Responding"
-            : "Working";
-      ctx.ui.setWorkingMessage?.(`${activity}...`);
+      ctx.ui.setWorkingMessage?.(
+        run.workingMessage(`${workflowWorkingLabel(workflow)}...`, Date.now(), useAsciiChrome()),
+      );
       ctx.ui.setStatus?.(
         "pituix-queue",
         workflow.queuedMessages > 0 ? `${workflow.queuedMessages} follow-up queued` : undefined,
@@ -89,15 +104,28 @@ export default function piTuix(pi: ExtensionAPI): void {
     };
     shell.handleRefresh(ctx, true);
   });
-  pi.on("agent_start", () => {
+  pi.on("agent_start", (_event, ctx) => {
+    run.begin();
+    stopRunTimer();
+    if (ctx.mode === "tui") {
+      runTimer = setInterval(() => refreshWorkflow(workflow), 1000);
+      runTimer.unref?.();
+    }
     beginAgentRun(workflow);
     shell.handleAgentStart();
   });
-  pi.on("agent_end", () => {
+  pi.on("agent_end", (event) => {
+    stopRunTimer();
+    run.end(event.messages ?? []);
     finishAgentRun(workflow);
     shell.handleAgentEnd();
   });
   pi.on("agent_settled", (event, ctx) => {
+    stopRunTimer();
+    const completion = run.settle();
+    if (completion && ctx.mode === "tui" && toolMode.enabled) {
+      pi.appendEntry<CompletionEntryData>(COMPLETION_ENTRY_TYPE, { version: 1, ...completion });
+    }
     settleAgent(workflow);
     shell.handleAgentSettled(event, ctx);
   });
@@ -109,6 +137,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     refreshWorkflow(workflow);
   });
   pi.on("message_update", (event) => {
+    run.observeMessage(event.message);
     const type = event.assistantMessageEvent.type;
     if (type === "thinking_start" || type === "thinking_delta")
       setStreamActivity(workflow, "THINKING");
@@ -123,14 +152,16 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.on("input", (event) => {
     if (event.streamingBehavior === "followUp") queueMessage(workflow);
   });
-  pi.on("tool_execution_start", (event) => startTool(workflow, event.toolName));
+  pi.on("tool_execution_start", (event) => startTool(workflow, event.toolCallId, event.toolName));
   pi.on("tool_execution_end", (event, ctx) => {
+    run.observeTool(event.toolCallId, event.result, event.isError);
     const affected = groups.complete(event.toolCallId, event.result, event.isError);
     if (toolMode.enabled && affected.length) toolRenderers.invalidate(affected);
-    finishTool(workflow, event.isError);
+    finishTool(workflow, event.toolCallId, event.isError);
     shell.handleRefresh(ctx);
   });
   pi.on("message_end", (event, ctx) => {
+    run.observeMessage(event.message);
     if (ctx.mode === "tui") {
       const affected = groups.recordMessage(event.message);
       if (toolMode.enabled && affected.length) toolRenderers.invalidate(affected);
@@ -143,11 +174,14 @@ export default function piTuix(pi: ExtensionAPI): void {
     shell.handleRefresh(ctx);
   });
   pi.on("session_tree", (_event, ctx) => {
+    run.reset();
     hydrateGroups(ctx);
     toolRenderers.invalidate();
     shell.handleRefresh(ctx);
   });
   pi.on("session_shutdown", (_event, ctx) => {
+    stopRunTimer();
+    run.reset();
     toolRenderers.clear();
     groups.reset(ctx.cwd);
     shell.handleSessionShutdown(ctx);

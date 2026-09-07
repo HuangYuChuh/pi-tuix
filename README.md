@@ -140,3 +140,5 @@ UI changes should be checked at narrow and normal terminal widths, including idl
 ## License
 
 Pi-TUIX is released under the [MIT License](LICENSE).
+
+The working line shows elapsed time and reported output tokens. Pi stores one display-only completion or interruption record per settled run through its public custom-entry API. Historical records remain outside model context, and default mode hides their rendering.

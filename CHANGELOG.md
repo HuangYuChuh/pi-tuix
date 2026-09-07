@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 First stable release of Pi-TUIX, published to npm with the `latest` dist-tag.
 
 ### Added
+- Add elapsed working feedback, concurrent-tool tracking and Pi-owned display-only completion/interruption history.
 - Engineering infrastructure
   - Biome for code formatting and linting
   - GitHub Actions CI workflow (typecheck, lint, test, pack:check)
