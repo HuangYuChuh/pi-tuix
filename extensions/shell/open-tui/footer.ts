@@ -1,4 +1,9 @@
-import type { ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import {
+  type ExtensionContext,
+  keyText,
+  type Theme,
+  type ThemeColor,
+} from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { SubagentActivityState } from "../../session/subagent-activity.ts";
 import type { OpenTuiConfig } from "./config.ts";
@@ -204,6 +209,7 @@ function renderExtensionStatusLines(
 export interface FooterHooks {
   setRequestRender: (fn: (() => void) | undefined) => void;
   scheduleGitRefresh: () => void;
+  isPanelOpen?: () => boolean;
   getSubagentActivity?: () => SubagentActivityState;
 }
 
@@ -228,12 +234,59 @@ export function installFooter(
       },
       invalidate() {},
       render(width: number): string[] {
-        if (width <= 0) return [""];
+        if (width <= 0 || hooks.isPanelOpen?.()) return [];
         const state = getState();
         const config = getConfig();
         const glyphs = resolveGlyphs(config.icons.mode);
         const segments = config.footerSegments;
         const meta = getModelMeta();
+
+        if (config.footerStyle === "compact") {
+          const running = state.workingSince !== undefined;
+          const hint = running ? `${keyText("app.interrupt")} to interrupt` : "? for shortcuts";
+          const left = theme.fg(
+            "dim",
+            `  ${hint}${width >= 80 ? " · /pituix-status for details" : ""}`,
+          );
+          const usage = ctx.getContextUsage();
+          const pressure = usage?.percent;
+          const right =
+            typeof pressure === "number" && pressure >= 80
+              ? theme.fg(
+                  pressure >= 95 ? "error" : "warning",
+                  `context ${pressure.toFixed(0)}% ${pressure >= 95 ? "CRITICAL" : "HIGH"}`,
+                )
+              : width < 60
+                ? ""
+                : theme.fg("dim", meta.model);
+          const lines = [truncateToWidth(alignRight(left, right, width, theme), width, "")];
+          const activity = hooks.getSubagentActivity?.();
+          if (activity?.available) {
+            for (const item of activity.activities) {
+              lines.push(
+                truncateToWidth(
+                  theme.fg(
+                    item.status === "failed" ? "error" : "muted",
+                    `  ${item.status} ${item.agent}: ${item.task}`,
+                  ),
+                  width,
+                  "",
+                ),
+              );
+            }
+          }
+          if (segments.extensionStatuses) {
+            lines.push(
+              ...renderExtensionStatusLines(
+                theme,
+                footerData.getExtensionStatuses(),
+                glyphs,
+                width,
+              ),
+            );
+          }
+          return lines;
+        }
 
         const totals = getUsageTotals(ctx);
 

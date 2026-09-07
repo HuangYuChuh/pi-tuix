@@ -105,6 +105,21 @@ function formatDiff(diff: string, theme: Theme): string[] {
   });
 }
 
+interface SharedPresentationState {
+  pituixHasResult?: boolean;
+}
+
+class PendingToolView extends ThreeLayerToolView {
+  private readonly shared: SharedPresentationState;
+  constructor(summary: ToolSummary, theme: Theme, shared: SharedPresentationState) {
+    super("collapsed", summary, [], theme);
+    this.shared = shared;
+  }
+  override render(width: number): string[] {
+    return this.shared.pituixHasResult ? [] : super.render(width);
+  }
+}
+
 // ===== READ 工具渲染器（三层版本）=====
 
 export function createThreeLayerReadDefinition(
@@ -114,6 +129,9 @@ export function createThreeLayerReadDefinition(
 ): ReadDefinition {
   return {
     ...original,
+    get renderShell() {
+      return mode.enabled ? "self" : original.renderShell;
+    },
     renderCall(args: ReadToolInput, theme, context) {
       if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
@@ -132,7 +150,11 @@ export function createThreeLayerReadDefinition(
         attention: false,
       };
 
-      return new ThreeLayerToolView("collapsed", summary, [], theme);
+      return new PendingToolView(
+        summary,
+        theme,
+        context.state as unknown as SharedPresentationState,
+      );
     },
 
     renderResult(result, options, theme, context) {
@@ -140,6 +162,7 @@ export function createThreeLayerReadDefinition(
         return original.renderResult(result, options, theme, contextForOriginal(context));
       }
 
+      (context.state as unknown as SharedPresentationState).pituixHasResult = true;
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const details = result.details as ReadToolDetails | undefined;
@@ -184,6 +207,9 @@ export function createThreeLayerBashDefinition(
 ): BashDefinition {
   return {
     ...original,
+    get renderShell() {
+      return mode.enabled ? "self" : original.renderShell;
+    },
     renderCall(args: BashToolInput, theme, context) {
       if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
@@ -198,7 +224,11 @@ export function createThreeLayerBashDefinition(
         attention: false,
       };
 
-      return new ThreeLayerToolView("collapsed", summary, [], theme);
+      return new PendingToolView(
+        summary,
+        theme,
+        context.state as unknown as SharedPresentationState,
+      );
     },
 
     renderResult(result, options, theme, context) {
@@ -206,6 +236,7 @@ export function createThreeLayerBashDefinition(
         return original.renderResult(result, options, theme, contextForOriginal(context));
       }
 
+      (context.state as unknown as SharedPresentationState).pituixHasResult = true;
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const details = result.details as BashToolDetails | undefined;
@@ -241,6 +272,9 @@ export function createThreeLayerEditDefinition(
 ): EditDefinition {
   return {
     ...original,
+    get renderShell() {
+      return mode.enabled ? "self" : original.renderShell;
+    },
     renderCall(args: EditToolInput, theme, context) {
       if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
@@ -255,7 +289,11 @@ export function createThreeLayerEditDefinition(
         attention: false,
       };
 
-      return new ThreeLayerToolView("collapsed", summary, [], theme);
+      return new PendingToolView(
+        summary,
+        theme,
+        context.state as unknown as SharedPresentationState,
+      );
     },
 
     renderResult(result, options, theme, context) {
@@ -263,6 +301,7 @@ export function createThreeLayerEditDefinition(
         return original.renderResult(result, options, theme, contextForOriginal(context));
       }
 
+      (context.state as unknown as SharedPresentationState).pituixHasResult = true;
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const details = result.details as EditToolDetails | undefined;
@@ -306,6 +345,9 @@ export function createThreeLayerWriteDefinition(
 ): WriteDefinition {
   return {
     ...original,
+    get renderShell() {
+      return mode.enabled ? "self" : original.renderShell;
+    },
     renderCall(args: WriteToolInput, theme, context) {
       if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
@@ -321,10 +363,11 @@ export function createThreeLayerWriteDefinition(
       };
 
       // Write 工具在 call 阶段可以 preview 内容
-      const displayMode: DisplayMode = context.expanded ? "preview" : "collapsed";
-      const detailLines = formatLines(splitLines(content), theme);
-
-      return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
+      return new PendingToolView(
+        summary,
+        theme,
+        context.state as unknown as SharedPresentationState,
+      );
     },
 
     renderResult(result, options, theme, context) {
@@ -332,6 +375,7 @@ export function createThreeLayerWriteDefinition(
         return original.renderResult(result, options, theme, contextForOriginal(context));
       }
 
+      (context.state as unknown as SharedPresentationState).pituixHasResult = true;
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const args = context.args as WriteToolInput;

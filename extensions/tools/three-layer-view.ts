@@ -1,4 +1,4 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import { keyText, type Theme } from "@earendil-works/pi-coding-agent";
 import { type Component, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 /**
@@ -8,6 +8,8 @@ import { type Component, truncateToWidth, visibleWidth } from "@earendil-works/p
  * - Preview: Header + 前2行 + "...N hidden" + 后2行
  * - Expanded: Header + 完整输出
  */
+
+import { useAsciiChrome } from "../shell/open-tui/icons.ts";
 
 export type DisplayMode = "collapsed" | "preview" | "expanded";
 export type ToolStatus = "QUEUED" | "RUNNING" | "OK" | "ERROR" | "CANCELLED";
@@ -42,7 +44,8 @@ export class ThreeLayerToolView implements Component {
 
   render(width: number): string[] {
     const lines: string[] = [];
-    const safeWidth = Math.max(1, width);
+    if (width <= 0) return [];
+    const safeWidth = width;
 
     // === Header 行（所有模式都显示）===
     lines.push(this.renderHeader(safeWidth));
@@ -66,7 +69,7 @@ export class ThreeLayerToolView implements Component {
       if (hidden > 0) {
         const hiddenLine = this.theme.fg(
           "dim",
-          `  ... ${hidden} more lines hidden (press E to expand)`,
+          `  ... ${hidden} more lines hidden (${keyText("app.tools.expand") || "/pituix-mode expanded"} to expand)`,
         );
         lines.push(truncateToWidth(hiddenLine, safeWidth));
       }
@@ -88,7 +91,12 @@ export class ThreeLayerToolView implements Component {
 
   private renderHeader(width: number): string {
     // 格式：ACTION target [STATUS] meta | ATTENTION
-    const action = this.theme.bold(this.theme.fg("toolTitle", this.summary.action.toUpperCase()));
+    const action = this.theme.bold(
+      this.theme.fg(
+        "toolTitle",
+        this.summary.action[0].toUpperCase() + this.summary.action.slice(1).toLowerCase(),
+      ),
+    );
     const target = this.theme.fg("accent", this.summary.target);
     const statusLabel = this.statusLabel(this.summary.status);
     const statusText = this.statusStyle(this.summary.status, `[${statusLabel}]`);
@@ -98,23 +106,27 @@ export class ThreeLayerToolView implements Component {
       suffix += ` ${this.theme.fg("dim", this.summary.meta)}`;
     }
     if (this.summary.attention) {
-      suffix += ` ${this.theme.fg("error", "⚠ ATTENTION")}`;
+      suffix += ` ${this.theme.fg("error", "! ATTENTION")}`;
     }
 
     // 计算固定宽度
     const actionWidth = visibleWidth(this.removeAnsi(action));
     const suffixWidth = visibleWidth(this.removeAnsi(suffix));
-    const fixedWidth = actionWidth + suffixWidth + 2; // +2 for spaces
+    const fixedWidth = actionWidth + suffixWidth + 5; // +2 for spaces
 
     // 动态分配 target 宽度
     if (fixedWidth < width) {
       const targetWidth = Math.max(1, width - fixedWidth);
       const truncatedTarget = truncateToWidth(target, targetWidth);
-      return `${action} ${truncatedTarget} ${suffix}`;
+      return `${this.statusStyle(this.summary.status, useAsciiChrome() ? "*" : "⏺")} ${action}(${truncatedTarget}) ${suffix}`;
     }
 
     // 宽度不够：全部截断
-    return truncateToWidth(`${action} ${target} ${suffix}`, width);
+    return truncateToWidth(
+      `${statusText} ${action}(${target})${this.summary.attention ? " !" : ""}`,
+      width,
+      "",
+    );
   }
 
   private statusLabel(status: ToolStatus): string {

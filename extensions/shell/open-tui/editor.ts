@@ -3,6 +3,7 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
   type KeybindingsManager,
+  keyText,
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { CURSOR_MARKER, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
@@ -11,6 +12,7 @@ import {
   applyFullscreenWheelScrollLines,
   DEFAULT_FULLSCREEN_WHEEL_SCROLL_LINES,
 } from "./fullscreen-scroll.ts";
+import { type IconMode, useAsciiChrome } from "./icons.ts";
 import { findBottomBorderIndex, isEditorBorderLine, stripAnsi } from "./utils.ts";
 
 function fillLine(content: string, width: number): string {
@@ -41,48 +43,49 @@ function configureCursor(tui: TUI, cursorStyle: CursorStyle): void {
   if (sequence) tui.terminal.write(sequence);
 }
 
-function roundedBorder(
+export function renderPromptRule(
   width: number,
-  kind: "top" | "bottom",
   paint: (s: string) => string,
-  sourceLine?: string,
+  sourceLine = "",
+  ascii = false,
 ): string {
-  if (width < 2) return paint(truncateToWidth(kind === "top" ? "╭╮" : "╰╯", width, ""));
-  const corners = kind === "top" ? (["╭", "╮"] as const) : (["╰", "╯"] as const);
-
-  if (sourceLine) {
-    const plain = stripAnsi(sourceLine);
-    const scrollMatch = plain.match(/([↑↓]\s+\d+\s+more)/);
-    if (scrollMatch) {
-      const label = `─── ${scrollMatch[1]} `;
-      const fill = Math.max(0, width - 2 - visibleWidth(label));
-      return paint(`${corners[0]}${label}${"─".repeat(fill)}${corners[1]}`);
-    }
-  }
-
-  return paint(`${corners[0]}${"─".repeat(Math.max(0, width - 2))}${corners[1]}`);
+  const safeWidth = Math.max(0, width);
+  const scroll = stripAnsi(sourceLine).match(/([↑↓]\s+\d+\s+more)/)?.[1];
+  const label = scroll ? `--- ${scroll} ` : "";
+  return paint(truncateToWidth(label + (ascii ? "-" : "─").repeat(safeWidth), safeWidth, ""));
 }
 
 export class OpenTuiEditor extends CustomEditor {
-  private readonly getRail: () => string;
+  private helpVisible = false;
+  private ascii: boolean;
   private readonly getBorder: (s: string) => string;
   private cursorStyle: CursorStyle;
   private previewHardwareCursor = false;
+  private readonly getPromptStatus: (width: number) => string;
 
   constructor(
     tui: TUI,
     editorTheme: EditorTheme,
     keybindings: KeybindingsManager,
     cursorStyle: CursorStyle = "block",
+    ascii = useAsciiChrome(),
+    getPromptStatus: (width: number) => string = () => "",
   ) {
     super(tui, editorTheme, keybindings, { paddingX: 0 });
     this.cursorStyle = cursorStyle;
+    this.ascii = ascii;
+    this.getPromptStatus = getPromptStatus;
     configureCursor(tui, cursorStyle);
     // ponytail: route the frame through this.borderColor so Pi can recolor it
     // via updateEditorBorderColor() — bash mode ("! " prefix → green) and
     // thinking-level borders both flow through this one property.
-    this.getRail = () => this.borderColor("│");
+
     this.getBorder = (s: string) => this.borderColor(s);
+  }
+
+  setIconMode(mode: IconMode): void {
+    this.ascii = useAsciiChrome(mode);
+    this.tui.requestRender();
   }
 
   override setPaddingX(_padding: number): void {
@@ -106,7 +109,9 @@ export class OpenTuiEditor extends CustomEditor {
   }
 
   private renderBase(width: number): string[] {
-    const renderedLines = super.render(width);
+    // Pi 0.84 can recurse while wrapping a wide glyph into a one-cell editor.
+    // Render a safe minimum and clip our surface for extremely narrow terminals.
+    const renderedLines = super.render(Math.max(4, width));
     if (this.cursorStyle === "block") return renderedLines;
 
     // A focused overlay suppresses the editor's cursor marker. Preserve its
@@ -120,35 +125,47 @@ export class OpenTuiEditor extends CustomEditor {
     });
   }
 
-  render(width: number): string[] {
-    if (width < 4) return this.renderBase(width);
+  override handleInput(data: string): void {
+    if (data === "?" && this.getText() === "") {
+      this.helpVisible = !this.helpVisible;
+      this.tui.requestRender();
+      return;
+    }
+    if (this.helpVisible && data === "\u001b") {
+      this.helpVisible = false;
+      this.tui.requestRender();
+      return;
+    }
+    this.helpVisible = false;
+    super.handleInput(data);
+  }
 
-    const rail = this.getRail();
-    const borderPaint = this.getBorder;
-    // ponytail: 1-char rail + 1-char gap on each side = 4 chars of chrome.
-    const innerWidth = Math.max(0, width - 4);
+  render(width: number): string[] {
+    if (width <= 0) return [];
+    if (width < 4) return this.renderBase(width).map((line) => truncateToWidth(line, width, ""));
+    const innerWidth = width - 2;
     const baseLines = this.renderBase(innerWidth);
     const bottomIdx = findBottomBorderIndex(baseLines);
-
-    const result: string[] = [];
-    result.push(roundedBorder(width, "top", borderPaint, baseLines[0]));
-
+    const result = [renderPromptRule(width, this.getBorder, baseLines[0], this.ascii)];
     for (let i = 1; i < bottomIdx; i++) {
       const line = baseLines[i] ?? "";
-      if (isEditorBorderLine(line)) {
-        result.push(`${rail} ${fillLine("", innerWidth)} ${rail}`);
-      } else {
-        result.push(`${rail} ${fillLine(line, innerWidth)} ${rail}`);
-      }
+      const prefix = i === 1 ? this.getBorder(this.ascii ? "> " : "❯ ") : "  ";
+      result.push(prefix + fillLine(isEditorBorderLine(line) ? "" : line, innerWidth));
     }
-
-    result.push(roundedBorder(width, "bottom", borderPaint, baseLines[bottomIdx]));
-
-    for (let i = bottomIdx + 1; i < baseLines.length; i++) {
-      const line = baseLines[i];
-      if (line !== undefined) result.push(line);
+    result.push(renderPromptRule(width, this.getBorder, baseLines[bottomIdx], this.ascii));
+    // Autocomplete belongs to Pi; keep its rows after the input rules.
+    result.push(...baseLines.slice(bottomIdx + 1));
+    if (this.helpVisible) {
+      result.push(
+        "  / commands    @ file paths    ! shell",
+        `  ${keyText("app.tools.expand")} expand tools    ${keyText("app.interrupt")} interrupt`,
+        "  /pituix-settings appearance    /pituix-default restore Pi",
+        "  /pituix-steer steer    /pituix-followup queue",
+        "  ? or esc close help",
+      );
     }
-
+    const status = this.getPromptStatus(width);
+    if (status) result.unshift(status);
     return result.map((line) => truncateToWidth(line, width, ""));
   }
 }
@@ -158,10 +175,13 @@ export function installEditor(
   ctx: ExtensionContext,
   cursorStyle: CursorStyle = "block",
   wheelScrollLines = DEFAULT_FULLSCREEN_WHEEL_SCROLL_LINES,
+  iconMode: IconMode = "auto",
+  getPromptStatus: (width: number) => string = () => "",
 ) {
   let activeTui: TUI | undefined;
   let activeEditor: OpenTuiEditor | undefined;
   let previousHardwareCursor: boolean | undefined;
+  let currentIconMode = iconMode;
   let currentCursorStyle = cursorStyle;
   let currentWheelScrollLines = wheelScrollLines;
 
@@ -169,10 +189,21 @@ export function installEditor(
     activeTui = tui;
     applyFullscreenWheelScrollLines(tui, currentWheelScrollLines);
     previousHardwareCursor = tui.getShowHardwareCursor();
-    activeEditor = new OpenTuiEditor(tui, editorTheme, keybindings, currentCursorStyle);
+    activeEditor = new OpenTuiEditor(
+      tui,
+      editorTheme,
+      keybindings,
+      currentCursorStyle,
+      useAsciiChrome(currentIconMode),
+      getPromptStatus,
+    );
     return activeEditor;
   });
   return {
+    setIconMode(next: IconMode): void {
+      currentIconMode = next;
+      activeEditor?.setIconMode(next);
+    },
     setCursorStyle(nextCursorStyle: CursorStyle): void {
       currentCursorStyle = nextCursorStyle;
       activeEditor?.setCursorStyle(nextCursorStyle, previousHardwareCursor);

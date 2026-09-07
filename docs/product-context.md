@@ -80,3 +80,13 @@ Approval, plan, queue, keyboard, and focused overlays using Pi's public UI APIs.
 ### Session awareness
 
 Context pressure, resume references, and subagent status where Pi exposes reliable events or read-only state.
+
+## Current reference-validation milestone
+
+The next validation target is measured visual alignment with Claude Code 2.1.263
+for startup, input, working state, compact tool rows, and progressive disclosure.
+See the [parity report](claude-code-parity.md). This target does not transfer
+provider, permission, transcript, or session ownership to Pi-TUIX. Successful
+reference tool workflows have now been observed through a separately configured
+Claude Code gateway. The model picker reads Pi's scoped/available models and
+delegates selection to Pi; it does not maintain a separate model catalogue.

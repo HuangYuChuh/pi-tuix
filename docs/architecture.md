@@ -53,3 +53,34 @@ Pi 0.84.x does not expose a generic approval-rendering event for every built-in 
 The package declares Pi and `pi-tui` as peer dependencies. This prevents a second copy of the host UI framework from being bundled into the extension and makes the supported Pi range explicit.
 
 When a Pi release changes a public extension type, the compatibility fix belongs in the adapter/component layer. The project should not patch or vendor the entire Pi runtime.
+
+## Versioned terminal reference
+
+The current shell is based on observed Claude Code 2.1.263 terminal behavior;
+see [the parity report](claude-code-parity.md) for evidence and remaining gaps.
+A compact header, horizontal input rules, contextual help, and one-line footer
+replace the previous large welcome panel and boxed editor. `/pituix-status`
+reveals the existing detailed footer. The packaged dark theme is applied through
+`getTheme`/`setTheme`, and the previous theme is restored on disable if the user
+has not selected a different theme meanwhile.
+
+The effective thinking level is event-driven and rendered above the editor's
+upper rule. The settings page uses `ctx.ui.custom` and the public `Input`
+component for search editing. It adapts the input's two-cell prompt to a search
+marker, retaining host paste, cursor and horizontal-scroll handling. Its tabs
+contain Pi-TUIX preferences only. Footer chrome is hidden while settings are
+open and restored in a `finally` handler when the custom view closes.
+
+`/pituix-model` presents Pi's scoped models, falling back to its available model
+registry when no scope is configured. Public pi-ai helpers determine supported
+thinking levels. Arrow-key adjustments remain draft UI state until confirmation;
+then `pi.setModel` and `pi.setThinkingLevel` apply them. Authentication, model
+availability, effective effort and persistence remain Pi-owned. The native
+`/model` command is preserved.
+
+Tool definitions use the public `renderShell: "self"` option while enabled.
+Their call and result components share a small presentation flag through the
+public `context.state`: once a result is rendered, the pending call row becomes
+empty. Execution functions, argument schemas, and permission behavior are
+unchanged. Other extensions' MCP tools and built-in transcript components remain
+host-owned. No new runtime dependency or private host patch is introduced.

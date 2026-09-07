@@ -34,10 +34,17 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   assert.ok(!commands.has("open-tui"));
 
   const editorFactories: unknown[] = [];
+  const workingMessages: (string | undefined)[] = [];
+  const originalTheme = { name: "original", fg: (_color: string, text: string) => text };
+  const referenceTheme = { ...originalTheme, name: "pi-tuix-dark" };
   const ui = {
-    theme: {
-      fg: (_color: string, text: string) => text,
+    theme: originalTheme,
+    getTheme: () => referenceTheme,
+    setTheme: (next: typeof originalTheme) => {
+      ui.theme = next;
+      return { success: true };
     },
+    setWorkingMessage: (message?: string) => workingMessages.push(message),
     setTitle: () => {},
     setHeader: () => {},
     setFooter: () => {},
@@ -57,6 +64,7 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
 
   await handlers.get("session_start")?.({ type: "session_start", reason: "startup" }, context);
   assert.equal(typeof editorFactories.at(-1), "function");
+  assert.equal(ui.theme, referenceTheme);
 
   const editorFactory = editorFactories.at(-1) as (
     tui: TUI,
@@ -73,14 +81,22 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     { borderColor: (text: string) => text, selectList: {} } as EditorTheme,
     { matches: () => false } as unknown as KeybindingsManager,
   );
-  assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /╭/);
+  assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /^[-─]+$/);
 
   await handlers.get("agent_start")?.({ type: "agent_start" }, context);
+  assert.equal(workingMessages.at(-1), "Working...");
+  await handlers.get("message_update")?.(
+    { assistantMessageEvent: { type: "thinking_delta" } },
+    context,
+  );
+  assert.equal(workingMessages.at(-1), "Thinking...");
   await handlers.get("agent_end")?.({ type: "agent_end" }, context);
-  assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /╭/);
+  assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /^[-─]+$/);
 
   await commands.get("pituix-default")?.handler("", context);
   assert.equal(editorFactories.at(-1), undefined);
+  assert.equal(ui.theme, originalTheme);
+  assert.equal(workingMessages.at(-1), undefined);
   assert.equal(commands.has("pituix-settings"), true);
 });
 

@@ -29,7 +29,10 @@ const theme = {
 
 function render(component: Component | undefined, width = 80): string[] {
   assert.ok(component);
-  return component.render(width).map(stripTerminalSequences);
+  return component
+    .render(width)
+    .map(stripTerminalSequences)
+    .map((line) => line.replace(/^⏺/, "*"));
 }
 
 function context<T>(args: T, overrides: Record<string, unknown> = {}) {
@@ -86,14 +89,14 @@ test("three-layer view renders collapsed, preview, and expanded without duplicat
 
   const collapsed = render(new ThreeLayerToolView("collapsed", summary, details, theme));
   assert.equal(collapsed.length, 1);
-  assert.match(collapsed[0] ?? "", /READ README\.md \[OK\] 6 lines/);
+  assert.match(collapsed[0] ?? "", /Read\(README\.md\) \[OK\] 6 lines/);
 
   const preview = render(new ThreeLayerToolView("preview", summary, details, theme));
   assert.deepEqual(preview, [
-    "READ README.md [OK] 6 lines",
+    "* Read(README.md) [OK] 6 lines",
     "  one",
     "  two",
-    "  ... 2 more lines hidden (press E to expand)",
+    "  ... 2 more lines hidden (/pituix-mode expanded to expand)",
     "  five",
     "  six",
   ]);
@@ -101,7 +104,7 @@ test("three-layer view renders collapsed, preview, and expanded without duplicat
   const shortPreview = render(
     new ThreeLayerToolView("preview", summary, ["one", "two", "three"], theme),
   );
-  assert.deepEqual(shortPreview, ["READ README.md [OK] 6 lines", "  one", "  two", "  three"]);
+  assert.deepEqual(shortPreview, ["* Read(README.md) [OK] 6 lines", "  one", "  two", "  three"]);
 
   const expanded = render(new ThreeLayerToolView("expanded", summary, details, theme));
   assert.equal(expanded.length, 7);
@@ -115,7 +118,7 @@ test("three-layer renderers expose tool-specific summaries and states", () => {
   const mode: ToolRendererMode = { enabled: true, defaultMode: "preview" };
   const read = createThreeLayerReadDefinition("C:\\workspace", mode);
   const readLines = previewResult(read, { path: "src/index.ts" }, "one\ntwo\nthree\nfour\nfive");
-  assert.match(readLines[0] ?? "", /READ src\/index\.ts \[OK\] 5 lines/);
+  assert.match(readLines[0] ?? "", /Read\(src\/index\.ts\) \[OK\] 5 lines/);
   assert.match(readLines[3] ?? "", /hidden/);
 
   const bash = createThreeLayerBashDefinition("C:\\workspace", mode);
@@ -127,7 +130,7 @@ test("three-layer renderers expose tool-specific summaries and states", () => {
       context({ command: "npm test" }, { isPartial: true }),
     ),
   );
-  assert.match(bashLines[0] ?? "", /BASH npm test \[RUNNING\] 3 output lines/);
+  assert.match(bashLines[0] ?? "", /Bash\(npm test\) \[RUNNING\] 3 output lines/);
 
   const edit = createThreeLayerEditDefinition("C:\\workspace", mode);
   const editLines = render(
@@ -143,7 +146,7 @@ test("three-layer renderers expose tool-specific summaries and states", () => {
       >[3],
     ),
   );
-  assert.match(editLines[0] ?? "", /EDIT src\/app\.ts \[OK\] \+1 -1/);
+  assert.match(editLines[0] ?? "", /Edit\(src\/app\.ts\) \[OK\] \+1 -1/);
   assert.deepEqual(editLines.slice(1), ["  @@", "  -old", "  +new"]);
 
   const write = createThreeLayerWriteDefinition("C:\\workspace", mode);
@@ -155,7 +158,7 @@ test("three-layer renderers expose tool-specific summaries and states", () => {
       context({ path: "out.txt", content: "one\ntwo" }),
     ),
   );
-  assert.match(writeLines[0] ?? "", /WRITE out\.txt \[OK\] 2 lines written/);
+  assert.match(writeLines[0] ?? "", /Write\(out\.txt\) \[OK\] 2 lines written/);
   assert.equal(writeLines.length, 1);
 });
 
@@ -170,7 +173,7 @@ test("three-layer renderers mark errors, cancellations, and empty output", () =>
       context({ command: "bad" }, { isError: true }),
     ),
   );
-  assert.match(error[0] ?? "", /BASH bad \[ERROR\].*ATTENTION/);
+  assert.match(error[0] ?? "", /Bash\(bad\) \[ERROR\].*ATTENTION/);
   assert.match(error[0] ?? "", /Command exited with code 127/);
   assert.match(error[1] ?? "", /not found/);
 
@@ -192,7 +195,7 @@ test("three-layer renderers mark errors, cancellations, and empty output", () =>
       context({ command: "true" }),
     ),
   );
-  assert.match(empty[0] ?? "", /BASH true \[OK\] 0 output lines/);
+  assert.match(empty[0] ?? "", /Bash\(true\) \[OK\] 0 output lines/);
   assert.equal(empty.length, 1);
 });
 
@@ -246,4 +249,25 @@ test("three-layer definitions retain Pi execution functions and disabled fallbac
   const fallback = definition.renderCall(params, theme, context(params));
   const expected = original.renderCall(params, theme, context(params));
   assert.deepEqual(render(fallback), render(expected));
+});
+
+test("result replaces its pending row and disabling restores the host shell", () => {
+  const mode: ToolRendererMode = { enabled: true, defaultMode: "preview" };
+  const definition = createThreeLayerBashDefinition(process.cwd(), mode);
+  const args = { command: "printf test" };
+  const shared = context(args);
+  const call = definition.renderCall?.(args, theme, shared);
+  assert.ok(call);
+  assert.match(render(call)[0] ?? "", /RUNNING/);
+  assert.equal(definition.renderShell, "self");
+  const output = definition.renderResult?.(
+    result("test"),
+    { expanded: false, isPartial: false },
+    theme,
+    shared,
+  );
+  assert.deepEqual(call.render(80), []);
+  assert.match(render(output)[0] ?? "", /OK/);
+  mode.enabled = false;
+  assert.notEqual(definition.renderShell, "self");
 });
