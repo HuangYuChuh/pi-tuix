@@ -169,7 +169,8 @@ preference.
 The preview shares the pure startup header and snapshot transcript components.
 It shows individual tool results (without live Read/Bash grouping), diffs,
 completion records and recorded assistant time/model above text responses.
-Binary attachments have type labels. Header, conversation and recovery hints
+Images have numbered attachment branches with local links; other attachments
+have type labels. Header, conversation and recovery hints
 scroll inside the reference separator. Arrows, paging, Home/End, wheel input and
 Pi's tool-expansion binding stay scoped to a public modal overlay; a fullscreen
 host otherwise consumes viewport keys before non-overlay editor input. The
@@ -187,11 +188,27 @@ unaffected. Recorded tool calls/results are paired by ID and displayed through
 public `ToolExecutionComponent` instances and the existing Pi-TUIX renderers.
 No executor is invoked or newly registered. Missing calls, failed/aborted
 responses, visible custom messages and compaction summaries remain explicit.
-Binary attachments receive type labels; foreign tool renderers are not copied.
+Images share the preview's numbered branches; foreign tool renderers are not copied.
 Rendering performs no I/O. The reader owns only scroll/expansion state, returns
 to the same editor, and remains a separate view of the current branch. The resume
 preview reuses its content renderer with individual tools and message metadata;
 the main snapshot keeps its existing grouping and optional expansion.
+
+`SessionImageCache` prepares supported raster attachments outside rendering.
+Occurrence numbers follow the displayed branch, while content hashes deduplicate
+temporary file bytes across repeated images and concurrent previews. Files use
+mode 0600 inside a fresh 0700 temporary directory. Base64, MIME/header dimensions
+and a 28 MiB encoded-size limit are checked before writing; unavailable media
+keeps a numbered label. Public `hyperlink` supplies OSC 8 links. Pi's fullscreen
+`openUrl` handling or the regular terminal opens them; no shell command runs from
+the renderer. Preparation cannot block modal navigation, and abort/request guards
+discard late updates after closure or a new selection. Runtime shutdown waits for
+pending writes, removes the temporary directory and resets the cache. These are
+disposable UI assets, not a second media catalogue or session store. Session
+files, original message content, model inputs and tool execution remain unchanged.
+The live main view and editor still retain native Pi image handling; the public
+user-message component does not expose its image payload, and image-only user
+messages are absent from Pi's native document in the tested versions.
 
 The main view composes reversible presentation containers into the public
 document tree. A version-local adapter recognizes public

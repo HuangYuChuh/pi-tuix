@@ -20,6 +20,7 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import { readGitBranch } from "./git-branch.ts";
+import type { PrepareImages } from "./image-attachments.ts";
 import { renameSession } from "./rename-session.ts";
 import {
   loadSessionMetadata,
@@ -553,6 +554,7 @@ export function registerResumePicker(
     onOpen: () => void;
     onClose: () => void;
     onResume?: (ctx: ExtensionCommandContext) => void;
+    prepareImages?: PrepareImages;
   },
   catalog: SessionCatalog = SessionManager,
   readPreview: (
@@ -698,10 +700,25 @@ export function registerResumePicker(
                 void readPreview(session, request.signal)
                   .then((snapshot) => {
                     if (closed || request.signal.aborted || previewLoad !== request) return;
-                    view.setPreview(
-                      session.path,
-                      new SessionPreviewContent(snapshot, theme, tui, hooks.ascii()),
+                    const content = new SessionPreviewContent(
+                      snapshot,
+                      theme,
+                      tui,
+                      hooks.ascii(),
+                      undefined,
+                      Boolean(hooks.prepareImages),
                     );
+                    view.setPreview(session.path, content);
+                    if (hooks.prepareImages)
+                      void hooks
+                        .prepareImages(snapshot.entries, request.signal)
+                        .catch(() => new Map<string, string>())
+                        .then((links) => {
+                          if (closed || request.signal.aborted || previewLoad !== request) return;
+                          content.setImageLinks(links);
+                          view.setPreview(session.path, content);
+                          tui.requestRender();
+                        });
                     previewMetadata.add(session.path);
                     view.setMetadata(session.path, snapshot);
                     tui.requestRender();

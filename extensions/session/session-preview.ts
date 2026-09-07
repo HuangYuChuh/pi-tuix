@@ -13,6 +13,7 @@ import {
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { renderStartupHeader } from "../shell/open-tui/header.ts";
 import { COMPLETION_ENTRY_TYPE, readCompletionEntry } from "../stream/completion-entry.ts";
+import type { ImageLinks } from "./image-attachments.ts";
 import { messageText } from "./message-view.ts";
 import { TranscriptContent } from "./transcript-view.ts";
 
@@ -112,12 +113,21 @@ export class SessionPreviewContent implements Component {
   private readonly transcript: TranscriptContent;
   private readonly snapshot: SessionPreviewSnapshot;
   private readonly theme: Theme;
-  constructor(snapshot: SessionPreviewSnapshot, theme: Theme, tui: TUI, ascii = false) {
+  constructor(
+    snapshot: SessionPreviewSnapshot,
+    theme: Theme,
+    tui: TUI,
+    ascii = false,
+    imageLinks?: ImageLinks,
+    imageLoading = false,
+  ) {
     this.snapshot = snapshot;
     this.theme = theme;
     this.transcript = new TranscriptContent(snapshot.entries, theme, tui, snapshot.cwd, ascii, {
       groupTools: false,
       showMessageMetadata: true,
+      imageLinks,
+      imageLoading,
     });
   }
 
@@ -135,6 +145,10 @@ export class SessionPreviewContent implements Component {
 
   setExpanded(expanded: boolean): void {
     this.transcript.setExpanded(expanded);
+  }
+
+  setImageLinks(links: ImageLinks): void {
+    this.transcript.setImageLinks(links);
   }
 
   invalidate(): void {

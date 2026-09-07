@@ -8,7 +8,15 @@ import {
   type SessionEntry,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, type TUI, visibleWidth } from "@earendil-works/pi-tui";
+import {
+  getOsc8LinkAtColumn,
+  stripTerminalSequences,
+  type Terminal,
+  Text,
+  type TUI,
+  TuiAltScreen,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 import {
   ReferenceAssistantText,
   ReferenceUserMessage,
@@ -327,7 +335,7 @@ test("transcript labels errors, cancellation, orphan results, media and public c
   ];
   const output = plain(new TranscriptContent(source, theme, tui, process.cwd()));
   for (const expected of [
-    "[image: image/png]",
+    "[Image #1] (unavailable)",
     "mcp_fixture result [ERROR] (call unavailable)",
     "Tool failed",
     "Error: Provider unavailable",
@@ -340,6 +348,202 @@ test("transcript labels errors, cancellation, orphan results, media and public c
   ])
     assert.ok(output.includes(expected), expected);
   assert.doesNotMatch(output, /not-decoded|Hidden custom message/);
+});
+
+test("numbered attachments stay adjacent to prompts/results and preserve links across expansion and narrow widths", () => {
+  const source = entries();
+  const image = { type: "image" as const, data: "not-rendered", mimeType: "image/png" };
+  source[0] = {
+    ...base,
+    type: "message",
+    id: "user",
+    message: {
+      role: "user",
+      timestamp: 0,
+      content: [image, { type: "text", text: "Describe 中文🙂" }, image],
+    },
+  };
+  const result = source[2];
+  assert.ok(result.type === "message" && result.message.role === "toolResult");
+  result.message.content.push(image);
+  source.push({
+    ...base,
+    type: "custom_message",
+    id: "custom",
+    customType: "notice",
+    content: [image],
+    display: true,
+  });
+  const before = structuredClone(source);
+  for (const ascii of [false, true]) {
+    const content = new TranscriptContent(source, theme, tui, process.cwd(), ascii, {
+      imageLoading: true,
+    });
+    assert.match(
+      plain(content),
+      /\[Image #1\] Describe 中文🙂 \[Image #2\].*\n {2}(?:⎿|L) {2}\[Image #1\] \(loading\.\.\.\)/,
+    );
+    const links = new Map([
+      ["user:0", "file:///tmp/first.png"],
+      ["user:2", "file:///tmp/second.png"],
+      ["read-result:1", "file:///tmp/result.png"],
+      ["custom:0", "file:///tmp/custom.png"],
+    ]);
+    content.setImageLinks(links);
+    for (const expanded of [false, true, false]) {
+      content.setExpanded(expanded);
+      const output = plain(content);
+      assert.doesNotMatch(output, /loading|unavailable|not-rendered/);
+      assert.match(output, /Read\(sample.ts\)[\s\S]*\[Image #3\][\s\S]*notice[\s\S]*\[Image #4\]/);
+      for (const width of [0, 1, 2, 4, 6, 8, 12, 40, 80, 100]) {
+        const lines = content.render(width);
+        assert.ok(lines.every((line) => visibleWidth(line) <= width));
+        for (const line of lines) {
+          const display = stripTerminalSequences(line);
+          if (display.startsWith(ascii ? "  L  [" : "  ⎿  [")) {
+            const link = getOsc8LinkAtColumn(line, 5);
+            assert.ok([...links.values()].includes(link ?? ""));
+            assert.equal(getOsc8LinkAtColumn(line, 0), undefined);
+            assert.equal(getOsc8LinkAtColumn(line, visibleWidth(line)), undefined);
+          }
+        }
+      }
+    }
+    content.setImageLinks(new Map());
+    assert.equal(plain(content).match(/\(unavailable\)/g)?.length, 4);
+  }
+  assert.deepEqual(source, before);
+});
+
+test("native fullscreen clicks activate snapshot attachment links, including after scrolling", () => {
+  let receive = (_data: string) => {};
+  const opened: string[] = [];
+  const terminal: Terminal = {
+    columns: 80,
+    rows: 12,
+    kittyProtocolActive: false,
+    start: (input) => {
+      receive = input;
+    },
+    stop() {},
+    drainInput: async () => {},
+    write() {},
+    moveBy() {},
+    hideCursor() {},
+    showCursor() {},
+    clearLine() {},
+    clearFromCursor() {},
+    clearScreen() {},
+    setTitle() {},
+    setProgress() {},
+  };
+  const native = new TuiAltScreen(terminal, false, undefined, {
+    openUrl: (url) => opened.push(url),
+  });
+  const source: SessionEntry[] = Array.from({ length: 10 }, (_, index) => ({
+    ...base,
+    type: "message",
+    id: `user-${index}`,
+    message: {
+      role: "user",
+      timestamp: 0,
+      content: [{ type: "image", data: "fixture", mimeType: "image/png" }],
+    },
+  }));
+  const links = new Map(
+    source.map((entry, index) => [`${entry.id}:0`, `file:///tmp/image-${index}.png`]),
+  );
+  const content = new TranscriptContent(source, theme, native, process.cwd(), false, {
+    imageLinks: links,
+  });
+  const view = new TranscriptView(
+    content,
+    theme,
+    () => terminal.rows,
+    () => {},
+    () => false,
+  );
+  native.addChild(new Text("Underlying document", 0, 0));
+  native.start();
+  const overlay = native.showOverlay(view, {
+    width: "100%",
+    maxHeight: "100%",
+    row: 0,
+    col: 0,
+    margin: 0,
+  });
+  try {
+    for (const key of ["\x1b[H", "\x1b[F"]) {
+      receive(key);
+      native.renderNow();
+      const lines = view.render(80);
+      const row = lines.findIndex((line) => getOsc8LinkAtColumn(line, 5));
+      assert.ok(row >= 0);
+      const url = getOsc8LinkAtColumn(lines[row], 5);
+      receive(`\x1b[<0;6;${row + 1}M`);
+      receive(`\x1b[<0;6;${row + 1}m`);
+      assert.equal(opened.at(-1), url);
+    }
+    assert.equal(opened.length, 2);
+    assert.notEqual(opened[0], opened[1]);
+  } finally {
+    overlay.hide();
+    native.stop();
+  }
+});
+
+test("snapshot image preparation is cancellable and cannot redraw a dismissed modal", async () => {
+  for (const fail of [false, true]) {
+    let handler!: (args: string, ctx: ExtensionCommandContext) => Promise<void>;
+    let resolve!: (links: ReadonlyMap<string, string>) => void;
+    let reject!: (error: Error) => void;
+    let signal!: AbortSignal;
+    let renders = 0;
+    const preparation = new Promise<ReadonlyMap<string, string>>((yes, no) => {
+      resolve = yes;
+      reject = no;
+    });
+    registerTranscriptCommand(
+      {
+        registerCommand(_name, command) {
+          handler = command.handler;
+        },
+      } as ExtensionAPI,
+      () => false,
+      (_entries, request) => {
+        signal = request;
+        return preparation;
+      },
+    );
+    const ctx = {
+      hasUI: true,
+      cwd: process.cwd(),
+      sessionManager: { getBranch: entries },
+      ui: {
+        custom: async (factory: Parameters<ExtensionCommandContext["ui"]["custom"]>[0]) => {
+          const component = await factory(
+            {
+              terminal: { rows: 40 },
+              requestRender() {
+                renders++;
+              },
+            } as TUI,
+            theme,
+            { matches: () => false } as never,
+            () => {},
+          );
+          component.handleInput?.("\x1b");
+        },
+      },
+    } as unknown as ExtensionCommandContext;
+    await handler("", ctx);
+    assert.ok(signal.aborted);
+    const before = renders;
+    if (fail) reject(new Error("late failure"));
+    else resolve(new Map());
+    await new Promise<void>((done) => setImmediate(done));
+    assert.equal(renders, before);
+  }
 });
 
 test("transcript viewport keeps navigation bounded, expands once per binding and returns without editing sessions", () => {

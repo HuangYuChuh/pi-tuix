@@ -10,6 +10,7 @@ import {
 import {
   type Component,
   getKeybindings,
+  hyperlink,
   Key,
   matchesKey,
   stripTerminalSequences,
@@ -28,20 +29,81 @@ import {
   type ToolRendererMode,
 } from "../tools/renderers-v2.ts";
 import { ToolGroupRuntime } from "../tools/tool-groups.ts";
+import {
+  collectImages,
+  type ImageAttachment,
+  type ImageLinks,
+  type PrepareImages,
+} from "./image-attachments.ts";
 import { messageText, ReferenceAssistantText, ReferenceUserMessage } from "./message-view.ts";
 
 type Message = Extract<SessionEntry, { type: "message" }>["message"];
 
-function contentText(content: unknown): string {
+function contentText(
+  content: unknown,
+  entryId = "",
+  images: ReadonlyMap<string, ImageAttachment> = new Map(),
+): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
-    .map((part) => {
+    .map((part, index) => {
       if (part?.type === "text" && typeof part.text === "string") return part.text;
-      // Binary media is deliberately labelled, never decoded or executed by this reader.
+      const image = images.get(`${entryId}:${index}`);
+      if (image) return `[Image #${image.number}]`;
       return `[${messageText(String(part?.type ?? "attachment"))}${part?.mimeType ? `: ${messageText(String(part.mimeType))}` : ""}]`;
     })
-    .join("\n");
+    .join(content.some((part) => part?.type === "image") ? " " : "\n");
+}
+
+/** Reference attachment branches stay adjacent to their message or tool. */
+class AttachedContent implements Component {
+  private readonly content: Component;
+  private readonly images: readonly ImageAttachment[];
+  private readonly links: ImageLinks;
+  private readonly theme: Theme;
+  private readonly ascii: boolean;
+  private readonly loading: boolean;
+  constructor(
+    content: Component,
+    images: readonly ImageAttachment[],
+    links: ImageLinks,
+    theme: Theme,
+    ascii: boolean,
+    loading: boolean,
+  ) {
+    this.content = content;
+    this.images = images;
+    this.links = links;
+    this.theme = theme;
+    this.ascii = ascii;
+    this.loading = loading;
+  }
+
+  render(width: number): string[] {
+    if (width <= 0) return [];
+    const lines = [...this.content.render(width)];
+    while (lines.length && !stripTerminalSequences(lines.at(-1) ?? "").trim()) lines.pop();
+    for (const image of this.images) {
+      const label = `[Image #${image.number}]`;
+      const url = this.links.get(image.key);
+      lines.push(
+        truncateToWidth(
+          this.theme.fg("muted", this.ascii ? "  L  " : "  ⎿  ") +
+            (url
+              ? hyperlink(label, url)
+              : `${label} ${this.theme.fg("muted", this.loading ? "(loading...)" : "(unavailable)")}`),
+          width,
+          "",
+        ),
+      );
+    }
+    return lines;
+  }
+
+  invalidate(): void {
+    this.content.invalidate();
+  }
 }
 
 /** Display-only snapshot. No session mutations, provider calls or tool execution. */
@@ -51,7 +113,13 @@ export class TranscriptContent implements Component {
   private readonly tui: TUI;
   private readonly cwd: string;
   private readonly ascii: boolean;
-  private readonly options: { groupTools?: boolean; showMessageMetadata?: boolean };
+  private readonly options: {
+    groupTools?: boolean;
+    showMessageMetadata?: boolean;
+    imageLinks?: ImageLinks;
+    imageLoading?: boolean;
+  };
+  private readonly images: ReadonlyMap<string, ImageAttachment>;
   private components: Component[] = [];
   private expanded = false;
   private cache: { width: number; lines: string[] } | undefined;
@@ -69,7 +137,8 @@ export class TranscriptContent implements Component {
     this.tui = tui;
     this.cwd = cwd;
     this.ascii = ascii;
-    this.options = options;
+    this.options = { ...options };
+    this.images = new Map(collectImages(this.entries).map((image) => [image.key, image]));
     this.rebuild();
   }
 
@@ -79,8 +148,28 @@ export class TranscriptContent implements Component {
     this.rebuild();
   }
 
+  setImageLinks(links: ImageLinks): void {
+    this.options.imageLinks = links;
+    this.options.imageLoading = false;
+    this.rebuild();
+  }
+
   private label(text: string, error = false): Component {
     return new Text(this.theme.fg(error ? "error" : "muted", messageText(text)), 0, 0);
+  }
+
+  private withAttachments(component: Component, entryId: string): Component {
+    const images = [...this.images.values()].filter((image) => image.entryId === entryId);
+    return images.length
+      ? new AttachedContent(
+          component,
+          images,
+          this.options.imageLinks ?? new Map(),
+          this.theme,
+          this.ascii,
+          this.options.imageLoading ?? false,
+        )
+      : component;
   }
 
   private rebuild(): void {
@@ -107,10 +196,10 @@ export class TranscriptContent implements Component {
       ].map((definition) => [definition.name, definition]),
     );
     const tools = new Map<string, ToolExecutionComponent>();
-    const results = new Map<string, ToolResultMessage>();
+    const results = new Map<string, { message: ToolResultMessage; entryId: string }>();
     for (const entry of this.entries) {
       if (entry.type === "message" && entry.message.role === "toolResult")
-        results.set(entry.message.toolCallId, entry.message);
+        results.set(entry.message.toolCallId, { message: entry.message, entryId: entry.id });
     }
     const addTool = (call: ToolCall) => {
       if (tools.has(call.id)) return;
@@ -127,16 +216,23 @@ export class TranscriptContent implements Component {
       const result = results.get(call.id);
       if (result) {
         component.markExecutionStarted();
-        component.updateResult(result);
+        component.updateResult(result.message);
       }
       component.setExpanded(this.expanded);
       tools.set(call.id, component);
-      this.components.push(component);
+      this.components.push(result ? this.withAttachments(component, result.entryId) : component);
     };
-    const addMessage = (message: Message) => {
+    const addMessage = (message: Message, entryId: string) => {
       if (message.role === "user") {
         this.components.push(
-          new ReferenceUserMessage(contentText(message.content), this.theme, this.ascii),
+          this.withAttachments(
+            new ReferenceUserMessage(
+              contentText(message.content, entryId, this.images),
+              this.theme,
+              this.ascii,
+            ),
+            entryId,
+          ),
         );
       } else if (message.role === "assistant") {
         let metadata: string | undefined;
@@ -175,7 +271,12 @@ export class TranscriptContent implements Component {
               message.isError,
             ),
           );
-          this.components.push(new Text(messageText(contentText(message.content)), 2, 0));
+          this.components.push(
+            this.withAttachments(
+              new Text(messageText(contentText(message.content, entryId, this.images)), 2, 0),
+              entryId,
+            ),
+          );
         }
       } else if (message.role === "bashExecution") {
         const state = message.cancelled
@@ -200,7 +301,14 @@ export class TranscriptContent implements Component {
         if (message.display) {
           this.components.push(this.label(message.customType));
           this.components.push(
-            new ReferenceAssistantText(contentText(message.content), this.theme, this.ascii),
+            this.withAttachments(
+              new ReferenceAssistantText(
+                contentText(message.content, entryId, this.images),
+                this.theme,
+                this.ascii,
+              ),
+              entryId,
+            ),
           );
         }
       } else if (message.role === "branchSummary" || message.role === "compactionSummary") {
@@ -211,7 +319,7 @@ export class TranscriptContent implements Component {
       }
     };
     for (const entry of this.entries) {
-      if (entry.type === "message") addMessage(entry.message);
+      if (entry.type === "message") addMessage(entry.message, entry.id);
       else if (entry.type === "custom" && entry.customType === COMPLETION_ENTRY_TYPE) {
         const completion = readCompletionEntry(entry.data);
         if (completion)
@@ -222,7 +330,14 @@ export class TranscriptContent implements Component {
       } else if (entry.type === "custom_message" && entry.display) {
         this.components.push(this.label(entry.customType));
         this.components.push(
-          new ReferenceAssistantText(contentText(entry.content), this.theme, this.ascii),
+          this.withAttachments(
+            new ReferenceAssistantText(
+              contentText(entry.content, entry.id, this.images),
+              this.theme,
+              this.ascii,
+            ),
+            entry.id,
+          ),
         );
       } else if (entry.type === "compaction" || entry.type === "branch_summary") {
         this.components.push(
@@ -340,36 +455,62 @@ export class TranscriptView implements Component {
   }
 }
 
-export function registerTranscriptCommand(pi: ExtensionAPI, ascii = useAsciiChrome): void {
+export function registerTranscriptCommand(
+  pi: ExtensionAPI,
+  ascii = useAsciiChrome,
+  prepareImages?: PrepareImages,
+): void {
   pi.registerCommand("pituix-transcript", {
     description: "Read the current conversation with reference message and tool layout",
     handler: async (_args, ctx: ExtensionCommandContext) => {
       if (!ctx.hasUI) return;
       const entries = ctx.sessionManager.getBranch();
-      await ctx.ui.custom<void>(
-        (tui, theme, keys, done) => {
-          const content = new TranscriptContent(entries, theme, tui, ctx.cwd, ascii());
-          const view = new TranscriptView(
-            content,
-            theme,
-            () => tui.terminal.rows,
-            () => done(undefined),
-            (data) => keys.matches(data, "app.tools.expand"),
-          );
-          return {
-            render: (width) => view.render(width),
-            invalidate: () => view.invalidate(),
-            handleInput: (data) => {
-              view.handleInput(data);
-              tui.requestRender();
-            },
-          };
-        },
-        {
-          overlay: true,
-          overlayOptions: { width: "100%", maxHeight: "100%", row: 0, col: 0, margin: 0 },
-        },
-      );
+      const load = new AbortController();
+      let closed = false;
+      try {
+        await ctx.ui.custom<void>(
+          (tui, theme, keys, done) => {
+            const content = new TranscriptContent(entries, theme, tui, ctx.cwd, ascii(), {
+              imageLoading: Boolean(prepareImages),
+            });
+            // Prepare asynchronously outside render; Escape remains responsive.
+            if (prepareImages)
+              void prepareImages(entries, load.signal)
+                .catch(() => new Map<string, string>())
+                .then((links) => {
+                  if (closed || load.signal.aborted) return;
+                  content.setImageLinks(links);
+                  tui.requestRender();
+                });
+            const view = new TranscriptView(
+              content,
+              theme,
+              () => tui.terminal.rows,
+              () => {
+                closed = true;
+                load.abort();
+                done(undefined);
+              },
+              (data) => keys.matches(data, "app.tools.expand"),
+            );
+            return {
+              render: (width) => view.render(width),
+              invalidate: () => view.invalidate(),
+              handleInput: (data) => {
+                view.handleInput(data);
+                tui.requestRender();
+              },
+            };
+          },
+          {
+            overlay: true,
+            overlayOptions: { width: "100%", maxHeight: "100%", row: 0, col: 0, margin: 0 },
+          },
+        );
+      } finally {
+        closed = true;
+        load.abort();
+      }
     },
   });
 }

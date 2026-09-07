@@ -64,6 +64,21 @@ is included in Pi-TUIX. The reference mascot is replaced with an original ASCII
   line was still rendered for that failed attempt. This is not evidence of a
   successful model turn or of model-driven Read/Edit/Write rendering.
 
+### Image attachments
+
+A 100x40 authenticated session received a disposable 160x96 red/blue PNG through
+bracketed paste. Claude replaced the path with `[Image #1]` in the draft and
+retained that marker in the submitted prompt, followed immediately by an
+indented attachment branch. The model correctly described the two colors.
+Detailed mode and the saved-session preview retained the same attachment layout.
+Pasting the same file again produced `[Image #2]`: numbers count occurrences,
+not unique file contents. No inline bitmap appeared in these sampled views.
+The official [image workflow documentation](https://code.claude.com/docs/en/common-workflows#work-with-images)
+describes Cmd+Click on macOS or Ctrl+Click on Windows/Linux to open a numbered
+image in the default viewer. Reference click activation itself was not tested;
+the captured output did not contain OSC 8 links, including with Ghostty declared.
+Pi-TUIX uses its host's public hyperlink behavior to provide that interaction.
+
 ### Authenticated tool workflow
 
 After configuring a compatible gateway outside the repository, an actual
@@ -136,7 +151,9 @@ broadly than the observed reference.
 | Effort above the prompt | Custom editor, `thinking_level_select`, `model_select` | Implemented; displays Pi's effective level and actual cycle binding |
 | Searchable settings page | `ctx.ui.custom`, public `Input` | Reference frame, filtering, focus navigation and value alignment implemented for Pi-TUIX settings |
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
-| Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Binary media remains labelled; old runs without branch observations stay unknown |
+| Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Old runs without branch observations stay unknown |
+| Snapshot/preview image attachments | Saved message image blocks, public `hyperlink`, native URL activation | Numbered branches and openable temporary raster files implemented; loading/unavailable states remain explicit |
+| Live image paste and attachment chrome | Native editor and public message components | Still native Pi behavior; image-only user messages are absent from the tested host document and user components do not expose image payloads |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -182,6 +199,22 @@ remain a measured difference, rather than a claim of full syntax parity.
 ## Validation
 
 - TypeScript compilation against Pi 0.84.4 and Biome checks.
+- Image tests cover occurrence numbering, hidden/custom/tool messages, duplicate
+  data, malformed/unsupported/oversized input, private file permissions,
+  cancellation, pending writes and shutdown cleanup. Snapshot tests check
+  adjacent branches, preserved OSC 8 links under ANSI/CJK truncation, expansion
+  and unchanged source messages. Native fullscreen mouse events activate the
+  correct link before and after scrolling. Preview races cannot replace a newer
+  selection or redraw after closing.
+  Actual Pi 0.85.1 at 100x40 and Pi 0.84.4 at 80x24 display image-only prompts,
+  repeated images and saved image tool results in both readers. Clicking the
+  fullscreen attachment opened the matching PNG document in macOS Preview.
+  Expansion and normal UI restoration were exercised; both runtime image
+  directories were removed after quit. Snapshot/preview operations preserved the
+  fixture's bytes and mtime after host startup. The initial native session load
+  had appended one `thinking_level_change` entry; all original bytes were intact.
+  Regular-mode OSC 8 output was verified, but its terminal-emulator click gesture
+  was not exercised. Live main-view image presentation remains a separate gap.
 - Resume controls tests cover branch indexing beyond the visible window,
   selection stability, search/scope combinations, unavailable Git, unreadable
   files, queue replacement, aborts and stale results. Rename tests cover native
