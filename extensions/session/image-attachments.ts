@@ -47,13 +47,16 @@ export function collectImages(entries: readonly SessionEntry[]): ImageAttachment
             : [],
         )
       : [];
+    // Multiple references may name one attachment. Preserve the original
+    // one-label-per-block interpretation for older/foreign messages as well.
+    const positional = labels.length === imageCount ? labels : [...new Set(labels)];
     const explicit =
-      labels.length === imageCount &&
-      labels.every((number) => Number.isSafeInteger(number) && number > 0);
+      positional.length === imageCount &&
+      positional.every((number) => Number.isSafeInteger(number) && number > 0);
     let ordinal = 0;
     content.forEach((part, index) => {
       if (part?.type !== "image") return;
-      const number = user ? (explicit ? labels[ordinal++] : ++userNumber) : undefined;
+      const number = user ? (explicit ? positional[ordinal++] : ++userNumber) : undefined;
       userNumber = Math.max(userNumber, number ?? 0);
       images.push({
         entryId: entry.id,

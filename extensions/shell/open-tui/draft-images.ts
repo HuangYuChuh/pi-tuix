@@ -208,14 +208,15 @@ export class DraftImages {
       .join("");
   }
 
-  restoreLabels(text: string, source: string): string {
+  /** External labels can reference the same captured attachment more than once. */
+  restoreExternalLabels(text: string, source: string): string {
     const known = new Map<string, string>(
       [...source].flatMap((token) => {
         const image = this.images.get(token);
         return image ? [[`[Image #${image.number}]`, token] as const] : [];
       }),
     );
-    return text.replace(/\[Image #\d+\]/g, (label) => known.get(label) ?? label);
+    return this.display(text).replace(/\[Image #\d+\]/g, (label) => known.get(label) ?? label);
   }
 
   restoreQueuedDraft(text: string, draft: QueueDraft): { text: string; unmatched: boolean } {
@@ -223,11 +224,24 @@ export class DraftImages {
   }
 
   transform(event: InputEvent, pending = true): InputEventResult {
-    const attached = [...event.text].flatMap((character) => {
+    const referenced = new Map<number, DraftImage>();
+    for (const character of event.text) {
       const image = this.images.get(character);
-      return image ? [{ ...image.image }] : [];
-    });
-    const text = attached.length ? this.display(event.text) : event.text;
+      if (image) referenced.set(image.number, image);
+    }
+    const text = referenced.size ? this.display(event.text) : event.text;
+    const attached: ImageContent[] = [];
+    // One attachment per owned identity, in first visible-reference order.
+    // A typed reference can precede its chip; unused/old numbers stay text.
+    if (referenced.size) {
+      for (const match of text.matchAll(/\[Image #(\d+)\]/g)) {
+        const number = Number(match[1]);
+        const image = referenced.get(number);
+        if (!image) continue;
+        attached.push({ ...image.image });
+        referenced.delete(number);
+      }
+    }
     const images = [...(event.images ?? []), ...attached];
     this.queue.observe(event, text, images, pending);
     return attached.length

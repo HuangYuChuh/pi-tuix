@@ -198,7 +198,9 @@ the main snapshot keeps its existing grouping and optional expansion.
 `SessionImageCache` prepares supported raster attachments outside rendering.
 Only user images receive numbers. When user text contains one valid positional
 label per image, those labels preserve their numbers and positions, including
-deleted-draft gaps; other user images receive branch-order numbers. Tool/custom
+deleted-draft gaps. When repeated references outnumber image blocks, a matching
+set of distinct labels supplies first-reference numbers instead. Original
+one-label-per-block messages retain their prior interpretation; other user images receive branch-order numbers. Tool/custom
 images do not advance that counter. Content hashes deduplicate temporary bytes
 across repeated images and concurrent main/preview preparation. Files use
 mode 0600 inside a fresh 0700 temporary directory. Base64, MIME/header dimensions
@@ -271,7 +273,14 @@ presentation badge after take-back. Later input handlers can still change image
 payloads without changing text; Pi exposes no accepted-queue payload event to
 verify that case. Unobserved compaction queues also lack complete public metadata.
 The native external-editor action receives readable labels; its public `setText`
-callback restores surviving known labels to their image identities. Disabling the
+callback restores surviving known labels to their image identities. Repeated
+references share one current attachment; removing the final reference removes
+it. Input transformation deduplicates owned identities in first visible-reference
+order, including references typed before the corresponding chip. Distinct pasted
+identities remain distinct even with identical bytes, and incoming host images
+remain untouched. Unknown/old labels do not acquire images absent from the
+exported draft. The next keystroke clears an unanswered external exchange, since
+a failed native editor does not call `setText`. Disabling the
 extension expands remaining draft chips to readable source paths before restoring
 the host editor. This also preserves the contents of native collapsed text pastes.
 After a new runtime, Pi recalls historical labels as text without automatically
@@ -283,7 +292,7 @@ handling. When expanded text differs from the editor buffer, deletion stays
 native: `setText` would otherwise clear the host's collapsed-paste registry.
 History remains Pi-owned and no display token or image data is inserted for a
 literal label. Collapsed-paste deletion, native commands consuming arguments
-before the input event, and external-editor literal/owned label collisions
+before the input event, and numbering after text-only historical labels
 need further work. Quoted path-list acceptance and retaining unavailable paths
 are documented differences from the sampled reference parser.
 

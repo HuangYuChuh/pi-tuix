@@ -182,7 +182,7 @@ broadly than the observed reference.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Old runs without branch observations stay unknown |
 | Main/snapshot/preview image attachments | Public message/context entries, component composition, `hyperlink`, native URL activation | User-only numbering, image-only prompts and openable temporary raster files implemented; Read images use file/byte summaries, other tool/custom images use unnumbered links |
-| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation | Multi-path chips, literal/history label editing, captured-image links and positional submission implemented; observed queue take-back distinguishes literal labels; collapsed-paste deletion, external-editor collisions and parser edge cases still differ |
+| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation | Multi-path chips, literal/history label editing, captured-image links and positional submission implemented; observed queue take-back distinguishes literal labels; shared external references implemented; collapsed-paste deletion, text-only history numbering and parser edge cases still differ |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -315,8 +315,31 @@ remain a measured difference, rather than a claim of full syntax parity.
   four temporary assets, and saved sessions contain no internal draft tokens.
   Native take-back collapsed queued messages into one input as expected. Later
   handlers changing image payloads without changing text and unobserved compaction
-  queues remain public-API limitations. External-editor label collisions are
-  separate remaining work.
+  queues remain public-API limitations. The external-editor reference rule is described below.
+- External-editor reference sampling used the documented
+  [Ctrl+G action](https://code.claude.com/docs/en/keybindings) with a disposable
+  editor. It received ordinary readable labels. Two same-number references
+  retained one attachment; deleting the first reference still retained it;
+  removing all references removed the attachment. Persisted reference messages
+  confirm image counts 1 / 1 / 0 and the original PNG hash. This corrects the
+  assumption that external-editor same-number text must remain an unrelated
+  literal. Pi-TUIX now shares one payload per owned identity and preserves
+  distinct same-byte pastes. Unknown labels remain text. A failed external
+  exchange expires on the next keystroke instead of affecting a later replacement.
+  Saved repeated references retain their image numbers without rewriting messages.
+  Regression tests cover shared-reference deletion/undo, first-reference ordering,
+  untouched native images, legacy positional data, unknown labels, failure and
+  widths 8-100. Actual Pi 0.84.4 at 80x24 exported two #22 references and submitted
+  one original PNG; the conversation displayed one #22 attachment branch.
+  Pi 0.85.1 at 100x40 retained an image after external deletion of the first
+  reference and sent no image after all references were removed. A failed editor,
+  followed by deleting the chip and reopening plain same-number text, submitted
+  text only. A further Pi 0.84.4 run placed a GIF reference before its PNG/GIF
+  chips and delivered GIF/PNG bytes in that first-reference order with matching
+  #26/#25 branches. Default restoration and all six temporary-asset removals
+  passed; sessions contain no internal draft tokens. A separate reference resume assigned
+  #1000 after saved text-only #999; Pi currently seeds from actual image blocks.
+  That historical-numbering edge still needs investigation.
 - Resume controls tests cover branch indexing beyond the visible window,
   selection stability, search/scope combinations, unavailable Git, unreadable
   files, queue replacement, aborts and stale results. Rename tests cover native

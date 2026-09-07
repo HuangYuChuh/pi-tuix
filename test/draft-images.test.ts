@@ -244,6 +244,69 @@ test("saved positional labels preserve gaps and avoid duplicate markers in conve
   }
 });
 
+test("saved repeated image references share positional numbers without changing legacy payloads", () => {
+  const manager = SessionManager.inMemory("/fixture");
+  const image = { type: "image" as const, data: png, mimeType: "image/png" };
+  manager.appendMessage({
+    role: "user",
+    content: [{ type: "text", text: "[Image #7] [Image #4] [Image #7]" }, image, image],
+    timestamp: 0,
+  });
+  manager.appendMessage({
+    role: "user",
+    content: [{ type: "text", text: "[Image #9] [Image #9]" }, image, image],
+    timestamp: 0,
+  });
+  manager.appendMessage({ role: "user", content: [image], timestamp: 0 });
+  manager.appendMessage({
+    role: "user",
+    content: [{ type: "text", text: "[Image #12] [Image #12] [Image #13]" }, image],
+    timestamp: 0,
+  });
+  manager.appendMessage({
+    role: "user",
+    content: [{ type: "text", text: "[Image #0] [Image #0]" }, image],
+    timestamp: 0,
+  });
+  const entries = manager.getBranch();
+  const before = structuredClone(entries);
+  const images = collectImages(entries);
+  assert.deepEqual(
+    images.map((image) => image.number),
+    [7, 4, 9, 9, 10, 11, 12],
+  );
+  assert.deepEqual(
+    images.map((image) => image.inline),
+    [true, true, true, true, false, false, false],
+  );
+  const first = entries[0];
+  assert.ok(first.type === "message" && first.message.role === "user");
+  assert.equal(
+    contentText(
+      first.message.content,
+      first.id,
+      new Map(images.map((image) => [image.key, image])),
+    ),
+    "[Image #7] [Image #4] [Image #7]",
+  );
+  assert.deepEqual(entries, before);
+  const h = fixture();
+  try {
+    h.images.reserve(
+      {
+        role: "user",
+        content: [{ type: "text", text: "[Image #9] [Image #9]" }, image],
+        timestamp: 0,
+      },
+      false,
+    );
+    h.paste();
+    assert.equal(h.images.display(h.editor.getText()), "[Image #10]");
+  } finally {
+    h.close();
+  }
+});
+
 test("rich draft rendering wraps whole chips and bounds Unicode, cursor and control text", () => {
   const h = fixture();
   try {
@@ -415,6 +478,158 @@ test("taking back a native queue restores owned chips and leaves literal labels 
   }
 });
 
+test("external editing shares repeated labels with one attachment until the final reference is deleted", () => {
+  const h = fixture();
+  try {
+    h.paste();
+    h.editor.handleInput(" literal [Image #1]");
+    let external = "";
+    h.editor.onAction("app.editor.external", () => {
+      external = h.editor.getExpandedText();
+    });
+    h.editor.handleInput("\x07");
+    assert.equal(external, "[Image #1] literal [Image #1]");
+    h.editor.setText(`${external} edited`);
+    const submit = () =>
+      h.images.transform(
+        { type: "input", text: h.editor.getExpandedText(), source: "interactive" },
+        false,
+      );
+    let input = submit();
+    assert.equal(input.action, "transform");
+    if (input.action !== "transform") assert.fail();
+    assert.equal(input.text, `${external} edited`);
+    assert.deepEqual(input.images, [{ type: "image", data: png, mimeType: "image/png" }]);
+    h.editor.handleInput("\x01");
+    h.editor.handleInput("\x1b[3~");
+    input = submit();
+    assert.equal(input.action, "transform");
+    if (input.action !== "transform") assert.fail();
+    assert.equal(input.text, " literal [Image #1] edited");
+    assert.equal(input.images?.length, 1);
+    h.editor.handleInput("\x05");
+    h.editor.handleInput("\x15");
+    assert.equal(submit().action, "continue");
+    h.editor.handleInput("\x1f");
+    assert.equal(submit().action, "transform");
+    for (const width of [8, 20, 40, 80, 100])
+      assert.ok(h.editor.render(width).every((line) => visibleWidth(line) <= width));
+    h.editor.restoreImagePaths();
+    assert.equal(h.images.has(h.editor.getText()), false);
+    assert.ok(h.editor.getText().includes(h.path));
+  } finally {
+    h.close();
+  }
+});
+
+test("external references retain identity order, separate same-byte pastes and untouched native images", () => {
+  const h = fixture();
+  try {
+    h.paste();
+    const old = h.editor.getText();
+    h.editor.setText("");
+    h.paste();
+    h.paste();
+    let external = "";
+    h.editor.onAction("app.editor.external", () => {
+      external = h.editor.getExpandedText();
+    });
+    h.editor.handleInput("\x07");
+    assert.equal(external, "[Image #2][Image #3]");
+    h.editor.setText(`[Image #3] [Image #2] [Image #3] old [Image #1] ${old}`);
+    const existing = { type: "image" as const, mimeType: "image/png", data: png };
+    const event = {
+      type: "input" as const,
+      source: "interactive" as const,
+      text: h.editor.getExpandedText(),
+      images: [existing, existing],
+    };
+    const before = structuredClone(event);
+    const input = h.images.transform(event, false);
+    assert.equal(input.action, "transform");
+    if (input.action !== "transform") assert.fail();
+    assert.equal(input.text, "[Image #3] [Image #2] [Image #3] old [Image #1] [Image #1]");
+    assert.deepEqual(input.images, [existing, existing, existing, existing]);
+    assert.deepEqual(
+      [...h.editor.getText()]
+        .filter((token) => h.images.get(token))
+        .map((token) => h.images.get(token)?.number),
+      [3, 2, 3],
+    );
+    assert.deepEqual(event, before);
+    h.editor.handleInput("\x07");
+    h.editor.setText("all references removed");
+    assert.equal(
+      h.images.transform({ ...event, text: h.editor.getExpandedText() }, false).action,
+      "continue",
+    );
+  } finally {
+    h.close();
+  }
+});
+
+test("failed external editing cannot attach an old image to a later text replacement", () => {
+  const h = fixture();
+  try {
+    h.paste();
+    h.editor.onAction("app.editor.external", () => {
+      h.editor.getExpandedText();
+    });
+    h.editor.handleInput("\x07");
+    // Native failure supplies no setText result and leaves the draft untouched.
+    h.editor.handleInput("\x7f");
+    h.editor.setText("later [Image #1]");
+    assert.equal(h.images.has(h.editor.getText()), false);
+    assert.equal(
+      h.images.transform(
+        { type: "input", source: "interactive", text: h.editor.getExpandedText() },
+        false,
+      ).action,
+      "continue",
+    );
+  } finally {
+    h.close();
+  }
+});
+
+test("typed references before owned chips keep image bytes aligned with visible attachment numbers", () => {
+  const h = fixture();
+  try {
+    const gif = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    const path = join(h.cwd, "second.gif");
+    writeFileSync(path, Buffer.from(gif, "base64"));
+    h.paste();
+    h.paste(path);
+    h.editor.setText(`[Image #2] ${h.editor.getText()}`);
+    const result = h.images.transform(
+      { type: "input", source: "interactive", text: h.editor.getExpandedText() },
+      false,
+    );
+    assert.equal(result.action, "transform");
+    if (result.action !== "transform") assert.fail();
+    assert.equal(result.text, "[Image #2] [Image #1][Image #2]");
+    assert.deepEqual(
+      result.images?.map(({ data }) => data),
+      [gif, png],
+    );
+    const manager = SessionManager.inMemory("/fixture");
+    manager.appendMessage({
+      role: "user",
+      content: [{ type: "text", text: result.text }, ...(result.images ?? [])],
+      timestamp: 0,
+    });
+    assert.deepEqual(
+      collectImages(manager.getBranch()).map(({ number, mimeType }) => [number, mimeType]),
+      [
+        [2, "image/gif"],
+        [1, "image/png"],
+      ],
+    );
+  } finally {
+    h.close();
+  }
+});
+
 test("incoming user media reserves numbers before persistence without advancing tool-image numbers", () => {
   const h = fixture();
   try {
@@ -515,7 +730,7 @@ test("queue take-back preserves lane order and real/literal collisions through e
     );
     assert.equal(input.action, "transform");
     if (input.action !== "transform") assert.fail();
-    assert.equal(input.images?.length, 2);
+    assert.equal(input.images?.length, 1);
     assert.ok(input.images?.every((image) => image.data === png));
     h.editor.setText("");
     h.editor.onAction("app.message.dequeue", () => h.editor.setText(input.text));

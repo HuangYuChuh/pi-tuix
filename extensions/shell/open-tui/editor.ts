@@ -162,6 +162,9 @@ export class OpenTuiEditor extends CustomEditor {
   }
 
   override handleInput(data: string): void {
+    // A failed external editor resumes input without calling setText. Do not
+    // apply that abandoned exchange to a later history or queue replacement.
+    this.externalDraft = undefined;
     if (this.images && this.handleImagePaste(data)) return;
     if (this.appKeys.matches(data, "app.editor.external")) {
       this.externalImages = true;
@@ -351,7 +354,7 @@ export class OpenTuiEditor extends CustomEditor {
       if (restored.unmatched) this.onQueueRestoreUnmatched?.();
     }
     if (this.externalDraft !== undefined && this.images) {
-      text = this.images.restoreLabels(text, this.externalDraft);
+      text = this.images.restoreExternalLabels(text, this.externalDraft);
       this.externalDraft = undefined;
     }
     super.setText(text);
