@@ -18,6 +18,7 @@ Pi-TUIX is a presentation layer. Pi continues to own model requests, built-in to
 - Compact Read, Bash, Edit, and Write rows with explicit state and attention labels
 - Expandable ANSI-aware output and edit diff summaries
 - `pituix`, `pituix-default`, and `pituix-about` commands
+- `pituix-transcript` for a read-only conversation snapshot with tool expansion
 - Bundled `pi-tuix-dark` theme
 
 ## Planned Features

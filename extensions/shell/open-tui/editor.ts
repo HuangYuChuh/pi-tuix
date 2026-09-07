@@ -6,7 +6,12 @@ import {
   keyText,
 } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
-import { CURSOR_MARKER, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import {
+  CURSOR_MARKER,
+  sliceByColumn,
+  truncateToWidth,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 import type { CursorStyle } from "./config.ts";
 import {
   applyFullscreenWheelScrollLines,
@@ -16,7 +21,17 @@ import { type IconMode, useAsciiChrome } from "./icons.ts";
 import { findBottomBorderIndex, isEditorBorderLine, stripAnsi } from "./utils.ts";
 
 function fillLine(content: string, width: number): string {
-  const truncated = truncateToWidth(content, Math.max(0, width), "");
+  let truncated = truncateToWidth(content, Math.max(0, width), "");
+  const cursor = content.indexOf(CURSOR_MARKER);
+  if (width > 0 && cursor >= 0 && !truncated.includes(CURSOR_MARKER)) {
+    const column = visibleWidth(content.slice(0, cursor));
+    truncated = truncateToWidth(
+      sliceByColumn(content, Math.max(0, column - width + 1), width, true),
+      width,
+      "",
+    );
+    if (!truncated.includes(CURSOR_MARKER)) truncated = CURSOR_MARKER + truncated;
+  }
   const pad = " ".repeat(Math.max(0, width - visibleWidth(truncated)));
   return `${truncated}${pad}`;
 }
@@ -177,6 +192,7 @@ export function installEditor(
   wheelScrollLines = DEFAULT_FULLSCREEN_WHEEL_SCROLL_LINES,
   iconMode: IconMode = "auto",
   getPromptStatus: (width: number) => string = () => "",
+  onCreate?: (tui: TUI, editor: OpenTuiEditor) => () => void,
 ) {
   let activeTui: TUI | undefined;
   let activeEditor: OpenTuiEditor | undefined;
@@ -184,8 +200,10 @@ export function installEditor(
   let currentIconMode = iconMode;
   let currentCursorStyle = cursorStyle;
   let currentWheelScrollLines = wheelScrollLines;
+  let disposePresentation: (() => void) | undefined;
 
   ctx.ui.setEditorComponent((tui, editorTheme, keybindings) => {
+    disposePresentation?.();
     activeTui = tui;
     applyFullscreenWheelScrollLines(tui, currentWheelScrollLines);
     previousHardwareCursor = tui.getShowHardwareCursor();
@@ -197,6 +215,7 @@ export function installEditor(
       useAsciiChrome(currentIconMode),
       getPromptStatus,
     );
+    disposePresentation = onCreate?.(tui, activeEditor);
     return activeEditor;
   });
   return {
@@ -213,6 +232,8 @@ export function installEditor(
       if (activeTui) applyFullscreenWheelScrollLines(activeTui, currentWheelScrollLines);
     },
     cleanup(): void {
+      disposePresentation?.();
+      disposePresentation = undefined;
       ctx.ui.setEditorComponent(undefined);
       if (activeTui) {
         if (currentCursorStyle !== "block") activeTui.terminal.write(DEFAULT_CURSOR_STYLE_SEQUENCE);

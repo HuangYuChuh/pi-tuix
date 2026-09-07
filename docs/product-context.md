@@ -92,3 +92,5 @@ Claude Code gateway. The model picker reads Pi's scoped/available models and
 delegates selection to Pi; it does not maintain a separate model catalogue.
 
 Run-completion and interruption records improve scanning across past turns. Pi-TUIX owns their display payload and renderer, while Pi owns session storage and excludes these plain custom entries from model context.
+
+The live message view and read-only transcript snapshot share presentation components. Pi retains document ownership, native viewport input and session state. Reversible public wrappers and disposable layout caches introduce no second runtime.

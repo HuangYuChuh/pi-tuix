@@ -9,6 +9,7 @@ import {
 } from "./control/plan.ts";
 import { registerSessionTreeCommand } from "./session/session-tree.ts";
 import { createSubagentActivityObserver } from "./session/subagent-activity.ts";
+import { registerTranscriptCommand } from "./session/transcript-view.ts";
 import { useAsciiChrome } from "./shell/open-tui/icons.ts";
 import { createOpenTuiShellRuntime } from "./shell/open-tui/shell.ts";
 import {
@@ -73,6 +74,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   };
   const plan = createPlanRuntime();
   registerSessionTreeCommand(pi);
+  registerTranscriptCommand(pi);
 
   const toolRenderers = registerThreeLayerToolRenderers(pi, toolMode);
   const hydrateGroups = (ctx: ExtensionContext) => {
