@@ -205,3 +205,8 @@ export function runtimeSymbol(name: string, mode: IconMode): string {
   if (resolveIconMode(mode) === "ascii") return RUNTIME_ASCII_SYMBOLS[name] ?? name;
   return RUNTIME_SYMBOLS[name] ?? "";
 }
+
+/** Standard terminal symbols need no Nerd Font; dumb terminals get ASCII. */
+export function useAsciiChrome(mode: IconMode = "auto"): boolean {
+  return mode === "ascii" || (mode === "auto" && process.env.TERM === "dumb");
+}

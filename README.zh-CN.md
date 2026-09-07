@@ -47,11 +47,11 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 
 本地安装方式见[开发版使用手册](docs/development.md)，开发版、预发布版与正式版规则见[发版流程](docs/releasing.md)。
 
-## 0.1.0 稳定版
+## 当前开发版本
 
-`0.1.0` 版本通过 Pi 的公开 `ExtensionAPI` 提供 Pi-TUIX header、footer、终端标题、working indicator、editor chrome，以及三层 Read/Bash/Edit/Write 展示。工具执行过程仍原样委托给 Pi。默认是 preview 模式：显示前两行和后两行；collapsed 只显示摘要，expanded 显示完整输出或 diff。
+当前 shell 依据 Claude Code 2.1.263 的实际终端界面调整：紧凑启动信息、上下横线输入区、快捷键帮助和单行底栏。`/pituix-status` 可切换详细统计。完整复刻尚未完成，已观察的界面、已实现部分和剩余差异见[对照报告](docs/claude-code-parity.md)。
 
-Editor border 会显示 `READY/WORKING`、输入行数和字符数。它继承 Pi 公开的 `CustomEditor`，保留提交、历史记录、autocomplete、粘贴处理和应用快捷键。
+编辑器继承 Pi 公开的 `CustomEditor`，保留提交、历史、自动补全和粘贴行为。空输入时按 `?` 查看帮助；`/pituix-default` 恢复原生组件与之前的主题。工具执行仍原样委托给 Pi。
 
 每个紧凑工具行都会明确显示动作、目标、状态和 `ATTENTION/CLEAR` 信号。Read 与 Bash 汇总输出规模，Edit 展示 diff 统计，Write 展示写入行数；展开后可查看经过 ANSI-aware 宽度约束的输出或 diff。
 
@@ -64,13 +64,15 @@ Editor border 会显示 `READY/WORKING`、输入行数和字符数。它继承 P
 | `/pituix-compact` | 使用原有紧凑工具展示 |
 | `/pituix-three-layer` | 使用三层工具展示 |
 | `/pituix-mode <collapsed\|preview\|expanded>` | 设置工具详情模式，默认是 preview |
+| `/pituix-status` | 切换简洁底栏和详细统计 |
+| `/pituix-settings` | 配置界面、底栏、图标和统计 |
 | `/pituix-about` | 查看 package 与兼容的 Pi 版本 |
 | `/pituix-steer <消息>` | 立即纠偏当前执行中的任务 |
 | `/pituix-followup <消息>` | 排队追加，等当前任务结束后执行 |
 | `/pituix-queue` | 查看 Pi 是否还有待处理消息 |
 | `/pituix-plan [show\|hide\|clear]` | 控制自动识别出的只读计划面板 |
 
-可在 Pi 的 `/settings` 中选择内置的 `pi-tuix-dark` 主题。
+启用 shell 时会应用内置的 `pi-tuix-dark` 主题，也可在 Pi 的 `/settings` 中切换主题。
 
 ## 工作原理
 

@@ -43,6 +43,7 @@ export interface OpenTuiConfig {
   enabled: boolean;
   settingsLanguage: SettingsLanguage;
   cursorStyle: CursorStyle;
+  footerStyle: "compact" | "detailed";
   fullscreen: FullscreenConfig;
   icons: {
     mode: IconMode;
@@ -55,6 +56,7 @@ export const DEFAULT_CONFIG: OpenTuiConfig = {
   enabled: true,
   settingsLanguage: "en",
   cursorStyle: "block",
+  footerStyle: "compact",
   fullscreen: {
     wheelScrollLines: DEFAULT_FULLSCREEN_WHEEL_SCROLL_LINES,
   },
@@ -151,6 +153,9 @@ export function loadConfig(
       config.cursorStyle !== "underline"
     ) {
       config.cursorStyle = DEFAULT_CONFIG.cursorStyle;
+    }
+    if (config.footerStyle !== "compact" && config.footerStyle !== "detailed") {
+      config.footerStyle = "compact";
     }
     config.fullscreen.wheelScrollLines = normalizeFullscreenWheelScrollLines(
       config.fullscreen.wheelScrollLines,

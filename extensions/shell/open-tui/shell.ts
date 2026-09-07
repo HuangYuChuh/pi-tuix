@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { SubagentActivityObserver } from "../../session/subagent-activity.ts";
 import {
   DEFAULT_CONFIG,
@@ -11,6 +11,7 @@ import { installEditor } from "./editor.ts";
 import { installFooter } from "./footer.ts";
 import { emptyGitStatus, readGitStatus } from "./git.ts";
 import { installHeader } from "./header.ts";
+import { useAsciiChrome } from "./icons.ts";
 import { readRuntimeInfo } from "./runtime.ts";
 import { SessionLifecycle } from "./session-lifecycle.ts";
 import { registerSettingsCommand } from "./settings-command.ts";
@@ -49,6 +50,7 @@ export function createOpenTuiShellRuntime(
   let context: ExtensionContext | undefined;
   let requestRender: (() => void) | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
+  let previousTheme: Theme | undefined;
   let disposeHeader: (() => void) | undefined;
   let disposeFooter: (() => void) | undefined;
   let editor: ReturnType<typeof installEditor> | undefined;
@@ -95,6 +97,11 @@ export function createOpenTuiShellRuntime(
   const remove = (ctx: ExtensionContext) => {
     if (!active || !isTuiContext(ctx)) return;
     stopTimer();
+    ctx.ui.setWorkingIndicator();
+    ctx.ui.setWorkingMessage?.();
+    ctx.ui.setHiddenThinkingLabel();
+    if (previousTheme && ctx.ui.theme.name === "pi-tuix-dark") ctx.ui.setTheme(previousTheme);
+    previousTheme = undefined;
     disposeHeader?.();
     disposeFooter?.();
     editor?.cleanup();
@@ -106,6 +113,19 @@ export function createOpenTuiShellRuntime(
   };
   const apply = (ctx: ExtensionContext) => {
     if (!isTuiContext(ctx) || active) return;
+    const referenceTheme = ctx.ui.getTheme?.("pi-tuix-dark");
+    if (referenceTheme) {
+      previousTheme = ctx.ui.theme;
+      ctx.ui.setTheme(referenceTheme);
+    }
+    ctx.ui.setWorkingIndicator({
+      frames: (useAsciiChrome(config.icons.mode)
+        ? [".", "*", "+", "*"]
+        : ["·", "✻", "✽", "✶", "✳", "✢"]
+      ).map((frame) => ctx.ui.theme.fg("accent", frame)),
+      intervalMs: 120,
+    });
+    ctx.ui.setHiddenThinkingLabel("Thinking (expand to view)");
     disposeHeader = installHeader(pi, ctx);
     disposeFooter = installFooter(
       ctx,
@@ -125,6 +145,19 @@ export function createOpenTuiShellRuntime(
     editor = installEditor(pi, ctx, config.cursorStyle, config.fullscreen.wheelScrollLines);
     active = true;
   };
+
+  pi.registerCommand("pituix-status", {
+    description: "Toggle compact hints and detailed session statistics",
+    handler: async (_args, ctx) => {
+      if (!active) {
+        ctx.ui.notify("Enable Pi-TUIX with /pituix before showing session statistics", "info");
+        return;
+      }
+      config.footerStyle = config.footerStyle === "compact" ? "detailed" : "compact";
+      saveConfig(config);
+      requestRender?.();
+    },
+  });
 
   ensureConfigExists();
   config = loadConfig();

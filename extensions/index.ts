@@ -77,6 +77,21 @@ export default function piTuix(pi: ExtensionAPI): void {
     clearPlan(plan);
     plan.visible = true;
     applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, true);
+    workflow.requestRender = () => {
+      if (ctx.mode !== "tui" || (!toolMode.enabled && !threeLayerMode.enabled)) return;
+      const activity = workflow.currentTool
+        ? `Running ${workflow.currentTool}`
+        : workflow.activity === "THINKING"
+          ? "Thinking"
+          : workflow.activity === "RESPONDING"
+            ? "Responding"
+            : "Working";
+      ctx.ui.setWorkingMessage?.(`${activity}...`);
+      ctx.ui.setStatus?.(
+        "pituix-queue",
+        workflow.queuedMessages > 0 ? `${workflow.queuedMessages} follow-up queued` : undefined,
+      );
+    };
     shell.handleRefresh(ctx, true);
   });
   pi.on("agent_start", () => {
@@ -138,6 +153,7 @@ export default function piTuix(pi: ExtensionAPI): void {
       threeLayerMode.enabled = false;
       ctx.ui.setTitle("pi");
       shell.remove(ctx);
+      ctx.ui.setStatus?.("pituix-queue", undefined);
       ctx.ui.setWidget("pituix-plan", undefined);
       ctx.ui.notify("Pi default interface restored", "info");
     },
@@ -168,6 +184,7 @@ export default function piTuix(pi: ExtensionAPI): void {
         return;
       }
       threeLayerMode.defaultMode = mode;
+      ctx.ui.setToolsExpanded?.(mode === "expanded");
       ctx.ui.notify(`Default tool mode: ${mode}`, "info");
     },
   });
