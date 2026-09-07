@@ -79,12 +79,11 @@ test("visible text, user turns, mutation tools and unknown tools separate groups
   }
 });
 
-test("pending, failed, cancelled, image and truncated results remain individually visible", () => {
+test("pending, failed, cancelled and truncated results remain individually visible", () => {
   for (const [middle, isError] of [
     [undefined, false],
     [result("Command exited with code 7"), true],
     [result("Operation cancelled"), true],
-    [{ content: [{ type: "image", data: "fixture" }] }, false],
     [{ ...result(), details: { truncation: { truncated: true } } }, false],
   ] as const) {
     const groups = new ToolGroupRuntime();
@@ -104,6 +103,24 @@ test("pending, failed, cancelled, image and truncated results remain individuall
   assert.deepEqual(groups.complete("b", result("failure"), true), ["a", "b", "c"]);
   assert.equal(groups.get("a"), undefined);
   assert.equal(groups.get("c"), undefined);
+});
+
+test("Read images collapse to a file count while Bash images remain individually visible", () => {
+  const groups = new ToolGroupRuntime();
+  const media = { content: [{ type: "image", data: "fixture", mimeType: "image/png" }] };
+  groups.recordMessage(assistant(call("image", "read", { path: "image.png" })));
+  groups.complete("image", media, false);
+  assert.equal(groups.get("image")?.summary, "Read 1 file");
+  groups.recordMessage(assistant(call("text", "read", { path: "text.txt" })));
+  groups.complete("text", result(), false);
+  assert.equal(groups.get("image")?.summary, "Read 2 files");
+  groups.recordMessage(assistant(call("bash", "bash", { command: "render-image" })));
+  groups.complete("bash", media, false);
+  assert.equal(groups.get("bash"), undefined);
+  assert.equal(groups.get("image")?.summary, "Read 2 files");
+  assert.deepEqual(groups.complete("image", media, true), ["image", "text"]);
+  assert.equal(groups.get("image"), undefined);
+  assert.equal(groups.get("text"), undefined);
 });
 
 test("group metadata can be hydrated from the public session branch and reset on navigation", () => {

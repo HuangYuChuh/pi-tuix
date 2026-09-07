@@ -139,7 +139,7 @@ test("saved preview renders recorded tools separately, diffs, metadata, media la
   assert.match(output, /\/snapshot-project/);
   assert.equal(output.match(/Read\(/g)?.length, 2);
   assert.doesNotMatch(output, /Read 1 file|not-decoded/);
-  assert.match(output, /\[image: image\/png\]/);
+  assert.match(output, /\[Image #1\] \(unavailable\)/);
   assert.match(output, /Update\(sample.ts\)[\s\S]*one = 3/);
   assert.match(output, /\d+:\d{2} [AP]M recorded-model\n⏺.*Recorded response/);
   assert.match(output, /Worked for 2s/);

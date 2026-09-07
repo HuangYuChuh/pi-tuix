@@ -540,6 +540,66 @@ test("a native running renderer receives completion after switching presentation
   assert.deepEqual(updates, [true, false]);
 });
 
+test("official Read image execution retains its bytes and renders byte summaries with host warnings", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pituix-read-image-"));
+  try {
+    const bytes = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAKAAAABgCAIAAAAVRe7OAAAA/klEQVR4nO3RQQ0AIRDAQDTdG00oRszJIOlOUgWddfce1XfuqNbz44ABAwYMGDDgET0/DhgwYMCAAQMeEeB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOP94QRk7Wn8KkUAAAAASUVORK5CYII=",
+      "base64",
+    );
+    await writeFile(join(dir, "image.png"), bytes);
+    const mode: ToolRendererMode = { enabled: true, defaultMode: "preview" };
+    const original = createReadToolDefinition(dir);
+    const definition = createThreeLayerReadDefinition(dir, mode, original);
+    assert.equal(definition.execute, original.execute);
+    const args = { path: "image.png" };
+    const actual = await definition.execute("image", args, undefined, undefined, {} as never);
+    const media = actual.content.find((part) => part.type === "image");
+    assert.ok(media);
+    assert.deepEqual(Buffer.from(media.data, "base64"), bytes);
+    const before = structuredClone(actual);
+    for (const expanded of [false, true]) {
+      const component = definition.renderResult?.(
+        actual,
+        { expanded, isPartial: false },
+        theme,
+        context(args),
+      );
+      assert.deepEqual(render(component), [
+        "* Read(image.png) [OK]",
+        `  L  Read image (${bytes.length} bytes)`,
+      ]);
+      for (const width of [0, 1, 2, 4, 12, 40, 80, 100])
+        assert.ok(component?.render(width).every((line) => visibleWidth(line) <= width));
+    }
+    assert.deepEqual(actual, before);
+    const warned = structuredClone(actual);
+    warned.content.unshift({ type: "text", text: "[Current model does not support images.]" });
+    const expanded = definition.renderResult?.(
+      warned,
+      { expanded: true, isPartial: false },
+      theme,
+      context(args),
+    );
+    assert.match(render(expanded).join("\n"), /Current model does not support images/);
+    for (const [text, state] of [
+      ["Operation cancelled", "CANCELLED"],
+      ["Cannot read image", "ERROR"],
+    ]) {
+      const failed = definition.renderResult?.(
+        { ...actual, content: [{ type: "text", text }, media] },
+        { expanded: false, isPartial: false },
+        theme,
+        context(args, { isError: true }),
+      );
+      assert.match(render(failed).join("\n"), new RegExp(`\\[${state}\\]`));
+      assert.match(render(failed).join("\n"), new RegExp(text));
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("official Edit execution produces a numbered reference diff without changing its result", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pituix-diff-"));
   try {

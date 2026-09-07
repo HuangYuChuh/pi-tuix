@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { registerModelPicker } from "../../control/model-picker.ts";
+import type { PrepareImages } from "../../session/image-attachments.ts";
 import { registerResumePicker } from "../../session/resume-picker.ts";
 import type { SubagentActivityObserver } from "../../session/subagent-activity.ts";
 import {
@@ -49,11 +50,12 @@ export function createOpenTuiShellRuntime(
   pi: ExtensionAPI,
   subagentActivity?: SubagentActivityObserver,
   onSettingsApplied?: (ctx: ExtensionContext) => void,
+  prepareImages?: PrepareImages,
 ): OpenTuiShellRuntime {
   const lifecycle = new SessionLifecycle();
   const state: FooterState = createInitialState();
   const telemetry = new TurnTelemetryTracker();
-  const liveTranscript = createLiveTranscript(pi);
+  const liveTranscript = createLiveTranscript(pi, prepareImages);
   let config: OpenTuiConfig = structuredClone(DEFAULT_CONFIG);
   const effort: EffortState = { enabled: false, level: "off", ascii: false };
   const syncEffort = (ctx: ExtensionContext) => {
@@ -217,6 +219,7 @@ export function createOpenTuiShellRuntime(
     onClose: onPanelClosed,
   });
   registerResumePicker(pi, {
+    prepareImages,
     ascii: () => useAsciiChrome(config.icons.mode),
     onOpen: onPanelOpened,
     onClose: onPanelClosed,
