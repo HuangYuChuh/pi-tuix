@@ -357,6 +357,9 @@ export class OpenTuiEditor extends CustomEditor {
       text = this.images.restoreExternalLabels(text, this.externalDraft);
       this.externalDraft = undefined;
     }
+    // Non-overlay custom dialogs restore the raw draft on this same editor.
+    // Native setText clears collapsed paste data even when the text is unchanged.
+    if (text === super.getText() && super.getExpandedText() !== text) return;
     super.setText(text);
   }
 

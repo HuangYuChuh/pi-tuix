@@ -1282,6 +1282,89 @@ test("literal label layout keeps Unicode, narrow widths and vertical cursor posi
   }
 });
 
+test("restoring unchanged draft text preserves collapsed pastes and image attachments", () => {
+  const h = fixture();
+  try {
+    const large = "line 中文 [Image #1]\n".repeat(100);
+    h.paste(large);
+    h.paste();
+    const raw = h.editor.getText();
+    const expanded = h.editor.getExpandedText();
+    assert.notEqual(raw, expanded);
+    h.editor.handleInput("\x1b[D");
+    const cursor = h.editor.getCursor();
+
+    // Public custom dialogs restore the saved raw draft on the same editor.
+    h.editor.setText(raw);
+    assert.equal(h.editor.getText(), raw);
+    assert.equal(h.editor.getExpandedText(), expanded);
+    assert.deepEqual(h.editor.getCursor(), cursor);
+    for (const width of [8, 22, 80]) {
+      for (const line of h.editor.render(width)) assert.ok(visibleWidth(line) <= width);
+      assert.equal(h.editor.getExpandedText(), expanded);
+    }
+    const result = h.images.transform({
+      type: "input",
+      source: "interactive",
+      text: h.editor.getExpandedText(),
+    });
+    if (result.action !== "transform") assert.fail();
+    assert.ok(result.text.includes(large));
+    assert.deepEqual(result.images, [{ type: "image", mimeType: "image/png", data: png }]);
+
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getExpandedText(), large, "native undo still removes the image paste");
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getExpandedText(), "", "the earlier text paste remains one undo unit");
+  } finally {
+    h.close();
+  }
+});
+
+test("unchanged text-only collapsed drafts retain native paste data and undo", () => {
+  const h = fixture();
+  try {
+    const first = "first line\n".repeat(20);
+    const second = "second line\n".repeat(20);
+    h.paste(first);
+    h.paste(second);
+    const raw = h.editor.getText();
+    assert.notEqual(raw, first + second);
+    h.editor.setText(raw);
+    h.editor.setText(raw);
+    assert.equal(h.editor.getExpandedText(), first + second);
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getExpandedText(), first);
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getExpandedText(), "");
+  } finally {
+    h.close();
+  }
+});
+
+test("changed drafts and literal paste labels keep native setText semantics", () => {
+  const h = fixture();
+  try {
+    const large = "pasted line\n".repeat(20);
+    h.paste(large);
+    const raw = h.editor.getText();
+    const replacement = `${raw} literal`;
+    h.editor.setText(replacement);
+    assert.equal(h.editor.getExpandedText(), replacement, "new text cannot inherit paste data");
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getExpandedText(), large, "undo restores the previous paste data");
+    h.editor.setText("");
+    h.editor.setText(raw);
+    assert.equal(h.editor.getExpandedText(), raw, "cleared paste data cannot be revived by labels");
+    h.editor.handleInput("\x1b[D");
+    h.editor.setText(raw);
+    assert.deepEqual(h.editor.getCursor(), { line: 0, col: raw.length });
+    assert.equal(h.editor.getExpandedText(), raw);
+  } finally {
+    h.close();
+  }
+});
+
 test("literal label edits retain real image identities and native collapsed-paste undo", () => {
   const h = fixture();
   try {
