@@ -155,6 +155,16 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   await commands.get("pituix")?.handler("", context);
   assert.equal(ui.theme, referenceTheme);
 
+  const switchedTheme = { ...originalTheme, name: "user-switched" };
+  const factoriesBeforeThemeSwitch = editorFactories.length;
+  ui.theme = switchedTheme;
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  assert.ok(
+    editorFactories.length > factoriesBeforeThemeSwitch,
+    "a runtime theme change rebinds the custom editor factory",
+  );
+  ui.theme = originalTheme;
+
   await handlers.get("agent_start")?.({ type: "agent_start" }, context);
   assert.equal(workingMessages.at(-1), "Working...");
   await handlers.get("message_update")?.(

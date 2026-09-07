@@ -122,7 +122,7 @@ These commands are reversible:
 
 The bundled `pi-tuix-dark` theme is applied with the shell and remains available from Pi's `/settings` screen. The project includes adapted MIT-licensed code from [OldSuns/pi-open-tui](https://github.com/OldSuns/pi-open-tui); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-If colors change after native `/new`, `/resume`, or `/reload` on Pi 0.84.4, run `/pituix` to restore the reference theme without restarting or replacing the editor. Pi reapplies its saved theme after those commands; automatic recovery is not available through its public lifecycle hooks. Recovery applies a temporary theme without changing Pi's saved theme setting. `/pituix-default` restores the theme that recovery replaced, unless you select another theme afterward.
+If colors change after native `/new`, `/resume`, or `/reload` on Pi 0.84.4, Pi-TUIX watches the public `ctx.ui.theme` value while its shell is active and rebinds its custom components when the host theme changes. This compatibility fallback does not patch Pi's private theme controller and stops when the shell is disabled. Recovery applies a temporary theme without changing Pi's saved theme setting. `/pituix-default` restores the theme that recovery replaced, unless you select another theme afterward.
 
 ## How It Works
 
