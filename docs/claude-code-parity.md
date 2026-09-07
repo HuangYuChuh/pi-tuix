@@ -82,6 +82,22 @@ pasting again produced `[Image #4]`. Submitting the two surviving chips retained
 `[Image #2][Image #4]` in the prompt and attachment branches; the model correctly
 reported identical images. Draft deletion therefore leaves numbering gaps.
 No inline bitmap appeared in these sampled views.
+In a later process, Up recalled the same numbered prompt. One Right arrow crossed
+the complete `[Image #2]` label, but submitting the recalled prompt created no
+image attachment branches; the authenticated model reported no images attached.
+The saved user entry contained text only. Historical label editing therefore
+does not prove that image bytes will be attached again.
+
+Pasting two absolute image paths separated by spaces or newlines produced two
+chips separated by one space. Backslash-escaped spaces in a filename worked;
+submitting the resulting `[Image #16] [Image #17]` prompt displayed both attachment
+branches and the model correctly described the identical fixtures. A path list
+mixed with ordinary prose stayed text, as did two bare relative filenames.
+Two individually quoted paths stayed text in the clean sample. With a valid
+image plus an absolute text-file path, the image became a chip and the text path
+remained, without a separating space. With a missing PNG path, only the valid
+image survived. Pi-TUIX accepts quoted lists and retains unavailable paths with
+spaces; these are explicit parser differences, not evidence of exact parity.
 The official [image workflow documentation](https://code.claude.com/docs/en/common-workflows#work-with-images)
 describes Cmd+Click on macOS or Ctrl+Click on Windows/Linux to open a numbered
 image in the default viewer. Reference click activation itself was not tested;
@@ -162,7 +178,7 @@ broadly than the observed reference.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Old runs without branch observations stay unknown |
 | Main/snapshot/preview image attachments | Public message/context entries, component composition, `hyperlink`, native URL activation | User-only numbering, image-only prompts and openable temporary raster files implemented; Read images use file/byte summaries, other tool/custom images use unnumbered links |
-| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation | Single-path chips, atomic edits, captured-image links, positional submission and native follow-up delivery implemented; multi-file paste and fresh-runtime image recall remain gaps |
+| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation | Multi-path chips, atomic edits, captured-image links, positional submission and native follow-up delivery implemented; atomic historical text labels and parser edge cases still differ |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -258,6 +274,16 @@ remain a measured difference, rather than a claim of full syntax parity.
   same image bytes with the edited text. No private-use draft tokens appeared
   in the saved fixture session. Native clipboard access itself was delegated,
   rather than replacing or inspecting the user's clipboard.
+- Multi-path tests cover source order across PNG/GIF/PNG attachments, repeated
+  images, one-step native undo, monotonic numbering after undo, mixed unavailable
+  paths, quoted/escaped parsing, malformed input and path-count/size limits.
+  Actual Pi 0.85.1 at 100x40 verified a three-image paste, one-step undo and
+  resubmission. The fixture provider received all three original hashes in order.
+  Actual Pi 0.84.4 at 80x24 delivered a two-image native follow-up with both
+  original hashes. Both runtimes removed their temporary assets on quit. No
+  draft tokens leaked into the saved session. A fresh Pi runtime recalled the
+  historical text labels; the Claude reference probe above corrected the earlier
+  assumption that restart recall should automatically reattach images.
 - Resume controls tests cover branch indexing beyond the visible window,
   selection stability, search/scope combinations, unavailable Git, unreadable
   files, queue replacement, aborts and stale results. Rename tests cover native

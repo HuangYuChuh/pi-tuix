@@ -224,12 +224,19 @@ images retain their tool summary without an extra attachment branch; other tool
 images keep unnumbered links. Width/theme/link-state caches cover stable prompts.
 The same rendered document supplies native search, prompt navigation and link
 activation. Deferred persistence refreshes and asset loads cancel on unmount.
-The editor handles an explicitly pasted single image path through a bounded file
+The editor handles explicitly pasted image paths through bounded file
 read outside rendering. It accepts PNG/JPEG/GIF/WebP headers with positive
 reported dimensions, regular files up to 20 MiB, and a 128 MiB per-runtime draft
 budget. An unrecognized path stays as ordinary pasted text. Quoted, shell-escaped,
 relative, home and file-URL paths are supported. Native clipboard callbacks still
 own clipboard access; their public `insertTextAtCursor` call enters the same path.
+For multiple paths, a pure tokenizer accepts absolute, home and file-URL tokens
+with quoted or escaped spaces. It does not evaluate shell syntax. Limits of 64
+paths and 64 KiB of path-list text bound parsing and file operations. A path list
+containing ordinary prose stays as text. Valid images receive tokens in source
+order, separated by one space; unavailable and non-image paths retain their raw
+spelling. Remaining draft capacity bounds each read before allocation. The whole
+batch enters the native editor in one insertion, preserving a single undo step.
 
 Each chip occupies one private-use Unicode grapheme in the native editor buffer.
 Native movement, deletion, kill/yank and undo therefore retain atomic image
@@ -256,8 +263,12 @@ The native external-editor action receives readable labels; its public `setText`
 callback restores surviving known labels to their image identities. Disabling the
 extension expands remaining draft chips to readable source paths before restoring
 the host editor. This also preserves the contents of native collapsed text pastes.
-Multi-file path paste, image history reconstruction after a new runtime, and
-native commands that consume arguments before the input event need further work.
+After a new runtime, Pi recalls historical labels as text without automatically
+reattaching image bytes. The sampled Claude history recall also submits text only,
+although it moves across those labels atomically. That atomic history-label
+behavior and native commands consuming arguments before the input event need
+further work. Quoted path-list acceptance and retaining unavailable paths are
+documented differences from the sampled reference parser.
 
 The main view composes reversible presentation containers into the public
 document tree. A version-local adapter recognizes public

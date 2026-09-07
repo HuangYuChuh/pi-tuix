@@ -6,6 +6,7 @@ import type { ImageContent } from "@earendil-works/pi-ai";
 import type { InputEvent, InputEventResult, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { getImageDimensions } from "@earendil-works/pi-tui";
 import { collectImages, type PrepareImages } from "../../session/image-attachments.ts";
+import { splitPastedPaths } from "./image-paths.ts";
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_DRAFT_BYTES = 128 * 1024 * 1024;
@@ -25,16 +26,30 @@ export interface DraftImage {
   url?: string;
 }
 
+type CapturedImage = Omit<DraftImage, "token" | "number">;
+
 /** Read only an explicitly pasted single image path, outside all rendering. */
 export function readPastedImage(
   text: string,
   cwd: string,
-): Omit<DraftImage, "token" | "number"> | undefined {
+  maxBytes = MAX_IMAGE_BYTES,
+): CapturedImage | undefined {
   let path = text.trim();
   if (!path || [...path].some((character) => character.charCodeAt(0) < 32)) return;
   if ((path.startsWith("'") && path.endsWith("'")) || (path.startsWith('"') && path.endsWith('"')))
     path = path.slice(1, -1);
   else path = path.replace(/\\([ ()[\]'"\\])/g, "$1");
+  return readImagePath(path, cwd, maxBytes);
+}
+
+function readImagePath(
+  path: string,
+  cwd: string,
+  maxBytes = MAX_IMAGE_BYTES,
+): CapturedImage | undefined {
+  const limit = Math.min(MAX_IMAGE_BYTES, maxBytes);
+  if (limit <= 0) return;
+  if ([...path].some((character) => character.charCodeAt(0) < 32)) return;
   try {
     if (path.startsWith("file:")) path = fileURLToPath(path);
     if (path.startsWith("~/")) path = resolve(homedir(), path.slice(2));
@@ -42,13 +57,13 @@ export function readPastedImage(
     const mimeType = mimeTypes[extname(path).toLowerCase()];
     if (!mimeType) return;
     const stat = statSync(path);
-    if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_IMAGE_BYTES) return;
+    if (!stat.isFile() || stat.size <= 0 || stat.size > limit) return;
     // Nonblocking open and a second descriptor check also reject a path replaced
     // with a pipe/device between stat and open. Reads never exceed the bound.
     const fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK);
     try {
       const current = fstatSync(fd);
-      if (!current.isFile() || current.size <= 0 || current.size > MAX_IMAGE_BYTES) return;
+      if (!current.isFile() || current.size <= 0 || current.size > limit) return;
       const bytes = Buffer.alloc(current.size + 1);
       let size = 0;
       while (size < bytes.length) {
@@ -107,8 +122,22 @@ export class DraftImages {
 
   paste(text: string, cwd: string): string | undefined {
     if (this.closed) return;
-    const value = readPastedImage(text, cwd);
-    if (!value) return;
+    const value = readPastedImage(text, cwd, MAX_DRAFT_BYTES - this.bytes);
+    if (value) return this.attach(value);
+    const paths = splitPastedPaths(text);
+    if (!paths) return;
+    let changed = false;
+    const transformed = paths.map(({ raw, path }) => {
+      const image = readImagePath(path, cwd, MAX_DRAFT_BYTES - this.bytes);
+      const token = image ? this.attach(image) : undefined;
+      if (!token) return this.display(raw);
+      changed = true;
+      return token;
+    });
+    return changed ? transformed.join(" ") : undefined;
+  }
+
+  private attach(value: CapturedImage): string | undefined {
     const size = Buffer.byteLength(value.image.data, "base64");
     if (this.bytes + size > MAX_DRAFT_BYTES || this.nextToken >= 0xfffd) return;
     const token = String.fromCodePoint(0xf0000 + ++this.nextToken);

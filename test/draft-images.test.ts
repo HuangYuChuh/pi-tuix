@@ -21,6 +21,7 @@ import { contentText } from "../extensions/session/image-attachment-view.ts";
 import { collectImages } from "../extensions/session/image-attachments.ts";
 import { DraftImages, readPastedImage } from "../extensions/shell/open-tui/draft-images.ts";
 import { OpenTuiEditor } from "../extensions/shell/open-tui/editor.ts";
+import { splitPastedPaths } from "../extensions/shell/open-tui/image-paths.ts";
 
 const png =
   "iVBORw0KGgoAAAANSUhEUgAAAKAAAABgCAIAAAAVRe7OAAAA/klEQVR4nO3RQQ0AIRDAQDTdG00oRszJIOlOUgWddfce1XfuqNbz44ABAwYMGDDgET0/DhgwYMCAAQMeEeB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOMBjgc4HuB4gOP94QRk7Wn8KkUAAAAASUVORK5CYII=";
@@ -450,6 +451,121 @@ test("terminal text cannot impersonate an existing internal image token", () => 
     h.editor.setText("");
     h.editor.handleInput(token);
     assert.equal(h.editor.getText(), "[Image #1]");
+  } finally {
+    h.close();
+  }
+});
+
+test("multiple dropped paths become ordered image chips in one native undo step", () => {
+  const h = fixture();
+  try {
+    const gif = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    const second = join(h.cwd, "second.gif");
+    writeFileSync(second, Buffer.from(gif, "base64"));
+    h.editor.handleInput("Before ");
+    h.paste(`${h.path.replaceAll(" ", "\\ ")}\r\n${second}\t${JSON.stringify(h.path)}`);
+    const raw = h.editor.getText();
+    assert.equal(h.images.display(raw), "Before [Image #1] [Image #2] [Image #3]");
+    const sent = h.images.transform({ type: "input", text: raw, source: "interactive" });
+    assert.equal(sent.action, "transform");
+    if (sent.action !== "transform") assert.fail();
+    assert.deepEqual(
+      sent.images?.map(({ data, mimeType }) => [data, mimeType]),
+      [
+        [png, "image/png"],
+        [gif, "image/gif"],
+        [png, "image/png"],
+      ],
+    );
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getText(), "Before ");
+    h.paste(`${JSON.stringify(h.path)} ${JSON.stringify(h.path)}`);
+    assert.equal(h.images.display(h.editor.getText()), "Before [Image #4] [Image #5]");
+    h.editor.handleInput("\x7f");
+    assert.equal(h.images.display(h.editor.getText()), "Before [Image #4] ");
+    h.editor.handleInput("\x1f");
+    assert.equal(h.images.display(h.editor.getText()), "Before [Image #4] [Image #5]");
+    for (const width of [1, 3, 8, 20, 40, 100])
+      assert.ok(h.editor.render(width).every((line) => visibleWidth(line) <= width));
+  } finally {
+    h.close();
+  }
+});
+
+test("file-list parsing preserves quoted paths and never expands shell expressions", () => {
+  const input = String.raw`'/tmp/one two.png' /tmp/three\ four.png "file:///tmp/five%20six.png" ~/seven.png /tmp/\$TOKEN.png '/tmp/$(command).png'`;
+  const paths = splitPastedPaths(input);
+  assert.deepEqual(
+    paths?.map(({ path }) => path),
+    [
+      "/tmp/one two.png",
+      "/tmp/three four.png",
+      "file:///tmp/five%20six.png",
+      "~/seven.png",
+      "/tmp/$TOKEN.png",
+      "/tmp/$(command).png",
+    ],
+  );
+  for (const text of [
+    "/tmp/one.png please",
+    "Compare /tmp/one.png /tmp/two.png",
+    "one.png two.png",
+    "'/tmp/unclosed.png /tmp/two.png",
+    "/tmp/one.png /tmp/dangling\\",
+    "/tmp/one.png\x1b /tmp/two.png",
+    Array(65).fill("/tmp/one.png").join(" "),
+    `/tmp/${"a".repeat(64 * 1024)}.png /tmp/two.png`,
+  ])
+    assert.equal(splitPastedPaths(text), undefined);
+});
+
+test("mixed file drops retain unavailable and non-image paths without losing the valid image", () => {
+  const h = fixture();
+  try {
+    const note = join(h.cwd, "note.txt");
+    const invalid = join(h.cwd, "invalid.png");
+    const missing = join(h.cwd, "missing.png");
+    writeFileSync(note, "text file");
+    writeFileSync(invalid, "not a PNG");
+    h.paste([h.path, note, invalid, missing].map((path) => JSON.stringify(path)).join(" "));
+    assert.equal(
+      h.images.display(h.editor.getText()),
+      `[Image #1] ${JSON.stringify(note)} ${JSON.stringify(invalid)} ${JSON.stringify(missing)}`,
+    );
+    const sent = h.images.transform({
+      type: "input",
+      text: h.editor.getText(),
+      source: "interactive",
+    });
+    assert.equal(sent.action, "transform");
+    if (sent.action !== "transform") assert.fail();
+    assert.equal(sent.images?.length, 1);
+    assert.equal(sent.images?.[0].data, png);
+    h.editor.restoreImagePaths();
+    for (const path of [h.path, note, invalid, missing])
+      assert.ok(h.editor.getText().includes(path));
+  } finally {
+    h.close();
+  }
+});
+
+test("ordinary prose, malformed lists and excessive file drops stay unchanged and consume no numbers", () => {
+  const h = fixture();
+  try {
+    for (const text of [
+      `Compare ${JSON.stringify(h.path)} please`,
+      `${JSON.stringify(h.path)} '/unclosed.png`,
+      Array(65).fill(JSON.stringify(h.path)).join(" "),
+    ]) {
+      h.paste(text);
+      assert.equal(h.editor.getExpandedText(), text);
+      assert.equal(h.images.has(h.editor.getText()), false);
+      h.editor.setText("");
+    }
+    h.paste();
+    assert.equal(h.images.display(h.editor.getText()), "[Image #1]");
+    assert.equal(readPastedImage(h.path, h.cwd, bytes.length - 1), undefined);
+    assert.equal(readPastedImage(h.path, h.cwd, bytes.length)?.image.data, png);
   } finally {
     h.close();
   }
