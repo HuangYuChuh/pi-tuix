@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-08-27
 
 ### Overview
-First stable release of Pi-TUIX, published to npm with the `latest` dist-tag.
+First tagged source release of Pi-TUIX. The npm package has not been published.
 
 ### Added
 - Engineering infrastructure
@@ -114,9 +114,8 @@ First stable release of Pi-TUIX, published to npm with the `latest` dist-tag.
 - Pi Coding Agent >= 0.84.0
 
 ### Installation
-```bash
-pi install npm:pi-tuix@0.1.0
-```
+
+Use a local checkout until an npm release is announced; see [README.md](README.md).
 
 ### Known Limitations
 - Approval UI is not implemented because no supported public Pi API is available yet
