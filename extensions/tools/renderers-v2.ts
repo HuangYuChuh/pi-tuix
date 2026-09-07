@@ -11,10 +11,18 @@ import {
   type ExtensionAPI,
   type ReadToolDetails,
   type ReadToolInput,
+  renderDiff,
   type Theme,
   type ToolRenderResultOptions,
   type WriteToolInput,
 } from "@earendil-works/pi-coding-agent";
+import {
+  Box,
+  type Component,
+  sliceByColumn,
+  stripTerminalSequences,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 import {
   type DisplayMode,
   diffStats,
@@ -28,6 +36,7 @@ import {
 export interface ToolRendererMode {
   enabled: boolean;
   defaultMode: DisplayMode; // collapsed | preview | expanded
+  observe?: (toolCallId: string, invalidate: () => void) => void;
 }
 
 type ReadDefinition = ReturnType<typeof createReadToolDefinition>;
@@ -37,9 +46,43 @@ type WriteDefinition = ReturnType<typeof createWriteToolDefinition>;
 
 // ===== 辅助函数 =====
 
-function contextForOriginal<T extends { lastComponent: unknown }>(context: T): T {
-  if (!(context.lastComponent instanceof ThreeLayerToolView)) return context;
-  return { ...context, lastComponent: undefined };
+const emptyResult: Component = { render: () => [], invalidate() {} };
+
+function renderOriginal<
+  T extends { state: unknown; lastComponent: unknown; isPartial: boolean; isError: boolean },
+>(
+  slot: "call" | "result",
+  context: T,
+  theme: Theme,
+  shell: "self" | "default" | undefined,
+  render: (context: T) => Component,
+): Component {
+  const state = context.state as SharedPresentationState;
+  const component = render({
+    ...context,
+    lastComponent: slot === "call" ? state.pituixNativeCall : state.pituixNativeResult,
+  });
+  if (slot === "call") state.pituixNativeCall = component;
+  else {
+    state.pituixNativeResult = component;
+    state.pituixNativePartial = context.isPartial;
+  }
+  if (shell === "self") return component;
+
+  // Pi 0.84 keeps the original shell container attached after renderShell changes.
+  // Keep "self" stable and compose the native default frame with public components.
+  state.pituixNativeBox ??= new Box(1, 1);
+  const box = state.pituixNativeBox;
+  const background = context.isPartial
+    ? "toolPendingBg"
+    : context.isError
+      ? "toolErrorBg"
+      : "toolSuccessBg";
+  box.setBgFn((text) => theme.bg(background, text));
+  box.clear();
+  if (state.pituixNativeCall) box.addChild(state.pituixNativeCall);
+  if (state.pituixNativeResult) box.addChild(state.pituixNativeResult);
+  return slot === "call" ? box : emptyResult;
 }
 
 function cleanSingleLine(value: unknown, fallback: string): string {
@@ -97,16 +140,39 @@ function formatLines(lines: string[], theme: Theme): string[] {
   return lines.map((line) => theme.fg("toolOutput", line));
 }
 
-function formatDiff(diff: string, theme: Theme): string[] {
-  return splitLines(diff).map((line) => {
-    if (line.startsWith("+") && !line.startsWith("+++")) return theme.fg("success", line);
-    if (line.startsWith("-") && !line.startsWith("---")) return theme.fg("error", line);
-    return theme.fg("toolOutput", line);
+function numberedLines(content: string, theme: Theme): string[] {
+  const lines = splitLines(content);
+  if (lines.at(-1) === "") lines.pop();
+  const digits = Math.max(2, String(lines.length).length);
+  return lines.map(
+    (line, index) =>
+      `${theme.fg("dim", String(index + 1).padStart(digits))} ${theme.fg("toolOutput", line)}`,
+  );
+}
+
+function numberedDiff(diff: string, theme: Theme): string[] {
+  const rows = splitLines(renderDiff(diff)).map((styled) => ({
+    styled,
+    prefix: stripTerminalSequences(styled).match(/^([+ -])(\s*\d+) /),
+  }));
+  const digits = Math.max(2, ...rows.map(({ prefix }) => prefix?.[2].trim().length ?? 0));
+  return rows.map(({ styled, prefix }) => {
+    // Unknown host formats retain their original presentation.
+    if (!prefix) return styled;
+    const sign = prefix[1];
+    const color =
+      sign === "+" ? "toolDiffAdded" : sign === "-" ? "toolDiffRemoved" : "toolDiffContext";
+    const body = sliceByColumn(styled, prefix[0].length, visibleWidth(styled));
+    return `${theme.fg("dim", prefix[2].trim().padStart(digits))} ${theme.fg(color, sign)}${body}`;
   });
 }
 
 interface SharedPresentationState {
   pituixHasResult?: boolean;
+  pituixNativeCall?: Component;
+  pituixNativeResult?: Component;
+  pituixNativeBox?: Box;
+  pituixNativePartial?: boolean;
 }
 
 class PendingToolView extends ThreeLayerToolView {
@@ -129,12 +195,14 @@ export function createThreeLayerReadDefinition(
 ): ReadDefinition {
   return {
     ...original,
-    get renderShell() {
-      return mode.enabled ? "self" : original.renderShell;
-    },
+    renderShell: "self",
     renderCall(args: ReadToolInput, theme, context) {
-      if (!mode.enabled && original.renderCall) {
-        return original.renderCall(args, theme, contextForOriginal(context));
+      mode.observe?.(context.toolCallId, context.invalidate);
+      const nativeCall = original.renderCall;
+      if (!mode.enabled && nativeCall) {
+        return renderOriginal("call", context, theme, original.renderShell, (nativeContext) =>
+          nativeCall(args, theme, nativeContext),
+        );
       }
 
       const range =
@@ -158,8 +226,19 @@ export function createThreeLayerReadDefinition(
     },
 
     renderResult(result, options, theme, context) {
-      if (!mode.enabled && original.renderResult) {
-        return original.renderResult(result, options, theme, contextForOriginal(context));
+      mode.observe?.(context.toolCallId, context.invalidate);
+      const nativeResult = original.renderResult;
+      const shared = context.state as SharedPresentationState;
+      if (nativeResult && (!mode.enabled || (shared.pituixNativePartial && !options.isPartial))) {
+        // A native running renderer must receive completion even after a UI mode switch.
+        const native = renderOriginal(
+          "result",
+          context,
+          theme,
+          original.renderShell,
+          (nativeContext) => nativeResult(result, options, theme, nativeContext),
+        );
+        if (!mode.enabled) return native;
       }
 
       (context.state as unknown as SharedPresentationState).pituixHasResult = true;
@@ -185,6 +264,10 @@ export function createThreeLayerReadDefinition(
         status: state,
         meta,
         attention: context.isError,
+        resultSummary: context.isError
+          ? undefined
+          : `${state === "OK" ? "Read" : "Reading"} ${meta}`,
+        previewDetails: context.isError,
       };
 
       // 决定显示模式
@@ -207,12 +290,14 @@ export function createThreeLayerBashDefinition(
 ): BashDefinition {
   return {
     ...original,
-    get renderShell() {
-      return mode.enabled ? "self" : original.renderShell;
-    },
+    renderShell: "self",
     renderCall(args: BashToolInput, theme, context) {
-      if (!mode.enabled && original.renderCall) {
-        return original.renderCall(args, theme, contextForOriginal(context));
+      mode.observe?.(context.toolCallId, context.invalidate);
+      const nativeCall = original.renderCall;
+      if (!mode.enabled && nativeCall) {
+        return renderOriginal("call", context, theme, original.renderShell, (nativeContext) =>
+          nativeCall(args, theme, nativeContext),
+        );
       }
 
       const meta = args.timeout ? `timeout ${args.timeout}s` : undefined;
@@ -232,8 +317,19 @@ export function createThreeLayerBashDefinition(
     },
 
     renderResult(result, options, theme, context) {
-      if (!mode.enabled && original.renderResult) {
-        return original.renderResult(result, options, theme, contextForOriginal(context));
+      mode.observe?.(context.toolCallId, context.invalidate);
+      const nativeResult = original.renderResult;
+      const shared = context.state as SharedPresentationState;
+      if (nativeResult && (!mode.enabled || (shared.pituixNativePartial && !options.isPartial))) {
+        // A native running renderer must receive completion even after a UI mode switch.
+        const native = renderOriginal(
+          "result",
+          context,
+          theme,
+          original.renderShell,
+          (nativeContext) => nativeResult(result, options, theme, nativeContext),
+        );
+        if (!mode.enabled) return native;
       }
 
       (context.state as unknown as SharedPresentationState).pituixHasResult = true;
@@ -272,17 +368,19 @@ export function createThreeLayerEditDefinition(
 ): EditDefinition {
   return {
     ...original,
-    get renderShell() {
-      return mode.enabled ? "self" : original.renderShell;
-    },
+    renderShell: "self",
     renderCall(args: EditToolInput, theme, context) {
-      if (!mode.enabled && original.renderCall) {
-        return original.renderCall(args, theme, contextForOriginal(context));
+      mode.observe?.(context.toolCallId, context.invalidate);
+      const nativeCall = original.renderCall;
+      if (!mode.enabled && nativeCall) {
+        return renderOriginal("call", context, theme, original.renderShell, (nativeContext) =>
+          nativeCall(args, theme, nativeContext),
+        );
       }
 
       const count = Array.isArray(args.edits) ? args.edits.length : 0;
       const summary: ToolSummary = {
-        action: "edit",
+        action: "update",
         target: truncatePath(cleanSingleLine(args.path, "(path pending)"), 56),
         status: callState(context),
         meta: `${count} replacement${count === 1 ? "" : "s"}`,
@@ -297,8 +395,19 @@ export function createThreeLayerEditDefinition(
     },
 
     renderResult(result, options, theme, context) {
-      if (!mode.enabled && original.renderResult) {
-        return original.renderResult(result, options, theme, contextForOriginal(context));
+      mode.observe?.(context.toolCallId, context.invalidate);
+      const nativeResult = original.renderResult;
+      const shared = context.state as SharedPresentationState;
+      if (nativeResult && (!mode.enabled || (shared.pituixNativePartial && !options.isPartial))) {
+        // A native running renderer must receive completion even after a UI mode switch.
+        const native = renderOriginal(
+          "result",
+          context,
+          theme,
+          original.renderShell,
+          (nativeContext) => nativeResult(result, options, theme, nativeContext),
+        );
+        if (!mode.enabled) return native;
       }
 
       (context.state as unknown as SharedPresentationState).pituixHasResult = true;
@@ -315,18 +424,22 @@ export function createThreeLayerEditDefinition(
           : "applied";
 
       const summary: ToolSummary = {
-        action: "edit",
+        action: "update",
         target: truncatePath(cleanSingleLine(args.path, "(unknown path)"), 56),
         status: state,
         meta,
         attention: context.isError,
+        resultSummary:
+          state === "OK" && stats
+            ? `Added ${stats.additions} line${stats.additions === 1 ? "" : "s"}, removed ${stats.removals} line${stats.removals === 1 ? "" : "s"}`
+            : undefined,
       };
 
       const displayMode: DisplayMode = options.expanded ? "expanded" : mode.defaultMode;
 
       // 详情：优先显示 diff，否则显示错误输出
       const detailLines = details?.diff
-        ? formatDiff(details.diff, theme)
+        ? numberedDiff(details.diff, theme)
         : context.isError
           ? formatLines(splitLines(output), theme)
           : [];
@@ -345,12 +458,14 @@ export function createThreeLayerWriteDefinition(
 ): WriteDefinition {
   return {
     ...original,
-    get renderShell() {
-      return mode.enabled ? "self" : original.renderShell;
-    },
+    renderShell: "self",
     renderCall(args: WriteToolInput, theme, context) {
-      if (!mode.enabled && original.renderCall) {
-        return original.renderCall(args, theme, contextForOriginal(context));
+      mode.observe?.(context.toolCallId, context.invalidate);
+      const nativeCall = original.renderCall;
+      if (!mode.enabled && nativeCall) {
+        return renderOriginal("call", context, theme, original.renderShell, (nativeContext) =>
+          nativeCall(args, theme, nativeContext),
+        );
       }
 
       const content = typeof args.content === "string" ? args.content : "";
@@ -371,18 +486,33 @@ export function createThreeLayerWriteDefinition(
     },
 
     renderResult(result, options, theme, context) {
-      if (!mode.enabled && original.renderResult) {
-        return original.renderResult(result, options, theme, contextForOriginal(context));
+      mode.observe?.(context.toolCallId, context.invalidate);
+      const nativeResult = original.renderResult;
+      const shared = context.state as SharedPresentationState;
+      if (nativeResult && (!mode.enabled || (shared.pituixNativePartial && !options.isPartial))) {
+        // A native running renderer must receive completion even after a UI mode switch.
+        const native = renderOriginal(
+          "result",
+          context,
+          theme,
+          original.renderShell,
+          (nativeContext) => nativeResult(result, options, theme, nativeContext),
+        );
+        if (!mode.enabled) return native;
       }
 
       (context.state as unknown as SharedPresentationState).pituixHasResult = true;
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const args = context.args as WriteToolInput;
+      const contentLines = numberedLines(
+        typeof args.content === "string" ? args.content : "",
+        theme,
+      );
 
       const meta = context.isError
         ? extractErrorSummary(output)
-        : `${readLineCount(args.content)} lines written`;
+        : `${contentLines.length} lines written`;
 
       const summary: ToolSummary = {
         action: "write",
@@ -390,10 +520,13 @@ export function createThreeLayerWriteDefinition(
         status: state,
         meta,
         attention: context.isError,
+        resultSummary: context.isError
+          ? undefined
+          : `${state === "OK" ? "Wrote" : "Writing"} ${contentLines.length} line${contentLines.length === 1 ? "" : "s"} to ${cleanSingleLine(args.path, "(unknown path)")}`,
       };
 
-      const displayMode: DisplayMode = options.expanded ? "expanded" : "collapsed";
-      const detailLines = context.isError ? formatLines(splitLines(output), theme) : [];
+      const displayMode: DisplayMode = options.expanded ? "expanded" : mode.defaultMode;
+      const detailLines = context.isError ? formatLines(splitLines(output), theme) : contentLines;
 
       return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
     },
@@ -406,9 +539,19 @@ export function registerThreeLayerToolRenderers(
   pi: ExtensionAPI,
   mode: ToolRendererMode,
   cwd: string = process.cwd(),
-): void {
+) {
+  const invalidators = new Map<string, () => void>();
+  mode.observe = (id, invalidate) => invalidators.set(id, invalidate);
   pi.registerTool(createThreeLayerReadDefinition(cwd, mode));
   pi.registerTool(createThreeLayerBashDefinition(cwd, mode));
   pi.registerTool(createThreeLayerEditDefinition(cwd, mode));
   pi.registerTool(createThreeLayerWriteDefinition(cwd, mode));
+  return {
+    invalidate() {
+      for (const invalidate of invalidators.values()) invalidate();
+    },
+    clear() {
+      invalidators.clear();
+    },
+  };
 }

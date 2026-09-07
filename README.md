@@ -52,7 +52,7 @@ The editor extends Pi's public `CustomEditor`, preserving submission, history, a
 
 The effective thinking level appears above the prompt with Pi's configured shortcut. `/pituix-settings` opens searchable preference tabs: type to filter, press Enter to select a result, then Enter or Space to change it. Tab switches categories; Escape clears the query, leaves search, then closes the page.
 
-Each tool row keeps the action, target, state, and attention signal visible. The default preview shows the first and last two detail lines; collapsed mode keeps only the summary, and expanded mode reveals the full output or diff. Read and Bash results summarize output size, Edit reports diff statistics, and Write reports the written line count. All views use ANSI-aware width constraints.
+Each tool row keeps the action, target, state, and attention signal visible. Read defaults to a line-count result branch; Bash shows output, Edit uses an `Update` heading with a numbered diff, and Write previews numbered content. Long previews show the first and last two detail lines. Collapsed mode keeps the summary; expanded mode reveals the full output or diff, including Read contents. Errors retain their details. All views use ANSI-aware width constraints.
 
 These commands are reversible:
 

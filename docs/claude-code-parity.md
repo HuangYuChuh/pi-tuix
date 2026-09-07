@@ -105,7 +105,7 @@ colors retain Pi-TUIX's existing accessible palette.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented; spinner frames are an approximation |
 | Queued follow-up count | `input` events, `setStatus` | Observational count; Pi owns delivery |
-| Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state` | Earlier compact adaptation implemented; observed grouping, result branches, write preview and diff details still need alignment |
+| Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state`, public `renderDiff` | Result branches, compact Read counts, numbered Write previews and Update diffs implemented; adjacent-call grouping remains incomplete |
 | Tool expansion | `options.expanded`, configured `app.tools.expand` | Implemented; no invented E binding |
 | Execution, errors, cancellation | Original tool `execute` functions | Delegated unchanged |
 | Default UI restoration | Public unset/reset methods | Implemented and tested |
@@ -119,6 +119,12 @@ colors retain Pi-TUIX's existing accessible palette.
 
 Pi exposes `ui_prompt_start` and `ui_prompt_end` for blocking extension prompts.
 They do not provide a replacement renderer for all host permission decisions.
+
+Tool headings retain explicit status and attention text for accessibility.
+Expanded Read can reveal the file body, an intentional Pi-TUIX affordance beyond
+the observed reference count-only result. Diff layout follows the reference
+number/marker order, while word highlighting uses Pi's public formatter rather
+than reproducing Claude's syntax palette exactly.
 
 ## Validation
 
@@ -138,9 +144,17 @@ They do not provide a replacement renderer for all host permission decisions.
   check verified that confirming medium effort updates the prompt indicator.
 - Exact execution-function identity tests for all four overridden tools, plus
   running/success/error/cancellation, expansion, and shared-row replacement tests.
+- Public `ToolExecutionComponent` tests compare restored native frames and
+  results for all four tools, including errors, expansion and narrow widths.
+  An actual official Edit execution verifies the changed file and unchanged
+  result payload. Mode switches also test completion of a native partial renderer.
 - Interactive Pi full-screen smoke test at 100x40 with an isolated agent directory.
   An isolated display-only provider fixture exposes a reasoning model for effort
   rendering; it sends no requests and is not part of the package.
+- A separate scripted provider fixture drives real Pi Read/Bash/Edit/Write
+  execution and an exit-code-7 error in a disposable directory. It validates
+  result branches, expansion and native restoration through the actual host;
+  it is a deterministic UI test, not a successful Pi model-network request.
 - Successful Claude Read/Bash/Edit/Write calls and approval dialogs are now
   observed. Full cross-product visual parity remains incomplete; the tool
   presentation gaps above are based on these authenticated observations.

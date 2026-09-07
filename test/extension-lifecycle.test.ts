@@ -4,6 +4,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
   KeybindingsManager,
+  ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import {
   type EditorComponent,
@@ -18,13 +19,14 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   const handlers = new Map<string, (...args: any[]) => any>();
   // biome-ignore lint/suspicious/noExplicitAny: Test mock types
   const commands = new Map<string, { handler: (...args: any[]) => Promise<void> }>();
+  const tools: ToolDefinition[] = [];
   const pi = {
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
     on: (event: string, handler: (...args: any[]) => any) => handlers.set(event, handler),
     // biome-ignore lint/suspicious/noExplicitAny: Test mock types
     registerCommand: (name: string, definition: { handler: (...args: any[]) => Promise<void> }) =>
       commands.set(name, definition),
-    registerTool: () => {},
+    registerTool: (tool: ToolDefinition) => tools.push(tool),
     sendUserMessage: () => {},
   } as unknown as ExtensionAPI;
 
@@ -93,11 +95,26 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   await handlers.get("agent_end")?.({ type: "agent_end" }, context);
   assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /^[-─]+$/);
 
+  let toolRedraws = 0;
+  const tool = tools.at(-1);
+  tool?.renderCall?.(
+    { path: "fixture", content: "example" },
+    { fg: (_token: string, text: string) => text } as never,
+    { toolCallId: "fixture", state: {}, invalidate: () => toolRedraws++ } as never,
+  );
+  await commands.get("pituix-mode")?.handler("collapsed", context);
+  assert.equal(toolRedraws, 1);
+  await commands.get("pituix-mode")?.handler("preview", context);
+  assert.equal(toolRedraws, 2);
   await commands.get("pituix-default")?.handler("", context);
+  assert.equal(toolRedraws, 3);
   assert.equal(editorFactories.at(-1), undefined);
   assert.equal(ui.theme, originalTheme);
   assert.equal(workingMessages.at(-1), undefined);
   assert.equal(commands.has("pituix-settings"), true);
+  await handlers.get("session_shutdown")?.({ type: "session_shutdown" }, context);
+  await commands.get("pituix-mode")?.handler("preview", context);
+  assert.equal(toolRedraws, 3);
 });
 
 test("queue commands delegate steering and follow-ups to Pi", async () => {

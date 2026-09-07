@@ -55,7 +55,7 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 
 输入框上方显示当前思考强度及 Pi 的实际快捷键。`/pituix-settings` 提供可搜索的设置页：输入关键词筛选，Enter 选中结果，再按 Enter 或空格修改；Tab 切换分类，Esc 依次清空搜索、离开搜索框、关闭页面。
 
-每个紧凑工具行都会明确显示动作、目标、状态和 `ATTENTION/CLEAR` 信号。Read 与 Bash 汇总输出规模，Edit 展示 diff 统计，Write 展示写入行数；展开后可查看经过 ANSI-aware 宽度约束的输出或 diff。
+每个紧凑工具行都会显示动作、目标、状态，并用 `ATTENTION` 标出需要关注的错误。Read 默认只显示行数摘要，Bash 显示输出，Edit 使用 `Update` 标题和带行号的 diff，Write 预览带行号的正文。长预览保留前后各两行；collapsed 仅保留摘要，expanded 展示完整输出或 diff，也可以展开 Read 正文。错误保留详情，所有视图均使用 ANSI-aware 宽度约束。
 
 以下命令均可逆：
 

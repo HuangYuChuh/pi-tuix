@@ -38,7 +38,7 @@ The prototype intentionally uses only public hooks:
 - `ctx.ui.setTitle()` for terminal identity;
 - `pi.registerCommand()` for reversible toggles.
 
-Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` delegation pattern. Pi-TUIX retains each original public tool definition and exact `execute()` function while replacing only `renderCall()` and `renderResult()` when its UI mode is active. `/pituix-default` switches future tool rendering back to the original Pi renderer in the same session.
+Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` delegation pattern. Pi-TUIX retains each original public tool definition and exact `execute()` function while replacing only presentation. `/pituix-default` restores existing and future tool rows using the original Pi renderers in the same session.
 
 Workflow status shows the current phase, active tool, completed and failed tool counts, and queued follow-up messages. It resets for each agent run and never changes Pi's queue, tool inputs, or execution behavior.
 
@@ -78,9 +78,21 @@ then `pi.setModel` and `pi.setThinkingLevel` apply them. Authentication, model
 availability, effective effort and persistence remain Pi-owned. The native
 `/model` command is preserved.
 
-Tool definitions use the public `renderShell: "self"` option while enabled.
+Tool definitions keep the public `renderShell: "self"` option stable.
 Their call and result components share a small presentation flag through the
 public `context.state`: once a result is rendered, the pending call row becomes
-empty. Execution functions, argument schemas, and permission behavior are
+empty. Pi 0.84 retains the shell container attached at tool-row creation, so
+changing `renderShell` alone leaves stale rows. When disabled, the adapter calls
+the original renderers and composes their default frame with the public `Box`
+component; native self-rendered tools retain their own frame. Mode changes use
+each row's public `context.invalidate` callback, tracked by tool-call ID and
+cleared at session start/shutdown. A native partial renderer still receives its
+final result after a mode switch so its own timers can settle.
+
+Read previews show a count, Write previews add line numbers, and Edit uses the
+public `renderDiff` formatter for word highlights. A guarded presentation
+adapter moves recognized diff line numbers before the change marker while
+preserving ANSI sequences; unrecognized formats pass through unchanged.
+Execution functions, argument schemas, and permission behavior are
 unchanged. Other extensions' MCP tools and built-in transcript components remain
 host-owned. No new runtime dependency or private host patch is introduced.
