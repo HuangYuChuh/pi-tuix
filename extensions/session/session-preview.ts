@@ -14,6 +14,7 @@ import type { Component, TUI } from "@earendil-works/pi-tui";
 import { renderStartupHeader } from "../shell/open-tui/header.ts";
 import { COMPLETION_ENTRY_TYPE, readCompletionEntry } from "../stream/completion-entry.ts";
 import type { ImageLinks } from "./image-attachments.ts";
+import { withImageNumberMetadata } from "./image-number-metadata.ts";
 import { messageText } from "./message-view.ts";
 import { TranscriptContent } from "./transcript-view.ts";
 
@@ -64,7 +65,7 @@ export function parseSessionPreview(content: string, session: SessionInfo): Sess
     seen.set(entry.id, entry);
   }
   const context = buildSessionContext(entries);
-  const projected = buildContextEntries(entries);
+  const projected = withImageNumberMetadata(buildContextEntries(entries), entries);
   // Read the public parent links before compaction projects older UI metadata
   // away. Never take a branch observation from an abandoned conversation path.
   let gitBranch: string | undefined;

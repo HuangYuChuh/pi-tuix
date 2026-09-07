@@ -147,3 +147,13 @@ test("aborted preparations reject before and during file I/O and shutdown waits 
     await cache.dispose();
   }
 });
+
+test("malformed text blocks in imported image messages do not break attachment collection", () => {
+  const source = {
+    ...entry("imported"),
+    message: { role: "user", timestamp: 0, content: [null, { type: "text", text: 42 }, image()] },
+  } as unknown as SessionEntry;
+  const images = collectImages([source]);
+  assert.equal(images.length, 1);
+  assert.equal(images[0].number, 1);
+});

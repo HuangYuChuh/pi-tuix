@@ -11,6 +11,11 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, type TUI, visibleWidth } from "@earendil-works/pi-tui";
+import { collectImages } from "../extensions/session/image-attachments.ts";
+import {
+  IMAGE_NUMBERS_ENTRY_TYPE,
+  imageContentFingerprint,
+} from "../extensions/session/image-number-metadata.ts";
 import {
   loadSessionMetadata,
   loadSessionPreview,
@@ -127,6 +132,43 @@ function fixture() {
       .join("\n");
   return { manager, session, json };
 }
+
+test("saved preview keeps exact image numbers across a compaction boundary without rewriting records", () => {
+  const f = fixture();
+  const message = {
+    role: "user" as const,
+    timestamp: 456,
+    content: [
+      { type: "text" as const, text: "Literal [Image #300] [Image #301]" },
+      { type: "image" as const, mimeType: "image/png", data: "not-decoded" },
+    ],
+  };
+  f.manager.appendCustomEntry(IMAGE_NUMBERS_ENTRY_TYPE, {
+    version: 1,
+    timestamp: 456,
+    fingerprint: imageContentFingerprint(message.content),
+    numbers: [301],
+  });
+  const kept = f.manager.appendMessage(message);
+  f.manager.appendCompaction("recorded summary", kept, 1000);
+  const before = f.json();
+  const snapshot = parseSessionPreview(before, f.session);
+  assert.deepEqual(
+    collectImages(snapshot.entries).map((image) => image.number),
+    [301],
+  );
+  const view = new SessionPreviewContent(snapshot, theme, { requestRender() {} } as TUI);
+  for (const width of [12, 24, 80, 100]) {
+    const lines = view.render(width);
+    assert.ok(lines.every((line) => visibleWidth(line) <= width));
+    assert.doesNotMatch(
+      lines.map(stripTerminalSequences).join("\n"),
+      /pi-tuix-image-numbers|fingerprint/,
+    );
+  }
+  assert.match(view.render(80).map(stripTerminalSequences).join("\n"), /⎿.*\[Image #301\]/);
+  assert.equal(f.json(), before);
+});
 
 test("saved preview renders recorded tools separately, diffs, metadata, media labels and completion without executing", () => {
   const f = fixture();

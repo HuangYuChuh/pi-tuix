@@ -5,11 +5,18 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { getImageDimensions } from "@earendil-works/pi-tui";
+import {
+  IMAGE_NUMBERS_ENTRY_TYPE,
+  type ImageNumberData,
+  imageContentFingerprint,
+  readImageNumberData,
+} from "./image-number-metadata.ts";
 
 export interface ImageAttachment {
   entryId: string;
   key: string;
   number?: number;
+  inline?: boolean;
   mimeType: string;
   data: string;
 }
@@ -27,7 +34,12 @@ export function imageLabel(image: ImageAttachment): string {
 export function collectImages(entries: readonly SessionEntry[]): ImageAttachment[] {
   const images: ImageAttachment[] = [];
   let userNumber = 0;
+  let pendingNumbers: ImageNumberData | undefined;
   for (const entry of entries) {
+    if (entry.type === "custom" && entry.customType === IMAGE_NUMBERS_ENTRY_TYPE) {
+      pendingNumbers = readImageNumberData(entry.data);
+      continue;
+    }
     const content =
       entry.type === "message" && "content" in entry.message
         ? entry.message.content
@@ -36,14 +48,45 @@ export function collectImages(entries: readonly SessionEntry[]): ImageAttachment
           : undefined;
     if (entry.type === "message" && entry.message.role === "custom" && !entry.message.display)
       continue;
+    const user = entry.type === "message" && entry.message.role === "user";
+    const observed = user ? pendingNumbers : undefined;
+    if (user) pendingNumbers = undefined;
     if (!Array.isArray(content)) continue;
+    const imageCount = content.filter((part) => part?.type === "image").length;
+    const numbers =
+      observed?.numbers.length === imageCount &&
+      entry.type === "message" &&
+      "timestamp" in entry.message &&
+      observed.timestamp === entry.message.timestamp &&
+      observed.fingerprint === imageContentFingerprint(content)
+        ? observed.numbers
+        : undefined;
+    const labels = user
+      ? content.flatMap((part) =>
+          part?.type === "text" && typeof part.text === "string"
+            ? [...part.text.matchAll(/\[Image #(\d+)\]/g)].map((match) => Number(match[1]))
+            : [],
+        )
+      : [];
+    // Multiple references may name one attachment. Preserve the original
+    // one-label-per-block interpretation for older/foreign messages as well.
+    const positional = labels.length === imageCount ? labels : [...new Set(labels)];
+    const explicit =
+      positional.length === imageCount &&
+      positional.every((number) => Number.isSafeInteger(number) && number > 0);
+    let ordinal = 0;
     content.forEach((part, index) => {
       if (part?.type !== "image") return;
+      const known = numbers?.[ordinal];
+      const number = user ? (known ?? (explicit ? positional[ordinal] : ++userNumber)) : undefined;
+      ordinal++;
+      userNumber = Math.max(userNumber, number ?? 0);
       images.push({
         entryId: entry.id,
         key: `${entry.id}:${index}`,
-        number:
-          entry.type === "message" && entry.message.role === "user" ? ++userNumber : undefined,
+        number,
+        inline:
+          user && (explicit || (known !== null && known !== undefined && labels.includes(known))),
         mimeType: typeof part.mimeType === "string" ? part.mimeType : "",
         data: typeof part.data === "string" ? part.data : "",
       });

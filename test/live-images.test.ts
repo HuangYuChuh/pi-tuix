@@ -30,6 +30,10 @@ import {
   visibleWidth,
 } from "@earendil-works/pi-tui";
 import { collectImages, type PrepareImages } from "../extensions/session/image-attachments.ts";
+import {
+  IMAGE_NUMBERS_ENTRY_TYPE,
+  imageContentFingerprint,
+} from "../extensions/session/image-number-metadata.ts";
 import { LiveImagePresentation } from "../extensions/shell/open-tui/live-images.ts";
 import {
   LiveDocumentPresentation,
@@ -134,6 +138,37 @@ function setup(
     },
   };
 }
+
+test("live image numbering keeps exact annotations before and after native persistence", async () => {
+  const h = setup();
+  const text = "Literal [Image #300] [Image #301]";
+  const message = user([{ type: "text", text }, image]);
+  h.manager.appendCustomEntry(IMAGE_NUMBERS_ENTRY_TYPE, {
+    version: 1,
+    timestamp: 0,
+    fingerprint: imageContentFingerprint(message.content),
+    numbers: [301],
+  });
+  h.view.start(message, h.ctx);
+  h.chat.addChild(h.nativeUser(text).component);
+  try {
+    for (const width of [12, 24, 80, 100]) {
+      const lines = h.render(width);
+      assert.ok(lines.every((line) => visibleWidth(line) <= width));
+      assert.doesNotMatch(plain(lines), /\[Image #1\]/);
+    }
+    await tick();
+    assert.match(plain(h.render()), /Literal \[Image #300\] \[Image #301\]/);
+    assert.match(plain(h.render()), /⎿.*\[Image #301\]/);
+    h.manager.appendMessage(message);
+    h.view.end(message, h.ctx);
+    await tick();
+    assert.match(plain(h.render()), /⎿.*\[Image #301\]/);
+    assert.doesNotMatch(plain(h.render()), /pi-tuix-image-numbers|fingerprint/);
+  } finally {
+    h.view.dispose();
+  }
+});
 
 test("live images preserve chronological image-only prompts, repeated user text, tool links and native children", async () => {
   const h = setup();

@@ -18,7 +18,7 @@ export function contentText(
   const parts = content.map((part, index) => {
     if (part?.type === "text" && typeof part.text === "string") return part.text;
     const image = images.get(`${entryId}:${index}`);
-    if (image) return imageLabel(image);
+    if (image) return image.inline ? "" : imageLabel(image);
     return `[${messageText(String(part?.type ?? "attachment"))}${part?.mimeType ? `: ${messageText(String(part.mimeType))}` : ""}]`;
   });
   return content.some((part) => part?.type === "image")

@@ -75,8 +75,33 @@ Pasting the same file again produced `[Image #2]`: numbers count occurrences,
 not unique file contents. A subsequent Read of that same PNG rendered `Read 1
 file` in normal mode and `Read image (311 bytes)` in detailed mode, without an
 attachment row. Pasting another user image afterwards still produced `[Image #2]`.
-Tool-read images therefore do not consume user attachment numbers. No inline
-bitmap appeared in these sampled views.
+Tool-read images therefore do not consume user attachment numbers. A later draft
+probe inserted a chip between text, moved across it with one arrow press, deleted
+it with one Backspace, and restored it with Ctrl+_. Deleting `[Image #3]` then
+pasting again produced `[Image #4]`. Submitting the two surviving chips retained
+`[Image #2][Image #4]` in the prompt and attachment branches; the model correctly
+reported identical images. Draft deletion therefore leaves numbering gaps.
+No inline bitmap appeared in these sampled views.
+In a later process, Up recalled the same numbered prompt. One Right arrow crossed
+the complete `[Image #2]` label, but submitting the recalled prompt created no
+image attachment branches; the authenticated model reported no images attached.
+The saved user entry contained text only. Historical label editing therefore
+does not prove that image bytes will be attached again.
+A manually typed `[Image #999]`, with no corresponding attachment, had the same
+editing behavior: Right crossed it, Backspace removed it, Ctrl+_ restored it,
+and Alt+B moved to its beginning. Literal numbered labels are therefore atomic
+text spans independently of attachment data.
+
+Pasting two absolute image paths separated by spaces or newlines produced two
+chips separated by one space. Backslash-escaped spaces in a filename worked;
+submitting the resulting `[Image #16] [Image #17]` prompt displayed both attachment
+branches and the model correctly described the identical fixtures. A path list
+mixed with ordinary prose stayed text, as did two bare relative filenames.
+Two individually quoted paths stayed text in the clean sample. With a valid
+image plus an absolute text-file path, the image became a chip and the text path
+remained, without a separating space. With a missing PNG path, only the valid
+image survived. Pi-TUIX accepts quoted lists and retains unavailable paths with
+spaces; these are explicit parser differences, not evidence of exact parity.
 The official [image workflow documentation](https://code.claude.com/docs/en/common-workflows#work-with-images)
 describes Cmd+Click on macOS or Ctrl+Click on Windows/Linux to open a numbered
 image in the default viewer. Reference click activation itself was not tested;
@@ -157,7 +182,7 @@ broadly than the observed reference.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Old runs without branch observations stay unknown |
 | Main/snapshot/preview image attachments | Public message/context entries, component composition, `hyperlink`, native URL activation | User-only numbering, image-only prompts and openable temporary raster files implemented; Read images use file/byte summaries, other tool/custom images use unnumbered links |
-| Image paste and draft chips | Native editor and public input interfaces | Still native Pi behavior; bracketed paste of a PNG path was submitted as text in the tested host |
+| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation, custom entries | Multi-path chips, literal/history label editing, captured-image links, shared references and history numbering implemented; delivered image numbers survive mixed literals and resume; observed queue take-back distinguishes literal labels; collapsed-paste deletion, shared text/image counters and parser edge cases still differ |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -237,6 +262,109 @@ remain a measured difference, rather than a claim of full syntax parity.
   assets were removed on exit. A later authenticated Claude Read sample corrected
   the initial assumption that tool and user images shared one counter; the main
   view and both readers now follow the observed user-only numbering.
+- Draft tests cover quoted/escaped paths, byte preservation, atomic movement and
+  deletion, native undo with large pasted text, split terminal paste sequences,
+  bounds at widths 0-100, wrapped vertical navigation and control-text handling.
+  Input transformations preserve existing images and delivery metadata; saved
+  labels preserve numbering gaps without duplicated prompt markers. Link tests
+  cover preparation, truncation and late completion after disposal. External
+  editor and follow-up/dequeue actions keep image identity through public APIs.
+  In actual Pi 0.85.1 fullscreen, paste/delete/undo produced a numbered chip and
+  the fixture provider received its original SHA-256 with a positional prompt.
+  Clicking a draft chip opened the matching captured PNG in macOS Preview.
+  Actual Pi 0.84.4 regular mode queued a pasted image with Alt+Enter and delivered
+  the original bytes after the active run. A later run took the queued chip back,
+  edited its readable label in a disposable external editor, then delivered the
+  same image bytes with the edited text. No private-use draft tokens appeared
+  in the saved fixture session. Native clipboard access itself was delegated,
+  rather than replacing or inspecting the user's clipboard.
+- Multi-path tests cover source order across PNG/GIF/PNG attachments, repeated
+  images, one-step native undo, monotonic numbering after undo, mixed unavailable
+  paths, quoted/escaped parsing, malformed input and path-count/size limits.
+  Actual Pi 0.85.1 at 100x40 verified a three-image paste, one-step undo and
+  resubmission. The fixture provider received all three original hashes in order.
+  Actual Pi 0.84.4 at 80x24 delivered a two-image native follow-up with both
+  original hashes. Both runtimes removed their temporary assets on quit. No
+  draft tokens leaked into the saved session. A fresh Pi runtime recalled the
+  historical text labels; the Claude reference probe above corrected the earlier
+  assumption that restart recall should automatically reattach images.
+- Literal-label tests cover whole-span arrow/word movement, deletion and native
+  undo, fresh history browsing/draft restoration, remapped arrows, Unicode,
+  narrow layouts and unchanged text submission. Actual Pi 0.85.1 at 100x40
+  recalled `[Image #18] [Image #19]`, crossed/deleted/restored the first label
+  and submitted only the original text. Actual Pi 0.84.4 at 80x24 deleted and
+  restored a manually typed `[Image #999]`; the provider again received text
+  without new images. `/pituix-default` restored native character deletion in
+  the active fullscreen session, and both runtime caches were removed on quit.
+  Literal-label deletion retains native behavior when collapsed paste data is
+  present, because public `setText` would clear that registry.
+- Queue take-back now compares complete observed input text in native steering /
+  follow-up order, with current draft text kept separate. Regression tests cover
+  identical literal/owned labels, delivered image fingerprints, mixed paragraphs,
+  editing/requeue, current collapsed pastes, stale/overflow observations and native
+  interrupt delegation. Unknown transformed text stays text, with a warning if
+  owned images cannot be recovered. Actual Pi 0.84.4 at 80x24 took back a real
+  image follow-up and same-label steering message, retained a same-label current
+  draft, edited and requeued them, and delivered exactly one unchanged PNG hash.
+  A separate literal-only take-back delivered text without an image. Pi 0.85.1 at
+  100x40 restored a queued image through native Esc and retained all 100 lines of
+  a current collapsed text paste. Resubmission delivered one original image and
+  100 literal labels without extra image payloads. Native abort invocation is
+  covered by the editor regression; this display fixture waits for its timer
+  even after cancellation. Default-UI restoration passed, both hosts removed all
+  four temporary assets, and saved sessions contain no internal draft tokens.
+  Native take-back collapsed queued messages into one input as expected. Later
+  handlers changing image payloads without changing text and unobserved compaction
+  queues remain public-API limitations. The external-editor reference rule is described below.
+- External-editor reference sampling used the documented
+  [Ctrl+G action](https://code.claude.com/docs/en/keybindings) with a disposable
+  editor. It received ordinary readable labels. Two same-number references
+  retained one attachment; deleting the first reference still retained it;
+  removing all references removed the attachment. Persisted reference messages
+  confirm image counts 1 / 1 / 0 and the original PNG hash. This corrects the
+  assumption that external-editor same-number text must remain an unrelated
+  literal. Pi-TUIX now shares one payload per owned identity and preserves
+  distinct same-byte pastes. Unknown labels remain text. A failed external
+  exchange expires on the next keystroke instead of affecting a later replacement.
+  Saved repeated references retain their image numbers without rewriting messages.
+  Regression tests cover shared-reference deletion/undo, first-reference ordering,
+  untouched native images, legacy positional data, unknown labels, failure and
+  widths 8-100. Actual Pi 0.84.4 at 80x24 exported two #22 references and submitted
+  one original PNG; the conversation displayed one #22 attachment branch.
+  Pi 0.85.1 at 100x40 retained an image after external deletion of the first
+  reference and sent no image after all references were removed. A failed editor,
+  followed by deleting the chip and reopening plain same-number text, submitted
+  text only. A further Pi 0.84.4 run placed a GIF reference before its PNG/GIF
+  chips and delivered GIF/PNG bytes in that first-reference order with matching
+  #26/#25 branches. Default restoration and all six temporary-asset removals
+  passed; sessions contain no internal draft tokens.
+- A fresh authenticated Claude 2.1.263 numbering probe pasted after current text
+  #41 and received image #42. Clearing that draft and discarding text #77 still
+  produced #43 next. Sending text-only user #90 did not jump the running counter;
+  the later assistant #150 did not either. A new process resuming that history
+  produced #91. Pi-TUIX now seeds from saved user labels on the selected branch
+  and from the visible draft at successful image allocation, while keeping live
+  text-only messages, discarded labels and failed reads from consuming numbers.
+  The same reference pasted 100 lines containing #300: its collapsed text chip
+  received #92 and the following image #93. Pi still uses the native separate
+  long-text counter; shared text/image references remain a documented gap.
+- Mixed literal/image labels exposed a separate display ambiguity after delivery.
+  Pi-TUIX now records the known attachment numbers through a public plain custom
+  entry, bound to the following user's timestamp and ordered content fingerprint.
+  It contains no image bytes/source paths and does not enter model context.
+  Invalid, stale, ambiguous and transformed payloads retain legacy fallback.
+  Display projection preserves a matching ancestor annotation when compaction
+  keeps its image message. Regressions cover these cases, metadata bounds,
+  selected ancestry, unchanged model context, pre-persistence rendering,
+  restart, malformed imports and ANSI widths 8-100.
+  Actual Pi 0.84.4 regular mode at 80x24 submitted literal #800 with image #801;
+  the live view and transcript retained one #801 branch, and the next paste was
+  #802. Pi 0.85.1 fullscreen at 100x40 resumed that session with the same #801
+  branch and next #802, then delivered a native follow-up with literal #900 and
+  one GIF #901. Provider inputs retained the original PNG/GIF hashes and text.
+  Both hosts restored native UI and removed their temporary assets on quit;
+  saved messages contain no internal draft tokens. Old ambiguous messages cannot
+  be retroactively disambiguated without an original annotation.
 - Resume controls tests cover branch indexing beyond the visible window,
   selection stability, search/scope combinations, unavailable Git, unreadable
   files, queue replacement, aborts and stale results. Rename tests cover native

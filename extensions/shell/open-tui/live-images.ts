@@ -31,6 +31,7 @@ import {
   imageLabel,
   type PrepareImages,
 } from "../../session/image-attachments.ts";
+import { withImageNumberMetadata } from "../../session/image-number-metadata.ts";
 import { ReferenceUserMessage } from "../../session/message-view.ts";
 
 type Message = Extract<SessionEntry, { type: "message" }>["message"];
@@ -115,7 +116,10 @@ export class LiveImagePresentation {
     if (this.closed || ctx.sessionManager.getSessionId() !== this.sessionId) return;
     this.staged = undefined;
     clearTimeout(this.settleTimer);
-    this.entries = ctx.sessionManager.buildContextEntries();
+    this.entries = withImageNumberMetadata(
+      ctx.sessionManager.buildContextEntries(),
+      ctx.sessionManager.getBranch(),
+    );
     this.rebuild();
   }
 
@@ -123,7 +127,10 @@ export class LiveImagePresentation {
     if (this.closed || ctx.sessionManager.getSessionId() !== this.sessionId) return;
     if (message.role !== "user" && message.role !== "assistant") return;
     clearTimeout(this.settleTimer);
-    this.entries = ctx.sessionManager.buildContextEntries();
+    this.entries = withImageNumberMetadata(
+      ctx.sessionManager.buildContextEntries(),
+      ctx.sessionManager.getBranch(),
+    );
     this.staged = {
       type: "message",
       id: `pi-tuix-live-${++this.sequence}`,
@@ -371,7 +378,9 @@ export class LiveImagePresentation {
     )
       return cached.lines;
     const text = row.skill
-      ? [row.userText, ...(row.images ?? []).map(imageLabel)].filter(Boolean).join(" ")
+      ? [row.userText, ...(row.images ?? []).filter((image) => !image.inline).map(imageLabel)]
+          .filter(Boolean)
+          .join(" ")
       : contentText(row.content, row.entryId, this.imageMap);
     const content = new ReferenceUserMessage(text, theme, ascii);
     const lines = this.attached(content, row).render(width);
