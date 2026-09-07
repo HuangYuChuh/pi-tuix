@@ -18,11 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Group adjacent successful Read/Bash calls into unique-file and shell-call counts, with individual expansion and read-only reconstruction when resuming sessions.
 - Add elapsed working feedback, reported output-token counts, and persisted display-only settled-run completion/interruption lines; retain duration through automatic retries.
 - Match observed user-message background/text and successful tool-marker colors through the public theme.
-- Add a searchable resume picker with public Pi session metadata, text previews, project scope switching, and host-delegated session restoration through `/pituix-resume`.
+- Add a searchable resume picker with public Pi session metadata, read-only tool/diff previews, project scope switching, and host-delegated session restoration through `/pituix-resume`.
 - Match observed Edit row and changed-token backgrounds, gutter colors and right margin; preserve source characters, theme fallback, no-color mode and distinct 256-color fills.
 - Use the reference syntax palette with Pi's public highlighter for added/context diff lines; retain the documented differences in token categories.
 
 ### Fixed
+- Render resume previews as native modal overlays so fullscreen viewport keys reach the preview; preserve original focus, cancel pending reads, ignore late results, and parse/migrate session data only in memory.
+- Show individual historical tools, assistant model/time and completion records in resume previews; keep tool-boundary spacing compact while preserving internal output lines.
 - Use configured tool expansion bindings instead of the unregistered E hint.
 - Guard tiny editor widths against host wide-character wrapping recursion.
 - Hide duplicate footer hints during settings and restore them on close or failure; remove the unsupported wheel-speed control from settings.

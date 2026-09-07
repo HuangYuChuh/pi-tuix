@@ -106,9 +106,15 @@ availability, effective effort and persistence remain Pi-owned. The native
 `/pituix-resume` lists sessions through the public `SessionManager.list` and
 loads `listAll` only when the user chooses all projects. The current custom
 session directory is included through the public overload. The component
-filters `SessionInfo` records and previews `allMessagesText`, with no I/O from
-rendering. It shows message counts and modification times rather than guessing
-unavailable branch or file-size metadata. The custom view closes before
+filters public `SessionInfo` text and opens a selected conversation on demand.
+The command reads that file asynchronously with an AbortSignal, then uses public
+`parseSessionEntries`, in-memory `migrateSessionEntries`, `buildContextEntries`
+and `buildSessionContext` helpers. It verifies the selected header identity and
+rejects future formats or invalid ancestry before traversal. It never opens a
+persisting SessionManager to preview a file. The active saved branch and
+compaction projection remain Pi-owned. No file is rewritten or migrated on disk.
+It shows message counts and modification times rather than guessing unavailable
+branch or file-size metadata. The custom view closes before
 `ctx.switchSession(path)` replaces the runtime; late load callbacks are ignored,
 and no captured session-bound object is used after a successful replacement.
 Pi 0.84 reapplies its saved theme after `session_start` during replacement.
@@ -120,9 +126,19 @@ context exposes no post-theme-rebind event or saved automatic-theme preference.
 Switching by theme name would persist a different Pi setting, so the adapter
 continues using a temporary Theme instance rather than silently replacing that
 preference.
-This text preview does not reproduce tool/media transcript rendering. Session
-files, migration, persistence and branching remain Pi-owned; native `/resume`
-and `/tree` are untouched.
+The preview shares the pure startup header and snapshot transcript components.
+It shows individual tool results (without live Read/Bash grouping), diffs,
+completion records and recorded assistant time/model above text responses.
+Binary attachments have type labels. Header, conversation and recovery hints
+scroll inside the reference separator. Arrows, paging, Home/End, wheel input and
+Pi's tool-expansion binding stay scoped to a public modal overlay; a fullscreen
+host otherwise consumes viewport keys before non-overlay editor input. The
+bottom-anchored overlay leaves two context rows when space permits. Closing
+restores native focus before any session replacement. Cancelling or selecting
+another preview aborts the pending read; request identity also rejects late
+results from readers that ignore cancellation. A failed read can be retried by
+reopening the preview. Rendering does no file I/O or tool execution. Native
+`/resume` and `/tree` are untouched.
 
 `/pituix-transcript` reads and clones the current public session branch before
 opening a full-width custom overlay. Its snapshot components preserve raw user
@@ -133,7 +149,9 @@ No executor is invoked or newly registered. Missing calls, failed/aborted
 responses, visible custom messages and compaction summaries remain explicit.
 Binary attachments receive type labels; foreign tool renderers are not copied.
 Rendering performs no I/O. The reader owns only scroll/expansion state, returns
-to the same editor, and remains separate from the live view and resume preview.
+to the same editor, and remains a separate view of the current branch. The resume
+preview reuses its content renderer with individual tools and message metadata;
+the main snapshot keeps its existing grouping and optional expansion.
 
 The main view composes reversible presentation containers into the public
 document tree. A version-local adapter recognizes public

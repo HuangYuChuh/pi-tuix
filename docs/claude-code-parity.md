@@ -126,7 +126,7 @@ broadly than the observed reference.
 | Effort above the prompt | Custom editor, `thinking_level_select`, `model_select` | Implemented; displays Pi's effective level and actual cycle binding |
 | Searchable settings page | `ctx.ui.custom`, public `Input` | Reference frame, filtering, focus navigation and value alignment implemented for Pi-TUIX settings |
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
-| Searchable resume picker | Public `SessionManager.list`/`listAll`, `SessionInfo`, `ctx.switchSession` | Implemented in `/pituix-resume`; previews public message text and uses real message counts/time, without branch/file-size metadata or tool/media preview |
+| Searchable resume picker | Public session catalogue, parser/context helpers, modal UI and `ctx.switchSession` | Read-only rich preview includes individual tools, diffs, recorded model/time and completion rows; branch/file-size metadata and rendered binary media remain gaps |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -240,7 +240,7 @@ remain a measured difference, rather than a claim of full syntax parity.
   and scroll/close behavior. The reader clones public branch data and invokes
   no tool execution or session mutation. Actual Pi 100x40 and 80x24 sessions
   check grouped/expanded recorded tools, page navigation, editor return and
-  `/pituix-default`. Resume text previews remain separate.
+  `/pituix-default`. Resume previews reuse the snapshot content renderer.
   At 100 columns, the sampled plain assistant line matches all cell text,
   foreground, background and inverse values in the reference. The sampled
   two-line user message matches text and background; one automatically wrapped
@@ -273,6 +273,19 @@ remain a measured difference, rather than a claim of full syntax parity.
   cleanup, single switch delegation, and ANSI/CJK width/height bounds. Actual
   Claude `/resume` list, search and preview screens were captured in the
   disposable reference project without switching or sending a model request.
+  Further reference captures verify individual Read/Bash rows, full Edit diffs,
+  right-aligned assistant clock/model labels, Home/End navigation, scroll arrows
+  and recovery hints at the end of the preview. Pi now uses the same structure
+  with its own header and recorded values. Native TuiMainScreen/TuiAltScreen
+  tests send input through the terminal callback, proving modal paging, End,
+  Home and wheel navigation reach the preview and closing restores editor input.
+  Tests cover on-demand loading, aborts, stale completion order, retryable errors,
+  expansion, narrow layouts and unchanged legacy-file bytes/mtime after in-memory
+  migration. Pi's public context projection is checked against branch/compaction
+  fixtures. Actual Pi 0.85.1 at 100x40 and Pi 0.84.4 at 80x24 verify tool/diff
+  previews, paging, expansion, completion/interruption rows and native restoration.
+  Both previewed session files retain their exact bytes and modification times.
+  Enter from the preview successfully resumes through Pi after the overlay closes.
   The local-path installed package was tested by searching, previewing and
   actually switching to a saved fixture session. The resumed tool grouping,
   reference palette and default-UI restoration were verified. A public

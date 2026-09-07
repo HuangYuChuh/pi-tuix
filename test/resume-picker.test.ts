@@ -6,8 +6,16 @@ import type {
   SessionInfo,
   Theme,
 } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
+import {
+  stripTerminalSequences,
+  type Terminal,
+  Text,
+  TuiAltScreen,
+  TuiMainScreen,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 import { ResumePicker, registerResumePicker } from "../extensions/session/resume-picker.ts";
+import type { SessionPreviewSnapshot } from "../extensions/session/session-preview.ts";
 
 const now = new Date("2026-09-07T04:00:00Z").getTime();
 function session(index: number, overrides: Partial<SessionInfo> = {}): SessionInfo {
@@ -147,6 +155,7 @@ function harness(
     list?: () => Promise<SessionInfo[]>;
     customFailure?: boolean;
     resumeFailure?: boolean;
+    readPreview?: (session: SessionInfo, signal: AbortSignal) => Promise<SessionPreviewSnapshot>;
   } = {},
 ) {
   let handler: ((args: string, ctx: ExtensionCommandContext) => Promise<void>) | undefined;
@@ -155,6 +164,7 @@ function harness(
   const loads: (string | undefined)[] = [];
   const notifications: string[] = [];
   const resumed: ExtensionCommandContext[] = [];
+  const previewReads: { session: SessionInfo; signal: AbortSignal }[] = [];
   const replacement = {
     cwd: "/new-project",
     ui: { notify: (message: string) => notifications.push(message) },
@@ -187,6 +197,12 @@ function harness(
         return [session(4, { cwd: "/other" })];
       },
     },
+    async (session, signal) => {
+      previewReads.push({ session, signal });
+      return options.readPreview
+        ? options.readPreview(session, signal)
+        : { entries: [], cwd: session.cwd, model: "Recorded model", effort: "off" };
+    },
   );
   const ctx = {
     hasUI: true,
@@ -196,8 +212,12 @@ function harness(
       getSessionDir: () => "/custom/sessions",
     },
     ui: {
-      custom: (factory: (...args: unknown[]) => View) =>
+      custom: (factory: (...args: unknown[]) => View, uiOptions: unknown) =>
         new Promise<string | undefined>((done) => {
+          assert.deepEqual(uiOptions, {
+            overlay: true,
+            overlayOptions: { width: "100%", maxHeight: "100%", anchor: "bottom-left", margin: 0 },
+          });
           if (options.customFailure) throw new Error("custom view failed");
           views.push(
             factory(
@@ -208,7 +228,10 @@ function harness(
                 },
               },
               theme,
-              {},
+              {
+                matches: (data: string, action: string) =>
+                  action === "app.tools.expand" && data === "\x0f",
+              },
               done,
             ),
           );
@@ -243,6 +266,7 @@ function harness(
     loads,
     notifications,
     resumed,
+    previewReads,
     replacement,
     get renders() {
       return renders;
@@ -346,4 +370,215 @@ test("resume command restores panel chrome after custom view setup failure", asy
   await assert.rejects(async () => h.run(), /custom view failed/);
   assert.deepEqual(h.calls, ["open", "close"]);
   assert.deepEqual(h.loads, []);
+});
+
+test("rich preview loads on demand and cancellation suppresses late results without switching", async () => {
+  for (const fail of [false, true]) {
+    let resolve!: (value: SessionPreviewSnapshot) => void;
+    let reject!: (error: Error) => void;
+    const loading = new Promise<SessionPreviewSnapshot>((yes, no) => {
+      resolve = yes;
+      reject = no;
+    });
+    const h = harness({ readPreview: () => loading });
+    const pending = h.run();
+    await tick();
+    assert.equal(h.previewReads.length, 0);
+    h.views[0].handleInput(" ");
+    assert.equal(h.previewReads.length, 1);
+    assert.equal(h.previewReads[0].session.path, sessions[0].path);
+    assert.match(
+      h.views[0].render(100).map(stripTerminalSequences).join("\n"),
+      /Loading conversation/,
+    );
+    h.views[0].handleInput("\x1b");
+    assert.ok(h.previewReads[0].signal.aborted);
+    h.views[0].handleInput("\x1b");
+    await pending;
+    const renders = h.renders;
+    if (fail) reject(new Error("late preview failure"));
+    else resolve({ entries: [], cwd: "/late", model: "Late result", effort: "off" });
+    await tick();
+    assert.equal(h.renders, renders);
+    assert.deepEqual(h.calls, ["open", "close"]);
+    assert.deepEqual(h.notifications, []);
+  }
+});
+
+test("preview result ordering follows the selected session, not pending read completion order", async () => {
+  const resolvers: ((value: SessionPreviewSnapshot) => void)[] = [];
+  const h = harness({ readPreview: () => new Promise((resolve) => resolvers.push(resolve)) });
+  const pending = h.run();
+  await tick();
+  h.views[0].handleInput(" ");
+  h.views[0].handleInput("\x1b");
+  h.views[0].handleInput("\x1b[B");
+  h.views[0].handleInput(" ");
+  resolvers[1]({ entries: [], cwd: "/second", model: "Second preview", effort: "high" });
+  await tick();
+  resolvers[0]({ entries: [], cwd: "/first", model: "Stale first preview", effort: "off" });
+  await tick();
+  const output = h.views[0].render(100).map(stripTerminalSequences).join("\n");
+  assert.match(output, /Second preview with high effort/);
+  assert.doesNotMatch(output, /Stale first preview/);
+  assert.deepEqual(h.calls, ["open"]);
+  h.views[0].handleInput("\r");
+  await pending;
+  assert.deepEqual(h.calls, ["open", "close", sessions[1].path]);
+  assert.ok(h.previewReads.every((read) => read.signal.aborted));
+});
+
+test("preview errors are recoverable and Enter during loading closes before resuming", async () => {
+  const h = harness({
+    readPreview: async () => {
+      throw new Error("File unavailable");
+    },
+  });
+  const pending = h.run();
+  await tick();
+  h.views[0].handleInput(" ");
+  await tick();
+  assert.match(
+    h.views[0].render(100).map(stripTerminalSequences).join("\n"),
+    /Could not load preview.*File unavailable/,
+  );
+  h.views[0].handleInput(" ");
+  h.views[0].handleInput(" ");
+  assert.equal(h.previewReads.length, 2);
+  h.views[0].handleInput("\r");
+  await pending;
+  await tick();
+  assert.deepEqual(h.calls, ["open", "close", sessions[0].path]);
+  assert.deepEqual(h.notifications, []);
+});
+
+test("rich preview follows Home/End, page, wheel and expansion keys within ANSI/width bounds", () => {
+  for (const rows of [1, 2, 3, 8, 24, 40]) {
+    const states: boolean[] = [];
+    let renders = 0;
+    const view = new ResumePicker({
+      theme,
+      ascii: false,
+      cwd: "/project",
+      getRows: () => rows,
+      done() {},
+      onScopeChange() {},
+      onPreviewChange() {},
+      expandKey: (data) => data === "\x0f",
+    });
+    view.setSessions(sessions);
+    view.handleInput(" ");
+    view.setPreview(sessions[0].path, {
+      render: (width) => {
+        renders++;
+        return Array.from({ length: 80 }, (_, i) =>
+          theme.fg("text", `Rich line ${i} 中文 ${"wide ".repeat(width)}`),
+        );
+      },
+      setExpanded: (value) => states.push(value),
+      invalidate() {},
+    });
+    const output = (width = 80) => view.render(width).map(stripTerminalSequences).join("\n");
+    assert.match(output(), /Rich line 0/);
+    output();
+    assert.equal(renders, 1, "scroll layout reuses static preview content");
+    view.handleInput("\x1b[<65;10;10M");
+    assert.match(output(), /Rich line 3/);
+    view.handleInput("\x1b[<64;10;10M");
+    assert.match(output(), /Rich line 0/);
+    view.handleInput("\x1b[F");
+    assert.match(output(), /Enter to resume/);
+    view.handleInput("\x1b[H");
+    assert.match(output(), /Rich line 0/);
+    view.handleInput("\x0f");
+    assert.deepEqual(states, [false, true]);
+    for (const width of [0, 1, 2, 4, 12, 40, 80, 100]) {
+      const lines = view.render(width);
+      assert.ok(lines.length <= rows);
+      assert.ok(lines.every((line) => visibleWidth(line) <= width));
+    }
+    view.handleInput("\x1b");
+    view.setPreviewError(sessions[0].path, new Error("Late ignored"));
+    assert.doesNotMatch(output(), /Late ignored|Rich line/);
+  }
+});
+
+test("native regular and fullscreen renderers deliver preview navigation to the focused modal", () => {
+  for (const mode of ["regular", "fullscreen"]) {
+    let receive = (_data: string) => {};
+    let nativeInputs = 0;
+    const terminal: Terminal = {
+      columns: 80,
+      rows: 24,
+      kittyProtocolActive: false,
+      start: (input) => {
+        receive = input;
+      },
+      stop() {},
+      drainInput: async () => {},
+      write() {},
+      moveBy() {},
+      hideCursor() {},
+      showCursor() {},
+      clearLine() {},
+      clearFromCursor() {},
+      clearScreen() {},
+      setTitle() {},
+      setProgress() {},
+    };
+    const tui = mode === "fullscreen" ? new TuiAltScreen(terminal) : new TuiMainScreen(terminal);
+    const editor = {
+      render: () => ["ORIGINAL EDITOR"],
+      invalidate() {},
+      handleInput: () => {
+        nativeInputs++;
+      },
+    };
+    tui.addChild(new Text("Original document", 0, 0));
+    tui.addChild(editor);
+    tui.setFocus(editor);
+    const view = new ResumePicker({
+      theme,
+      ascii: false,
+      cwd: "/project",
+      getRows: () => 22,
+      done() {},
+      onScopeChange() {},
+      onPreviewChange() {},
+    });
+    view.setSessions(sessions);
+    view.handleInput(" ");
+    view.setPreview(sessions[0].path, {
+      render: () => Array.from({ length: 80 }, (_, i) => `Preview row ${i}`),
+      invalidate() {},
+    });
+    tui.start();
+    const modal = tui.showOverlay(view, {
+      width: "100%",
+      maxHeight: "100%",
+      anchor: "bottom-left",
+      margin: 0,
+    });
+    try {
+      tui.renderNow();
+      receive("\x1b[F");
+      tui.renderNow();
+      assert.match(text(view, 80), /Enter to resume/, mode);
+      receive("\x1b[H");
+      assert.match(text(view, 80), /Preview row 0/, mode);
+      receive("\x1b[6~");
+      assert.doesNotMatch(text(view, 80), /Preview row 0\n/, mode);
+      receive("\x1b[H");
+      text(view, 80);
+      receive("\x1b[<65;10;10M");
+      assert.match(text(view, 80), /Preview row 3/, mode);
+      assert.equal(nativeInputs, 0);
+      modal.hide();
+      receive("x");
+      assert.equal(nativeInputs, 1, "closing the modal restores original editor input");
+    } finally {
+      modal.hide();
+      tui.stop();
+    }
+  }
 });

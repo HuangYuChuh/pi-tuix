@@ -7,6 +7,7 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import {
+  type Component,
   CURSOR_MARKER,
   getKeybindings,
   Input,
@@ -17,6 +18,15 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
+import {
+  loadSessionPreview,
+  SessionPreviewContent,
+  type SessionPreviewSnapshot,
+} from "./session-preview.ts";
+
+interface PreviewComponent extends Component {
+  setExpanded?(expanded: boolean): void;
+}
 
 function plain(value: string): string {
   return stripTerminalSequences(value).replace(/\p{Cc}/gu, (char) =>
@@ -53,6 +63,8 @@ export class ResumePicker {
     now?: () => number;
     done: (path: string | undefined) => void;
     onScopeChange: (all: boolean) => void;
+    onPreviewChange?: (session: SessionInfo | undefined) => void;
+    expandKey?: (data: string) => boolean;
   };
   private sessions: readonly SessionInfo[] = [];
   private filtered: readonly SessionInfo[] = [];
@@ -60,6 +72,10 @@ export class ResumePicker {
   private searching = false;
   private preview = false;
   private previewOffset = 0;
+  private previewContent: PreviewComponent | undefined;
+  private previewLoading = false;
+  private previewError: string | undefined;
+  private previewExpanded = false;
   private all = false;
   private loading = true;
   private error: string | undefined;
@@ -94,6 +110,29 @@ export class ResumePicker {
     this.filter();
   }
 
+  setPreview(path: string, content: PreviewComponent): void {
+    if (this.finished || !this.preview || this.filtered[this.selected]?.path !== path) return;
+    this.previewContent = content;
+    content.setExpanded?.(this.previewExpanded);
+    this.previewLoading = false;
+    this.previewError = undefined;
+    this.previewCache = undefined;
+  }
+
+  setPreviewError(path: string, error: unknown): void {
+    if (this.finished || !this.preview || this.filtered[this.selected]?.path !== path) return;
+    this.previewLoading = false;
+    this.previewError = `Could not load preview: ${plain(String(error))}`;
+    this.previewCache = undefined;
+  }
+
+  private closePreview(): void {
+    this.preview = false;
+    this.previewContent = undefined;
+    this.previewCache = undefined;
+    this.options.onPreviewChange?.(undefined);
+  }
+
   private filter(): void {
     const words = this.search.getValue().toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
     this.filtered = words.length
@@ -111,7 +150,7 @@ export class ResumePicker {
     if (this.finished) return;
     const keys = getKeybindings();
     if (keys.matches(data, "tui.select.cancel")) {
-      if (this.preview) this.preview = false;
+      if (this.preview) this.closePreview();
       else if (this.searching && this.search.getValue()) {
         this.search.setValue("");
         this.selected = 0;
@@ -129,7 +168,16 @@ export class ResumePicker {
     const pageDown = keys.matches(data, "tui.select.pageDown");
     const confirm = keys.matches(data, "tui.select.confirm");
     if (this.preview) {
-      if (data === " ") this.preview = false;
+      const wheel = data.startsWith("\x1b") ? /^\[<(64|65);\d+;\d+M$/.exec(data.slice(1)) : null;
+      if (data === " ") this.closePreview();
+      else if (this.options.expandKey?.(data)) {
+        this.previewExpanded = !this.previewExpanded;
+        this.previewContent?.setExpanded?.(this.previewExpanded);
+        this.previewCache = undefined;
+      } else if (matchesKey(data, Key.home)) this.previewOffset = 0;
+      else if (matchesKey(data, Key.end)) this.previewOffset = Number.MAX_SAFE_INTEGER;
+      else if (wheel)
+        this.previewOffset = Math.max(0, this.previewOffset + (wheel[1] === "64" ? -3 : 3));
       else if (up || down || pageUp || pageDown) {
         this.previewOffset = Math.max(
           0,
@@ -164,6 +212,12 @@ export class ResumePicker {
     } else if (data === " " && !this.loading && this.filtered.length) {
       this.preview = true;
       this.previewOffset = 0;
+      this.previewExpanded = false;
+      this.previewContent = undefined;
+      this.previewError = undefined;
+      this.previewLoading = Boolean(this.options.onPreviewChange);
+      this.previewCache = undefined;
+      this.options.onPreviewChange?.(this.filtered[this.selected]);
     } else if (data === "/" || data.startsWith("\x1b[200~") || /^[^\p{Cc}]+$/u.test(data)) {
       this.searching = true;
       if (data !== "/") this.search.handleInput(data);
@@ -204,35 +258,50 @@ export class ResumePicker {
         ];
     const selected = this.filtered[this.selected];
     if (this.preview && selected) {
-      const hints = `${inset}${muted(`Up/Down to scroll${separator}Enter to resume${separator}Esc to return`)}`;
-      const bodyWidth = Math.max(1, inner - 2);
+      const previewInset = width >= 8 ? "  " : "";
+      const bodyWidth = Math.max(1, width - previewInset.length * 2);
       if (this.previewCache?.path !== selected.path || this.previewCache.width !== bodyWidth) {
         this.previewCache = {
           path: selected.path,
           width: bodyWidth,
-          lines: plain(selected.allMessagesText || selected.firstMessage || "No message text")
-            .split("\n")
-            .flatMap((line) => wrapTextWithAnsi(line, bodyWidth)),
+          lines: this.previewContent
+            ? this.previewContent.render(bodyWidth)
+            : [
+                accent(theme.bold("Session preview")),
+                accent(title(selected)),
+                "",
+                ...(this.previewLoading
+                  ? [muted("Loading conversation...")]
+                  : this.previewError
+                    ? [theme.fg("error", this.previewError)]
+                    : plain(selected.allMessagesText || selected.firstMessage || "No message text")
+                        .split("\n")
+                        .flatMap((line) => wrapTextWithAnsi(line, bodyWidth))),
+              ],
         };
       }
-      const lines = this.previewCache.lines;
-      const budget = Math.max(1, rows - heading.length - (compact ? 2 : 4));
+      const lines = [
+        ...this.previewCache.lines,
+        muted((ascii ? "-" : "─").repeat(bodyWidth)),
+        muted(`  ${metadata(selected)}`),
+        muted(`  Enter to resume${separator}Esc to return`),
+      ];
+      const top = rows >= 3 ? [accent((ascii ? "-" : "▔").repeat(width))] : [];
+      const budget = Math.max(1, rows - top.length);
       this.pageSize = budget;
       this.previewOffset = Math.min(this.previewOffset, Math.max(0, lines.length - budget));
       const body = lines
         .slice(this.previewOffset, this.previewOffset + budget)
-        .map((line) => `${inset}  ${line}`);
-      if (rows < 4) return body.slice(0, rows).map(clip);
-      return [
-        ...heading,
-        `${inset}${accent(title(selected))}`,
-        ...(!compact ? [""] : []),
-        ...body,
-        ...(!compact ? [""] : []),
-        hints,
-      ]
-        .slice(0, rows)
-        .map(clip);
+        .map((line) => `${previewInset}${truncateToWidth(line, bodyWidth, "")}`);
+      const mark = (index: number, symbol: string) => {
+        if (width < 8 || !body[index]) return;
+        const line = truncateToWidth(body[index], width - 2, "");
+        body[index] =
+          line + " ".repeat(Math.max(0, width - 2 - visibleWidth(line))) + muted(symbol);
+      };
+      if (this.previewOffset > 0) mark(0, ascii ? "^" : "↑");
+      if (this.previewOffset + budget < lines.length) mark(body.length - 1, ascii ? "v" : "↓");
+      return [...top, ...body].slice(0, rows).map(clip);
     }
     this.search.focused = this.focused && this.searching;
     const queryWidth = Math.max(1, inner - 6);
@@ -290,6 +359,8 @@ export class ResumePicker {
 
   invalidate(): void {
     this.search.invalidate();
+    this.previewContent?.invalidate();
+    this.previewCache = undefined;
   }
 }
 
@@ -307,6 +378,10 @@ export function registerResumePicker(
     onResume?: (ctx: ExtensionCommandContext) => void;
   },
   catalog: SessionCatalog = SessionManager,
+  readPreview: (
+    session: SessionInfo,
+    signal: AbortSignal,
+  ) => Promise<SessionPreviewSnapshot> = loadSessionPreview,
 ): void {
   pi.registerCommand("pituix-resume", {
     description: "Search, preview and resume Pi sessions",
@@ -317,56 +392,88 @@ export function registerResumePicker(
       hooks.onOpen();
       let path: string | undefined;
       let closed = false;
+      let previewLoad: AbortController | undefined;
       try {
-        path = await ctx.ui.custom<string | undefined>((tui, theme, _keys, done) => {
-          let current: SessionInfo[] = [];
-          let all: SessionInfo[] | undefined;
-          const load = async (allProjects: boolean) => {
-            try {
-              if (allProjects) {
-                all ??= [
-                  ...current,
-                  ...(await Promise.all([catalog.listAll(), catalog.listAll(sessionDir)])).flat(),
-                ];
-              } else current = await catalog.list(ctx.cwd, sessionDir);
-              if (!closed) view.setSessions(allProjects ? (all ?? []) : current);
-            } catch (error) {
-              if (!closed) view.setError(error);
-            }
-            if (!closed) tui.requestRender();
-          };
-          const view = new ResumePicker({
-            theme,
-            ascii: hooks.ascii(),
-            cwd: ctx.cwd,
-            currentPath,
-            getRows: () => tui.terminal.rows,
-            done: (selection) => {
-              closed = true;
-              done(selection);
-            },
-            onScopeChange: (allProjects) => {
-              void load(allProjects);
-            },
-          });
-          void load(false);
-          return {
-            get focused() {
-              return view.focused;
-            },
-            set focused(value: boolean) {
-              view.focused = value;
-            },
-            render: (width) => view.render(width),
-            invalidate: () => view.invalidate(),
-            handleInput: (data) => {
-              view.handleInput(data);
-              tui.requestRender();
-            },
-          };
-        });
+        path = await ctx.ui.custom<string | undefined>(
+          (tui, theme, keys, done) => {
+            let current: SessionInfo[] = [];
+            let all: SessionInfo[] | undefined;
+            const load = async (allProjects: boolean) => {
+              try {
+                if (allProjects) {
+                  all ??= [
+                    ...current,
+                    ...(await Promise.all([catalog.listAll(), catalog.listAll(sessionDir)])).flat(),
+                  ];
+                } else current = await catalog.list(ctx.cwd, sessionDir);
+                if (!closed) view.setSessions(allProjects ? (all ?? []) : current);
+              } catch (error) {
+                if (!closed) view.setError(error);
+              }
+              if (!closed) tui.requestRender();
+            };
+            const view = new ResumePicker({
+              theme,
+              ascii: hooks.ascii(),
+              cwd: ctx.cwd,
+              currentPath,
+              getRows: () => Math.max(1, tui.terminal.rows - 2),
+              done: (selection) => {
+                closed = true;
+                done(selection);
+              },
+              onScopeChange: (allProjects) => {
+                void load(allProjects);
+              },
+              expandKey: (data) => keys.matches(data, "app.tools.expand"),
+              onPreviewChange: (session) => {
+                previewLoad?.abort();
+                previewLoad = undefined;
+                if (!session || closed) return;
+                const request = new AbortController();
+                previewLoad = request;
+                void readPreview(session, request.signal)
+                  .then((snapshot) => {
+                    if (closed || request.signal.aborted || previewLoad !== request) return;
+                    view.setPreview(
+                      session.path,
+                      new SessionPreviewContent(snapshot, theme, tui, hooks.ascii()),
+                    );
+                    tui.requestRender();
+                  })
+                  .catch((error) => {
+                    if (closed || request.signal.aborted || previewLoad !== request) return;
+                    view.setPreviewError(session.path, error);
+                    tui.requestRender();
+                  });
+              },
+            });
+            void load(false);
+            return {
+              get focused() {
+                return view.focused;
+              },
+              set focused(value: boolean) {
+                view.focused = value;
+              },
+              render: (width) => view.render(width),
+              invalidate: () => view.invalidate(),
+              handleInput: (data) => {
+                view.handleInput(data);
+                tui.requestRender();
+              },
+            };
+          },
+          {
+            // A modal overlay owns preview navigation in both native modes;
+            // fullscreen document paging otherwise runs before editor input.
+            overlay: true,
+            overlayOptions: { width: "100%", maxHeight: "100%", anchor: "bottom-left", margin: 0 },
+          },
+        );
       } finally {
         closed = true;
+        previewLoad?.abort();
         hooks.onClose();
       }
       if (!path || path === currentPath) return;
