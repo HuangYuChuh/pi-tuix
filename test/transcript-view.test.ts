@@ -20,6 +20,7 @@ import {
 import {
   ReferenceAssistantText,
   ReferenceUserMessage,
+  renderAssistantLines,
 } from "../extensions/session/message-view.ts";
 import {
   registerTranscriptCommand,
@@ -206,6 +207,62 @@ test("reference message rows retain raw prompts and render Markdown before addin
   assert.doesNotMatch(rendered, /# Heading|\*\*bold\*\*/);
   assert.match(rendered, / {2}.*bold text/);
   assert.match(rendered, /const x = 1/);
+});
+
+test("narrow assistant snapshots preserve complete text instead of clipping each row", () => {
+  const source = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const response = new ReferenceAssistantText(source, theme);
+  for (const width of [1, 2, 3, 4, 5, 6, 8, 24, 80, 4, 80]) {
+    assert.equal(plain(response, width).replace(/[^A-Z]/g, ""), source, `width ${width}`);
+    assert.ok(response.render(width).every((line) => visibleWidth(line) <= width));
+  }
+});
+
+test("narrow Markdown retains wide graphemes, code content and wrapped table cells", () => {
+  const text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ中文🙂e\u0301TAIL";
+  for (const source of [text, `**${text}**`, `\`${text}\``, `\`\`\`\n${text}\n\`\`\``]) {
+    const response = new ReferenceAssistantText(source, theme);
+    for (const width of [2, 3, 4, 5, 8, 24, 40, 80]) {
+      assert.equal(plain(response, width).replace(/[\s⏺`]/gu, ""), text, `width ${width}`);
+    }
+  }
+  const table = new ReferenceAssistantText(
+    "| Key | Text | State |\n| --- | --- | --- |\n| Alpha | 中文🙂_abcdefghijklmnopqrstuvwxyz_END | READY |\n| Beta | English words wrap | DONE |",
+    theme,
+  );
+  for (const width of [24, 40, 80, 100]) {
+    const rows = plain(table, width)
+      .split("\n")
+      .filter((line) => line.includes("│"));
+    const columns = [1, 2, 3].map((column) =>
+      rows
+        .map((line) => line.split("│")[column].trim())
+        .join("")
+        .replace(/\s/gu, ""),
+    );
+    assert.deepEqual(columns, [
+      "KeyAlphaBeta",
+      "Text中文🙂_abcdefghijklmnopqrstuvwxyz_ENDEnglishwordswrap",
+      "StateREADYDONE",
+    ]);
+  }
+});
+
+test("assistant reflow preserves ANSI styling and hyperlink targets on continuation rows", () => {
+  const url = "https://example.com/layout";
+  const source = `\x1b[31m\x1b]8;;${url}\x07ABCDEFGHIJ\x1b]8;;\x07\x1b[39m`;
+  for (const width of [1, 2, 3, 4, 5, 8]) {
+    const lines = renderAssistantLines([source], width, theme, true, true);
+    assert.equal(lines.map(stripTerminalSequences).join("").replace(/[\s~]/g, ""), "ABCDEFGHIJ");
+    for (const line of lines) {
+      const plainLine = stripTerminalSequences(line);
+      assert.ok(visibleWidth(line) <= width);
+      const firstLetter = plainLine.search(/[A-Z]/);
+      assert.ok(firstLetter >= 0);
+      assert.ok(line.includes("\x1b[31m"));
+      assert.equal(getOsc8LinkAtColumn(line, firstLetter), url);
+    }
+  }
 });
 
 test("reference message bodies bound ANSI and wide glyphs without interpreting terminal controls", () => {
