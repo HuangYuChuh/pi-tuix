@@ -107,6 +107,28 @@ This text preview does not reproduce tool/media transcript rendering. Session
 files, migration, persistence and branching remain Pi-owned; native `/resume`
 and `/tree` are untouched.
 
+`/pituix-transcript` reads and clones the current public session branch before
+opening a full-width custom overlay. Its snapshot components preserve raw user
+text and prefix rendered assistant Markdown, so heading/list/fence parsing is
+unaffected. Recorded tool calls/results are paired by ID and displayed through
+public `ToolExecutionComponent` instances and the existing Pi-TUIX renderers.
+No executor is invoked or newly registered. Missing calls, failed/aborted
+responses, visible custom messages and compaction summaries remain explicit.
+Binary attachments receive type labels; foreign tool renderers are not copied.
+Rendering performs no I/O. The reader owns only scroll/expansion state, returns
+to the same editor, and does not replace the live transcript or resume preview.
+
+A disposable native-terminal probe also demonstrated that a public
+`TUI.showOverlay({ ... }, { nonCapturing: true, visible: ... })` projection can
+reuse the installed editor while showing the native UI whenever that editor
+loses focus. Tool runs, extension confirmation cancellation and native `/model`
+navigation worked. This is an implementation route for future live message
+chrome, not a shipped full-screen mode. A capturing overlay hid a native
+confirmation because that command-context prompt did not emit the expected
+prompt lifecycle events in the probe. Live notification/widget visibility,
+queue presentation, scrolling and session replacement still need validation
+before applying a projection to the main conversation.
+
 Tool definitions keep the public `renderShell: "self"` option stable.
 Each built-in tool is registered once. `/pituix-compact` selects collapsed
 summaries and `/pituix-three-layer` selects previews in the same renderer;

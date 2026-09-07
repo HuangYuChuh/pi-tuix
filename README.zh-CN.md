@@ -65,6 +65,8 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 
 `/pituix-resume` 可搜索已保存的 Pi 会话，并预览公开接口提供的消息文本。输入关键词筛选，按 Enter 选中结果，再按 Enter 恢复；空格打开文本预览，Ctrl+A 切换当前项目和所有项目。实际会话切换由 Pi 完成，原生 `/resume` 和 `/tree` 仍可使用。
 
+`/pituix-transcript` 打开当前对话的只读快照，按参考样式显示用户、助手和已记录的工具结果。Page Up/Down 或 Home/End 滚动，工具展开快捷键显示详情与思考内容，Esc 返回原来的编辑器。查看不会重新执行工具或修改会话数据。媒体显示类型标签，其他扩展工具使用 Pi 的通用视图；主界面的实时对话暂时保持现有实现。
+
 以下命令均可逆：
 
 | 命令 | 用途 |
@@ -78,6 +80,7 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 | `/pituix-model` | 在编号列表中选择 Pi 模型，并调整思考强度 |
 | `/pituix-resume` | 搜索、预览和恢复已保存的 Pi 会话 |
 | `/pituix-session` | 浏览当前 Pi 会话树并跳转到已有条目 |
+| `/pituix-transcript` | 滚动查看当前对话快照及工具详情 |
 | `/pituix-settings` | 配置界面、底栏、图标和统计 |
 | `/pituix-about` | 查看 package 与兼容的 Pi 版本 |
 | `/pituix-steer <消息>` | 立即纠偏当前执行中的任务 |

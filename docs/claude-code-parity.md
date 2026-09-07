@@ -135,7 +135,7 @@ broadly than the observed reference.
 | Tool expansion | `options.expanded`, configured `app.tools.expand` | Implemented; no invented E binding |
 | Execution, errors, cancellation | Original tool `execute` functions | Delegated unchanged |
 | Default UI restoration | Public unset/reset methods | Implemented and tested |
-| Built-in user/assistant transcript chrome | No general replacement hook in the declared extension contract | Host-owned; not pixel-identical |
+| User/assistant transcript chrome | Read-only public branch, Markdown and custom overlay | Reference rows implemented in `/pituix-transcript`; live native transcript still differs |
 | Native model command, transcript navigation, resume | Native Pi commands/components | Retained; `/pituix-model` and `/pituix-resume` provide custom selection surfaces |
 | Claude permission modes and approval dialogs | Pi trust/permission semantics differ | Not emulated |
 | Claude-specific settings tabs and preferences | Extension-specific settings available | Pi-TUIX categories retained; Claude account/runtime controls are not emulated |
@@ -145,6 +145,12 @@ broadly than the observed reference.
 
 Pi exposes `ui_prompt_start` and `ui_prompt_end` for blocking extension prompts.
 They do not provide a replacement renderer for all host permission decisions.
+An actual command-context confirmation did not emit those events in the
+capturing-overlay probe and appeared behind it. A separate noncapturing overlay
+using the native editor's public focus state correctly yielded to confirmations
+and `/model`, and retained normal tool execution and input. This proves a
+possible public route for a live transcript projection; it is not integrated
+until notification, widget, queue, scroll and replacement behavior is verified.
 
 Tool headings retain explicit status and attention text for accessibility.
 Group summaries also retain a compact target list and explicit success status;
@@ -212,6 +218,18 @@ remain a measured difference, rather than a claim of full syntax parity.
 - Successful Claude Read/Bash/Edit/Write calls and approval dialogs are now
   observed. Full cross-product visual parity remains incomplete; the tool
   presentation gaps above are based on these authenticated observations.
+- The conversation snapshot tests cover raw prompts, Markdown structure,
+  message/tool order, result expansion, orphan results, media labels, hidden
+  custom messages, errors, cancellation, compaction summaries, ANSI/CJK bounds
+  and scroll/close behavior. The reader clones public branch data and invokes
+  no tool execution or session mutation. Actual Pi 100x40 and 80x24 sessions
+  check grouped/expanded recorded tools, page navigation, editor return and
+  `/pituix-default`. The live transcript and resume text preview are unchanged.
+  At 100 columns, the sampled plain assistant line matches all cell text,
+  foreground, background and inverse values in the reference. The sampled
+  two-line user message matches text and background; one automatically wrapped
+  whitespace cell retains a different foreground. Complex Markdown and media
+  are not claimed to match fully.
 - Resume-picker tests cover public session scope, filtering, native input paste,
   preview navigation, two-step selection, loading failures, late callback
   cleanup, single switch delegation, and ANSI/CJK width/height bounds. Actual

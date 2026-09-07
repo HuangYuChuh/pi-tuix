@@ -62,6 +62,8 @@ The working line shows elapsed time and reported output tokens when available. A
 
 `/pituix-resume` searches saved Pi sessions and previews their public message text. Type to filter, press Enter to select a result, then Enter again to resume. Space opens a text preview; Ctrl+A switches between the current project and all projects. Pi performs the actual session switch. Native `/resume` and `/tree` remain available.
 
+`/pituix-transcript` opens a read-only snapshot of the current conversation, with reference-style user/assistant rows and recorded tool results. Use Page Up/Down or Home/End to scroll, the configured tool-expansion key to reveal details and thinking, and Esc to return to the same editor. It does not rerun tools or change session data. Media is labelled; other extensions' tools use a generic public Pi view. This reader is separate from the live transcript.
+
 These commands are reversible:
 
 | Command | Purpose |
@@ -76,6 +78,7 @@ These commands are reversible:
 | `/pituix-model` | Choose a Pi model and thinking level in the numbered picker |
 | `/pituix-resume` | Search, preview and resume saved Pi sessions |
 | `/pituix-session` | Navigate entries in the current Pi session tree |
+| `/pituix-transcript` | Read a scrollable snapshot with message and tool detail |
 | `/pituix-settings` | Open shell, footer, icon, and telemetry settings |
 | `/pituix-steer <message>` | Interrupt the current run with an immediate correction |
 | `/pituix-followup <message>` | Queue work to start after the current run |
