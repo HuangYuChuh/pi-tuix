@@ -142,7 +142,13 @@ export function createOpenTuiShellRuntime(
         getSubagentActivity: subagentActivity?.getState,
       },
     );
-    editor = installEditor(pi, ctx, config.cursorStyle, config.fullscreen.wheelScrollLines);
+    editor = installEditor(
+      pi,
+      ctx,
+      config.cursorStyle,
+      config.fullscreen.wheelScrollLines,
+      config.icons.mode,
+    );
     active = true;
   };
 
@@ -164,10 +170,12 @@ export function createOpenTuiShellRuntime(
   registerSettingsCommand(pi, {
     getConfig: () => config,
     onConfigChanged: (next) => {
+      const iconsChanged = config.icons.mode !== next.icons.mode;
       const cursorChanged = config.cursorStyle !== next.cursorStyle;
       const wheelChanged = config.fullscreen.wheelScrollLines !== next.fullscreen.wheelScrollLines;
       config = next;
       saveConfig(config);
+      if (iconsChanged) editor?.setIconMode(config.icons.mode);
       if (cursorChanged) editor?.setCursorStyle(config.cursorStyle);
       if (wheelChanged) editor?.setWheelScrollLines(config.fullscreen.wheelScrollLines);
       if (context) refresh(context, true);

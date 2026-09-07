@@ -106,6 +106,10 @@ test("empty-input help toggles without submitting text and ordinary question mar
   assert.match(input.render(100).map(stripTerminalSequences).join("\n"), /ctrl\+o expand tools/);
   input.handleInput("\x1b");
   assert.doesNotMatch(input.render(100).map(stripTerminalSequences).join("\n"), /expand tools/);
+  input.setIconMode("ascii");
+  assert.match(stripTerminalSequences(input.render(80)[1] ?? ""), /^> /);
+  input.setIconMode("nerd");
+  assert.match(stripTerminalSequences(input.render(80)[1] ?? ""), /^❯ /);
   input.setText("why");
   input.handleInput("?");
   assert.equal(input.getText(), "why?");
@@ -139,6 +143,7 @@ test("compact footer displays running hints and context pressure without width o
   assert.match(stripTerminalSequences(component.render(100)[0] ?? ""), /\? for shortcuts/);
   state.workingSince = Date.now();
   assert.match(stripTerminalSequences(component.render(100)[0] ?? ""), /esc.*to interrupt/);
+  assert.match(stripTerminalSequences(component.render(24)[0] ?? ""), /interrupt/);
   percent = 96;
   assert.match(stripTerminalSequences(component.render(100)[0] ?? ""), /96% CRITICAL/);
   for (const width of [1, 2, 12, 24, 80, 120]) {

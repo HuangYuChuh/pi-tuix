@@ -243,7 +243,10 @@ export function installFooter(
         if (config.footerStyle === "compact") {
           const running = state.workingSince !== undefined;
           const hint = running ? `${keyText("app.interrupt")} to interrupt` : "? for shortcuts";
-          const left = theme.fg("dim", `  ${hint} · /pituix-status for details`);
+          const left = theme.fg(
+            "dim",
+            `  ${hint}${width >= 80 ? " · /pituix-status for details" : ""}`,
+          );
           const usage = ctx.getContextUsage();
           const pressure = usage?.percent;
           const right =
@@ -252,12 +255,14 @@ export function installFooter(
                   pressure >= 95 ? "error" : "warning",
                   `context ${pressure.toFixed(0)}% ${pressure >= 95 ? "CRITICAL" : "HIGH"}`,
                 )
-              : theme.fg(
-                  "dim",
-                  !meta.effort || meta.effort === "off"
-                    ? meta.model
-                    : `${meta.model} · ${meta.effort}`,
-                );
+              : width < 60
+                ? ""
+                : theme.fg(
+                    "dim",
+                    !meta.effort || meta.effort === "off"
+                      ? meta.model
+                      : `${meta.model} · ${meta.effort}`,
+                  );
           const lines = [truncateToWidth(alignRight(left, right, width, theme), width, "")];
           const activity = hooks.getSubagentActivity?.();
           if (activity?.available) {

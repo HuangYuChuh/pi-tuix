@@ -12,7 +12,7 @@ import {
   applyFullscreenWheelScrollLines,
   DEFAULT_FULLSCREEN_WHEEL_SCROLL_LINES,
 } from "./fullscreen-scroll.ts";
-import { useAsciiChrome } from "./icons.ts";
+import { type IconMode, useAsciiChrome } from "./icons.ts";
 import { findBottomBorderIndex, isEditorBorderLine, stripAnsi } from "./utils.ts";
 
 function fillLine(content: string, width: number): string {
@@ -57,7 +57,7 @@ export function renderPromptRule(
 
 export class OpenTuiEditor extends CustomEditor {
   private helpVisible = false;
-  private readonly ascii: boolean;
+  private ascii: boolean;
   private readonly getBorder: (s: string) => string;
   private cursorStyle: CursorStyle;
   private previewHardwareCursor = false;
@@ -78,6 +78,11 @@ export class OpenTuiEditor extends CustomEditor {
     // thinking-level borders both flow through this one property.
 
     this.getBorder = (s: string) => this.borderColor(s);
+  }
+
+  setIconMode(mode: IconMode): void {
+    this.ascii = useAsciiChrome(mode);
+    this.tui.requestRender();
   }
 
   override setPaddingX(_padding: number): void {
@@ -165,10 +170,12 @@ export function installEditor(
   ctx: ExtensionContext,
   cursorStyle: CursorStyle = "block",
   wheelScrollLines = DEFAULT_FULLSCREEN_WHEEL_SCROLL_LINES,
+  iconMode: IconMode = "auto",
 ) {
   let activeTui: TUI | undefined;
   let activeEditor: OpenTuiEditor | undefined;
   let previousHardwareCursor: boolean | undefined;
+  let currentIconMode = iconMode;
   let currentCursorStyle = cursorStyle;
   let currentWheelScrollLines = wheelScrollLines;
 
@@ -176,10 +183,20 @@ export function installEditor(
     activeTui = tui;
     applyFullscreenWheelScrollLines(tui, currentWheelScrollLines);
     previousHardwareCursor = tui.getShowHardwareCursor();
-    activeEditor = new OpenTuiEditor(tui, editorTheme, keybindings, currentCursorStyle);
+    activeEditor = new OpenTuiEditor(
+      tui,
+      editorTheme,
+      keybindings,
+      currentCursorStyle,
+      useAsciiChrome(currentIconMode),
+    );
     return activeEditor;
   });
   return {
+    setIconMode(next: IconMode): void {
+      currentIconMode = next;
+      activeEditor?.setIconMode(next);
+    },
     setCursorStyle(nextCursorStyle: CursorStyle): void {
       currentCursorStyle = nextCursorStyle;
       activeEditor?.setCursorStyle(nextCursorStyle, previousHardwareCursor);
