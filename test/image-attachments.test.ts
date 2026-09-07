@@ -17,7 +17,7 @@ const entry = (id: string, content = [image()]): Extract<SessionEntry, { type: "
   message: { role: "user", timestamp: 0, content },
 });
 
-test("attachment numbers count visible occurrences in entry order, including repeated bytes", () => {
+test("only visible user attachments consume numbers, including repeated bytes", () => {
   const source: SessionEntry[] = [
     entry("one"),
     {
@@ -51,6 +51,16 @@ test("attachment numbers count visible occurrences in entry order, including rep
         timestamp: 0,
       },
     },
+    {
+      type: "custom_message",
+      id: "visible-custom",
+      parentId: null,
+      timestamp: new Date(0).toISOString(),
+      customType: "notice",
+      content: [image()],
+      display: true,
+    },
+    entry("after-tool"),
   ];
   const before = structuredClone(source);
   assert.deepEqual(
@@ -59,7 +69,9 @@ test("attachment numbers count visible occurrences in entry order, including rep
       { entryId: "one", key: "one:0", number: 1 },
       { entryId: "one:two", key: "one:two:0", number: 2 },
       { entryId: "one:two", key: "one:two:1", number: 3 },
-      { entryId: "tool", key: "tool:0", number: 4 },
+      { entryId: "tool", key: "tool:0", number: undefined },
+      { entryId: "visible-custom", key: "visible-custom:0", number: undefined },
+      { entryId: "after-tool", key: "after-tool:0", number: 4 },
     ],
   );
   assert.deepEqual(source, before);

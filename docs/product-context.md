@@ -108,7 +108,7 @@ explicit confirmation. Pi owns the native name entry and any legacy migration;
 opening, searching, filtering and previewing remain read-only. These controls
 do not introduce a separate session format or require migration on removal.
 
-Conversation readers may create disposable private image files for numbered
-attachment links. They prepare those files outside rendering and clean them up
+The main conversation and readers may create disposable private image files for
+attachment links. User attachments receive occurrence numbers; tool images do not. They prepare those files outside rendering and clean them up
 on normal runtime shutdown. This is UI-owned cache data: original session files,
 message content and model inputs remain Pi-owned and are not rewritten.

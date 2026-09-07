@@ -9,7 +9,7 @@ import { getImageDimensions } from "@earendil-works/pi-tui";
 export interface ImageAttachment {
   entryId: string;
   key: string;
-  number: number;
+  number?: number;
   mimeType: string;
   data: string;
 }
@@ -19,9 +19,14 @@ export type PrepareImages = (
   signal: AbortSignal,
 ) => Promise<ImageLinks>;
 
-/** Number occurrences, including repeated bytes, in saved conversation order. */
+export function imageLabel(image: ImageAttachment): string {
+  return image.number === undefined ? "[Image]" : `[Image #${image.number}]`;
+}
+
+/** Only user attachments consume numbers; repeated bytes still count separately. */
 export function collectImages(entries: readonly SessionEntry[]): ImageAttachment[] {
   const images: ImageAttachment[] = [];
+  let userNumber = 0;
   for (const entry of entries) {
     const content =
       entry.type === "message" && "content" in entry.message
@@ -37,7 +42,8 @@ export function collectImages(entries: readonly SessionEntry[]): ImageAttachment
       images.push({
         entryId: entry.id,
         key: `${entry.id}:${index}`,
-        number: images.length + 1,
+        number:
+          entry.type === "message" && entry.message.role === "user" ? ++userNumber : undefined,
         mimeType: typeof part.mimeType === "string" ? part.mimeType : "",
         data: typeof part.data === "string" ? part.data : "",
       });
@@ -79,7 +85,7 @@ export class SessionImageCache {
       if (this.closed) throw new Error("Image cache is closed");
       const extension = extensions[attachment.mimeType];
       // Only supported raster formats become openable files. Bad/absent media
-      // retains its numbered label instead of breaking the whole conversation.
+      // retains its attachment label instead of breaking the whole conversation.
       if (
         !extension ||
         !attachment.data ||

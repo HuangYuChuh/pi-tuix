@@ -394,7 +394,9 @@ test("numbered attachments stay adjacent to prompts/results and preserve links a
       content.setExpanded(expanded);
       const output = plain(content);
       assert.doesNotMatch(output, /loading|unavailable|not-rendered/);
-      assert.match(output, /Read\(sample.ts\)[\s\S]*\[Image #3\][\s\S]*notice[\s\S]*\[Image #4\]/);
+      assert.match(output, /(?:Read\(sample.ts\)|Read 1 file)[\s\S]*notice[\s\S]*\[Image\]/);
+      assert.doesNotMatch(output, /Image #3|Image #4|result\.png/);
+      if (expanded) assert.match(output, /Read image \(\d+ bytes\)/);
       for (const width of [0, 1, 2, 4, 6, 8, 12, 40, 80, 100]) {
         const lines = content.render(width);
         assert.ok(lines.every((line) => visibleWidth(line) <= width));
@@ -410,7 +412,7 @@ test("numbered attachments stay adjacent to prompts/results and preserve links a
       }
     }
     content.setImageLinks(new Map());
-    assert.equal(plain(content).match(/\(unavailable\)/g)?.length, 4);
+    assert.equal(plain(content).match(/\(unavailable\)/g)?.length, 3);
   }
   assert.deepEqual(source, before);
 });

@@ -55,7 +55,7 @@ export function createOpenTuiShellRuntime(
   const lifecycle = new SessionLifecycle();
   const state: FooterState = createInitialState();
   const telemetry = new TurnTelemetryTracker();
-  const liveTranscript = createLiveTranscript(pi);
+  const liveTranscript = createLiveTranscript(pi, prepareImages);
   let config: OpenTuiConfig = structuredClone(DEFAULT_CONFIG);
   const effort: EffortState = { enabled: false, level: "off", ascii: false };
   const syncEffort = (ctx: ExtensionContext) => {

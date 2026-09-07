@@ -10,7 +10,6 @@ import {
 import {
   type Component,
   getKeybindings,
-  hyperlink,
   Key,
   matchesKey,
   stripTerminalSequences,
@@ -29,6 +28,7 @@ import {
   type ToolRendererMode,
 } from "../tools/renderers-v2.ts";
 import { ToolGroupRuntime } from "../tools/tool-groups.ts";
+import { AttachedContent, contentText } from "./image-attachment-view.ts";
 import {
   collectImages,
   type ImageAttachment,
@@ -38,73 +38,6 @@ import {
 import { messageText, ReferenceAssistantText, ReferenceUserMessage } from "./message-view.ts";
 
 type Message = Extract<SessionEntry, { type: "message" }>["message"];
-
-function contentText(
-  content: unknown,
-  entryId = "",
-  images: ReadonlyMap<string, ImageAttachment> = new Map(),
-): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .map((part, index) => {
-      if (part?.type === "text" && typeof part.text === "string") return part.text;
-      const image = images.get(`${entryId}:${index}`);
-      if (image) return `[Image #${image.number}]`;
-      return `[${messageText(String(part?.type ?? "attachment"))}${part?.mimeType ? `: ${messageText(String(part.mimeType))}` : ""}]`;
-    })
-    .join(content.some((part) => part?.type === "image") ? " " : "\n");
-}
-
-/** Reference attachment branches stay adjacent to their message or tool. */
-class AttachedContent implements Component {
-  private readonly content: Component;
-  private readonly images: readonly ImageAttachment[];
-  private readonly links: ImageLinks;
-  private readonly theme: Theme;
-  private readonly ascii: boolean;
-  private readonly loading: boolean;
-  constructor(
-    content: Component,
-    images: readonly ImageAttachment[],
-    links: ImageLinks,
-    theme: Theme,
-    ascii: boolean,
-    loading: boolean,
-  ) {
-    this.content = content;
-    this.images = images;
-    this.links = links;
-    this.theme = theme;
-    this.ascii = ascii;
-    this.loading = loading;
-  }
-
-  render(width: number): string[] {
-    if (width <= 0) return [];
-    const lines = [...this.content.render(width)];
-    while (lines.length && !stripTerminalSequences(lines.at(-1) ?? "").trim()) lines.pop();
-    for (const image of this.images) {
-      const label = `[Image #${image.number}]`;
-      const url = this.links.get(image.key);
-      lines.push(
-        truncateToWidth(
-          this.theme.fg("muted", this.ascii ? "  L  " : "  ⎿  ") +
-            (url
-              ? hyperlink(label, url)
-              : `${label} ${this.theme.fg("muted", this.loading ? "(loading...)" : "(unavailable)")}`),
-          width,
-          "",
-        ),
-      );
-    }
-    return lines;
-  }
-
-  invalidate(): void {
-    this.content.invalidate();
-  }
-}
 
 /** Display-only snapshot. No session mutations, provider calls or tool execution. */
 export class TranscriptContent implements Component {
@@ -220,7 +153,11 @@ export class TranscriptContent implements Component {
       }
       component.setExpanded(this.expanded);
       tools.set(call.id, component);
-      this.components.push(result ? this.withAttachments(component, result.entryId) : component);
+      this.components.push(
+        result && !(call.name === "read" && !result.message.isError)
+          ? this.withAttachments(component, result.entryId)
+          : component,
+      );
     };
     const addMessage = (message: Message, entryId: string) => {
       if (message.role === "user") {

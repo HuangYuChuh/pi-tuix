@@ -36,7 +36,7 @@ Session renaming is a presentation control over Pi's public name APIs. Pi owns
 the resulting native name entries and any legacy-file migration; selecting,
 searching, filtering and previewing do not write session files.
 
-Image links in conversation previews use removable temporary UI assets. They do
+Image links in the main conversation and previews use removable temporary UI assets. They do
 not introduce a media service, model gateway or separate session format.
 
 ## Design principles

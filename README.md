@@ -54,7 +54,7 @@ The effective thinking level appears above the prompt with Pi's configured short
 
 Each tool row keeps the action, target, state, and attention signal visible. Read defaults to a line-count result branch; Bash shows output, Edit uses an `Update` heading with a numbered diff, and Write previews numbered content. Long previews show the first and last two detail lines. Collapsed mode keeps the summary; expanded mode reveals the full output or diff, including Read contents. Errors retain their details. All views use ANSI-aware width constraints.
 
-Adjacent successful Read/Bash calls combine into a count summary, deduplicating file paths while counting each shell call. Expand tools to reveal every call. Errors, cancellation, images, and truncated results remain separate; assistant text and other tools separate groups. Grouping is reconstructed from Pi's public session branch when resuming.
+Adjacent successful Read/Bash calls combine into a count summary, deduplicating file paths while counting each shell call. Expand tools to reveal every call. Successful Read images also use file counts, with byte summaries on expansion. Errors, cancellation, Bash images, and truncated results remain separate; assistant text and other tools separate groups. Grouping is reconstructed from Pi's public session branch when resuming.
 
 In the reference dark theme, Edit diffs use numbered `+/-` gutters, full-row backgrounds and stronger changed-word backgrounds. Added/context lines use Pi's syntax highlighter. Other themes retain Pi's diff styling; 256-color and no-color terminals have explicit fallbacks.
 
@@ -70,7 +70,7 @@ The main conversation uses reference-style user and assistant rows in both regul
 
 `/pituix-transcript` also opens a read-only snapshot of the current conversation and recorded tool results. Use Page Up/Down or Home/End to scroll, the configured tool-expansion key to reveal details and thinking, and Esc to return to the same editor. It does not rerun tools or change session data. Other extensions' tools use a generic public Pi view.
 
-Both readers show numbered image attachments such as `[Image #1]` next to their messages and tool results. Click the attachment branch in fullscreen mode to open the image; regular mode uses the terminal's hyperlink gesture. Supported PNG/JPEG/GIF/WebP data is prepared asynchronously in private temporary files and removed on normal runtime shutdown. Missing or unsupported data keeps an unavailable label. Numbering follows the displayed branch, including repeated images. Image paste and media presentation in the live main view still use Pi's native behavior.
+The main conversation and both readers show user image attachments such as `[Image #1]` next to their prompts, including image-only messages. Only user attachments consume numbers, in displayed branch order; repeated images count separately. Successful Read images show a file/byte summary, and other tool or custom images use unnumbered `[Image]` links. Click an attachment branch in fullscreen mode to open it; regular mode uses the terminal's hyperlink gesture. Supported PNG/JPEG/GIF/WebP data is prepared asynchronously in private temporary files and removed on normal runtime shutdown. Missing or unsupported data keeps an unavailable label. Main-view search and prompt navigation include the attachment rows. Image paste and draft chips remain native Pi behavior; pasting a file path does not itself create an image attachment.
 
 These commands are reversible:
 

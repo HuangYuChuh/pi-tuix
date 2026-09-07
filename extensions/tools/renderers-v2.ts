@@ -106,10 +106,6 @@ function textOutput(result: AgentToolResult<unknown>): string {
     .join("\n");
 }
 
-function hasImage(result: AgentToolResult<unknown>): boolean {
-  return result.content.some((item) => item.type === "image");
-}
-
 function isCancellation(text: string): boolean {
   return /\b(abort(?:ed)?|cancel(?:led|ed)?)\b/i.test(text);
 }
@@ -234,7 +230,14 @@ export function createThreeLayerReadDefinition(
       const args = context.args as ReadToolInput;
 
       // 计算元信息
-      let meta = hasImage(result) ? "image" : `${readLineCount(output)} lines`;
+      const images = result.content.filter((item) => item.type === "image");
+      const imageBytes = images.reduce(
+        (total, image) => total + Buffer.byteLength(image.data, "base64"),
+        0,
+      );
+      let meta = images.length
+        ? `${images.length === 1 ? "image" : `${images.length} images`} (${imageBytes} bytes)`
+        : `${readLineCount(output)} lines`;
       if (details?.truncation?.truncated) {
         const shown = details.truncation.outputLines ?? readLineCount(output);
         const total = details.truncation.totalLines;
@@ -260,7 +263,14 @@ export function createThreeLayerReadDefinition(
       const displayMode: DisplayMode = options.expanded ? "expanded" : mode.defaultMode;
 
       // 准备详情行
-      const detailLines = formatLines(splitLines(output), theme);
+      // The standard Read image note repeats the byte summary. Preserve any
+      // additional host warnings (for example, model image support) on expansion.
+      const detailLines = formatLines(
+        splitLines(output).filter(
+          (line) => !images.length || context.isError || !/^Read image file \[[^\]]+\]$/.test(line),
+        ),
+        theme,
+      );
 
       const view = new ThreeLayerToolView(displayMode, summary, detailLines, theme, mode.ascii);
       return mode.groups

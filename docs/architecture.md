@@ -169,8 +169,9 @@ preference.
 The preview shares the pure startup header and snapshot transcript components.
 It shows individual tool results (without live Read/Bash grouping), diffs,
 completion records and recorded assistant time/model above text responses.
-Images have numbered attachment branches with local links; other attachments
-have type labels. Header, conversation and recovery hints
+User images have numbered attachment branches with local links. Successful Read
+images show byte summaries; other tool/custom images have unnumbered links and
+other attachments have type labels. Header, conversation and recovery hints
 scroll inside the reference separator. Arrows, paging, Home/End, wheel input and
 Pi's tool-expansion binding stay scoped to a public modal overlay; a fullscreen
 host otherwise consumes viewport keys before non-overlay editor input. The
@@ -188,27 +189,41 @@ unaffected. Recorded tool calls/results are paired by ID and displayed through
 public `ToolExecutionComponent` instances and the existing Pi-TUIX renderers.
 No executor is invoked or newly registered. Missing calls, failed/aborted
 responses, visible custom messages and compaction summaries remain explicit.
-Images share the preview's numbered branches; foreign tool renderers are not copied.
+Images share the preview's attachment presentation; foreign tool renderers are not copied.
 Rendering performs no I/O. The reader owns only scroll/expansion state, returns
 to the same editor, and remains a separate view of the current branch. The resume
 preview reuses its content renderer with individual tools and message metadata;
 the main snapshot keeps its existing grouping and optional expansion.
 
 `SessionImageCache` prepares supported raster attachments outside rendering.
-Occurrence numbers follow the displayed branch, while content hashes deduplicate
-temporary file bytes across repeated images and concurrent previews. Files use
+Only user images receive occurrence numbers in displayed branch order. Tool/custom
+images do not advance that counter. Content hashes deduplicate temporary bytes
+across repeated images and concurrent main/preview preparation. Files use
 mode 0600 inside a fresh 0700 temporary directory. Base64, MIME/header dimensions
 and a 28 MiB encoded-size limit are checked before writing; unavailable media
-keeps a numbered label. Public `hyperlink` supplies OSC 8 links. Pi's fullscreen
+keeps an attachment label. Public `hyperlink` supplies OSC 8 links. Pi's fullscreen
 `openUrl` handling or the regular terminal opens them; no shell command runs from
 the renderer. Preparation cannot block modal navigation, and abort/request guards
 discard late updates after closure or a new selection. Runtime shutdown waits for
 pending writes, removes the temporary directory and resets the cache. These are
 disposable UI assets, not a second media catalogue or session store. Session
 files, original message content, model inputs and tool execution remain unchanged.
-The live main view and editor still retain native Pi image handling; the public
-user-message component does not expose its image payload, and image-only user
-messages are absent from Pi's native document in the tested versions.
+The live main adapter reads image payloads from public context entries and stages
+user/assistant message events until Pi persists them. It uses exact native component
+kind/order and observed user text to match rows. Image-only prompts, absent from
+the tested native document, become render-only rows anchored to that sequence.
+Native message instances, child order and session entries remain unchanged. An
+unknown or incomplete layout falls back to native output instead of guessing an
+attachment identity. Late-mounted chat containers are recognized separately from
+plain resource text. Public tool bitmap children are omitted only when composing
+those children exactly reproduces the native output; the native children and image
+visibility state are preserved for default-mode restoration. Successful Read
+images retain their tool summary without an extra attachment branch; other tool
+images keep unnumbered links. Width/theme/link-state caches cover stable prompts.
+The same rendered document supplies native search, prompt navigation and link
+activation. Deferred persistence refreshes and asset loads cancel on unmount.
+Editor image paste and draft chips still use Pi's native behavior: bracketed
+paste of a PNG path produced text rather than image content in the tested host.
 
 The main view composes reversible presentation containers into the public
 document tree. A version-local adapter recognizes public
@@ -282,7 +297,10 @@ Adjacent successful Read/Bash calls share a compact count summary. The grouping
 adapter observes public finalized messages and tool completion events, and
 rehydrates metadata from `sessionManager.getBranch()` on startup/navigation.
 It deduplicates lexically normalized file paths, counts every Bash call, and
-keeps failures, images, truncation, visible text and other tools as boundaries.
+keeps failures, Bash images, truncation, visible text and other tools as boundaries.
+Successful Read images participate in file counts, including a single-image Read.
+Expansion shows the returned image byte count, suppresses the redundant standard
+Read image note and preserves any additional host warning text.
 Group members use their individual tool views when expanded. Only affected tool
 rows are invalidated after completion; no message or session entry is rewritten.
 Execution functions, argument schemas, and permission behavior are
