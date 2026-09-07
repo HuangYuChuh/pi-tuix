@@ -16,6 +16,7 @@ Pi-TUIX is a focused terminal UI layer for Pi Coding Agent. It brings a Claude C
 - working, thinking, approval, and queue indicators;
 - Pi-specific theme tokens and UI preferences;
 - display-only run completion metadata, including an observed Git branch, and its rendering through Pi custom entries;
+- display-only attachment numbers bound to delivered messages through Pi custom entries;
 - keyboard interaction that is explicitly scoped to the extension.
 
 ## What Pi-TUIX does not own
@@ -27,7 +28,7 @@ Pi-TUIX is a focused terminal UI layer for Pi Coding Agent. It brings a Claude C
 - model catalogues;
 - project file mutation outside Pi's existing tools.
 
-Pi stores and restores completion metadata through its public session API. These
+Pi stores and restores completion and attachment-number metadata through its public session API. These
 entries stay outside model context and need no migration when Pi-TUIX is removed.
 Owning the UI payload does not transfer session persistence or branching to the
 extension.
@@ -72,3 +73,10 @@ Code 2.1.263. Fidelity is tracked per surface in the
 [parity report](claude-code-parity.md). Pi-TUIX preserves its identity and Pi's
 actual controls; it does not claim complete reproduction while reference flows
 remain unverified or the public host APIs leave rendering gaps.
+
+Image draft chips are input presentation. They use the native editor's grapheme
+editing and undo, then return text/images through Pi's public input event. The
+extension does not submit requests or run a separate delivery queue.
+Number annotations contain only a version, timestamp, content fingerprint and
+number list. They let the main view and readers distinguish owned attachments
+from unrelated literal labels without retaining source paths or extra image data.

@@ -41,6 +41,12 @@ export default function piTuix(pi: ExtensionAPI): void {
     subagentActivity,
     (ctx) => syncInterface(ctx),
     prepareImages,
+    (ctx) => {
+      if (!ctx.hasPendingMessages()) {
+        workflow.queuedMessages = 0;
+        refreshWorkflow(workflow);
+      }
+    },
   );
   // 工具渲染模式配置
   const groups = new ToolGroupRuntime();

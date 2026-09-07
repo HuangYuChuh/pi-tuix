@@ -196,7 +196,17 @@ preview reuses its content renderer with individual tools and message metadata;
 the main snapshot keeps its existing grouping and optional expansion.
 
 `SessionImageCache` prepares supported raster attachments outside rendering.
-Only user images receive occurrence numbers in displayed branch order. Tool/custom
+Only user images receive numbers. A matching `pi-tuix-image-numbers` custom entry
+supplies known numbers for delivered draft attachments. Matching requires the
+next user message, exact timestamp, image count and a SHA-256 fingerprint of its
+ordered text/image content. Unknown native-image slots retain the fallback below.
+When user text contains one valid positional
+label per image, those labels preserve their numbers and positions, including
+deleted-draft gaps. When repeated references outnumber image blocks, a matching
+set of distinct labels supplies first-reference numbers instead. Original
+one-label-per-block messages retain their prior interpretation; other user images
+receive branch-order numbers. Ambiguous legacy messages are not backfilled.
+Tool/custom
 images do not advance that counter. Content hashes deduplicate temporary bytes
 across repeated images and concurrent main/preview preparation. Files use
 mode 0600 inside a fresh 0700 temporary directory. Base64, MIME/header dimensions
@@ -222,8 +232,95 @@ images retain their tool summary without an extra attachment branch; other tool
 images keep unnumbered links. Width/theme/link-state caches cover stable prompts.
 The same rendered document supplies native search, prompt navigation and link
 activation. Deferred persistence refreshes and asset loads cancel on unmount.
-Editor image paste and draft chips still use Pi's native behavior: bracketed
-paste of a PNG path produced text rather than image content in the tested host.
+The editor handles explicitly pasted image paths through bounded file
+read outside rendering. It accepts PNG/JPEG/GIF/WebP headers with positive
+reported dimensions, regular files up to 20 MiB, and a 128 MiB per-runtime draft
+budget. An unrecognized path stays as ordinary pasted text. Quoted, shell-escaped,
+relative, home and file-URL paths are supported. Native clipboard callbacks still
+own clipboard access; their public `insertTextAtCursor` call enters the same path.
+For multiple paths, a pure tokenizer accepts absolute, home and file-URL tokens
+with quoted or escaped spaces. It does not evaluate shell syntax. Limits of 64
+paths and 64 KiB of path-list text bound parsing and file operations. A path list
+containing ordinary prose stays as text. Valid images receive tokens in source
+order, separated by one space; unavailable and non-image paths retain their raw
+spelling. Remaining draft capacity bounds each read before allocation. The whole
+batch enters the native editor in one insertion, preserving a single undo step.
+
+Each chip occupies one private-use Unicode grapheme in the native editor buffer.
+Native movement, deletion, kill/yank and undo therefore retain atomic image
+identity without replacing or inspecting the editor's undo/paste registries.
+A separate pure layout expands that grapheme to its visible numbered label,
+wraps whole chips, and derives cursor position from public `getLines`/`getCursor`.
+Vertical movement follows the expanded rows through public native key handling;
+autocomplete and explicit history bindings retain their native behavior.
+
+A public input handler replaces owned draft tokens with positional labels and
+adds the captured image bytes, preserving any existing input images. Pi performs
+submission, steering/follow-up delivery and persistence. Literal labels typed by
+a user do not create attachments. Incoming user-message events reserve numbers
+before persistence; deleted numbers are not recycled within the runtime. A fresh
+editor seeds from actual images and valid user text labels on the selected saved
+branch, ignoring assistant/tool labels. A successful paste also observes labels
+in the current visible draft. Discarded text, failed image reads and newly delivered
+text-only messages do not advance the running counter. Hidden text inside native
+collapsed pastes is not scanned. Unsafe integer labels cannot allocate duplicate
+numbers. Draft
+links asynchronously share the runtime's private image cache, so opening them
+shows captured bytes even if the source file changes. Late preparation cancels
+on shutdown. Private editor tokens and source paths are never saved separately.
+
+Input observations also remember a bounded content fingerprint and ordered number
+list. On a matching public user-message start, `pi.appendEntry` records versioned
+display metadata before Pi appends the user message. This handler runs before the
+live image adapter stages that row. No image bytes, text or source paths enter the
+annotation, and Pi excludes plain custom entries from model context. The message
+timestamp prevents a dangling annotation from matching a later identical payload.
+Conflicting identical-payload observations fall back rather than guess; an empty
+queue, take-back or disposal clears stale records. Bounds are 256 inputs and 65536
+number slots. Changes by a later input handler fail the content match.
+When compaction drops an annotation immediately before a kept user message,
+the live/preview presentation projection may reinsert its matching ancestor entry
+from the public branch. It never adds a summarized message, uses sibling metadata,
+changes model context or writes the session. Removing the extension needs no migration.
+
+The native follow-up action reads unresolved editor content so image data reaches
+the input event. Disposable input observations record original/displayed text,
+steering/follow-up lane and image fingerprints. They neither submit nor execute
+messages. Public user-message events retire observations using text and image
+payloads; a clear `hasPendingMessages()` result discards stale observations.
+The public dequeue and interrupt actions restore chips only when the complete
+native take-back text matches those observations in steering/follow-up order.
+The current draft is captured separately, including expanded native paste data,
+so literal labels never acquire attachments from matching numbers. A mismatch
+keeps the host text and warns when owned images could not be restored. Records
+are bounded to 256 inputs and 8 MiB of text; overflow disables matching until
+cleared. Disposal clears all observations. An empty public queue also resets the
+presentation badge after take-back. Later input handlers can still change image
+payloads without changing text; Pi exposes no accepted-queue payload event to
+verify that case. Unobserved compaction queues also lack complete public metadata.
+The native external-editor action receives readable labels; its public `setText`
+callback restores surviving known labels to their image identities. Repeated
+references share one current attachment; removing the final reference removes
+it. Input transformation deduplicates owned identities in first visible-reference
+order, including references typed before the corresponding chip. Distinct pasted
+identities remain distinct even with identical bytes, and incoming host images
+remain untouched. Unknown/old labels do not acquire images absent from the
+exported draft. The next keystroke clears an unanswered external exchange, since
+a failed native editor does not call `setText`. Disabling the
+extension expands remaining draft chips to readable source paths before restoring
+the host editor. This also preserves the contents of native collapsed text pastes.
+After a new runtime, Pi recalls historical labels as text without automatically
+reattaching image bytes. The sampled Claude history recall also submits text only.
+Literal `[Image #N]` spans now share whole-span layout and arrow/word navigation
+without entering the attachment registry. A span deletion uses public `setText`
+to create one native undo snapshot, then restores the cursor through native key
+handling. When expanded text differs from the editor buffer, deletion stays
+native: `setText` would otherwise clear the host's collapsed-paste registry.
+History remains Pi-owned and no display token or image data is inserted for a
+literal label. Collapsed-paste deletion, native commands consuming arguments
+before the input event, and a shared counter for long text/image paste references
+need further work. Quoted path-list acceptance and retaining unavailable paths
+are documented differences from the sampled reference parser.
 
 The main view composes reversible presentation containers into the public
 document tree. A version-local adapter recognizes public

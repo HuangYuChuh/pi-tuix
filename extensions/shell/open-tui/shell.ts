@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { registerModelPicker } from "../../control/model-picker.ts";
 import type { PrepareImages } from "../../session/image-attachments.ts";
+import { IMAGE_NUMBERS_ENTRY_TYPE } from "../../session/image-number-metadata.ts";
 import { registerResumePicker } from "../../session/resume-picker.ts";
 import type { SubagentActivityObserver } from "../../session/subagent-activity.ts";
 import {
@@ -10,6 +11,7 @@ import {
   type OpenTuiConfig,
   saveConfig,
 } from "./config.ts";
+import { DraftImages } from "./draft-images.ts";
 import { installEditor } from "./editor.ts";
 import { type EffortState, renderEffortLine } from "./effort.ts";
 import { installFooter } from "./footer.ts";
@@ -51,10 +53,18 @@ export function createOpenTuiShellRuntime(
   subagentActivity?: SubagentActivityObserver,
   onSettingsApplied?: (ctx: ExtensionContext) => void,
   prepareImages?: PrepareImages,
+  onQueueRestored?: (ctx: ExtensionContext) => void,
 ): OpenTuiShellRuntime {
   const lifecycle = new SessionLifecycle();
   const state: FooterState = createInitialState();
   const telemetry = new TurnTelemetryTracker();
+  let draftImages = new DraftImages(prepareImages, () => requestRender?.());
+  pi.on("input", (event, ctx) => draftImages.transform(event, ctx.hasPendingMessages()));
+  pi.on("message_start", (event, ctx) => {
+    const numbers = draftImages.reserve(event.message, ctx.hasPendingMessages());
+    if (numbers && ctx.mode === "tui") pi.appendEntry(IMAGE_NUMBERS_ENTRY_TYPE, numbers);
+  });
+  pi.on("message_end", (_event, ctx) => draftImages.observe(ctx.sessionManager.getBranch()));
   const liveTranscript = createLiveTranscript(pi, prepareImages);
   let config: OpenTuiConfig = structuredClone(DEFAULT_CONFIG);
   const effort: EffortState = { enabled: false, level: "off", ascii: false };
@@ -183,8 +193,18 @@ export function createOpenTuiShellRuntime(
       config.fullscreen.wheelScrollLines,
       config.icons.mode,
       (width) => renderEffortLine(effort, ctx.ui.theme, width),
-      (tui, activeEditor) =>
-        liveTranscript.mount(tui, activeEditor, ctx, () => useAsciiChrome(config.icons.mode)),
+      (tui, activeEditor) => {
+        activeEditor.onQueueRestored = () => onQueueRestored?.(ctx);
+        activeEditor.onQueueRestoreUnmatched = () =>
+          ctx.ui.notify(
+            "Could not verify restored image attachments. Check the draft and reattach missing images.",
+            "warning",
+          );
+        return liveTranscript.mount(tui, activeEditor, ctx, () =>
+          useAsciiChrome(config.icons.mode),
+        );
+      },
+      draftImages,
     );
     active = true;
     if (state.workingSince !== undefined) startTimer();
@@ -265,6 +285,9 @@ export function createOpenTuiShellRuntime(
     remove,
     handleSessionStart(ctx) {
       lifecycle.start();
+      draftImages.dispose();
+      draftImages = new DraftImages(prepareImages, () => requestRender?.());
+      draftImages.seedHistory(ctx.sessionManager.getBranch());
       subagentActivity?.reset();
       subagentActivity?.setOnChange(() => requestRender?.());
       context = ctx;
@@ -278,6 +301,7 @@ export function createOpenTuiShellRuntime(
       lifecycle.shutdown();
       subagentActivity?.setOnChange(undefined);
       remove(ctx);
+      draftImages.dispose();
       context = undefined;
     },
     handleAgentStart() {
