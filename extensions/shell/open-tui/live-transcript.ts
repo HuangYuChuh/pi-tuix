@@ -20,6 +20,7 @@ import {
   truncateToWidth,
 } from "@earendil-works/pi-tui";
 import type { PrepareImages } from "../../session/image-attachments.ts";
+import { styleReferenceMarkdownLines } from "../../session/markdown-style.ts";
 import { ReferenceUserMessage, renderAssistantLines } from "../../session/message-view.ts";
 import type { OpenTuiEditor } from "./editor.ts";
 import { OpenTuiHeader } from "./header.ts";
@@ -217,7 +218,9 @@ export class LiveMessageMirror {
         const sourceLines = read.lines;
         return this.cached(child, sourceLines, width, theme, ascii, () =>
           renderAssistantLines(
-            sourceLines.map((line) => sliceByColumn(line, padding, availableWidth, true)),
+            styleReferenceMarkdownLines(
+              sourceLines.map((line) => sliceByColumn(line, padding, availableWidth, true)),
+            ),
             width,
             theme,
             ascii,

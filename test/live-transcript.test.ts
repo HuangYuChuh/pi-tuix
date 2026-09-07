@@ -389,9 +389,12 @@ test("both native modes share live message presentation without changing dock, f
       h.chat.addChild(h.assistant);
       h.responseMarkdown.setText("Streaming updated 中文");
       assert.match(plain(h.document.render(80)), /⏺ Streaming updated 中文/);
+      h.responseMarkdown.setText("```ts\nconst restored = true;\n```");
+      assert.doesNotMatch(plain(h.document.render(80)), /```/);
       h.dispose();
       assert.deepEqual(h.document.children, [h.chat]);
       assert.equal(plain(h.document.render(80)), plain(h.chat.render(80)));
+      assert.match(plain(h.document.render(80)), /```ts/);
     } finally {
       h.close();
     }

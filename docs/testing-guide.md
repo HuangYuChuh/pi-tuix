@@ -200,6 +200,24 @@ Expected:
 ✅ Still shows error status and attention marker
 ✅ Manual expansion still works
 
+### Scenario 11: Markdown Presentation Across Surfaces
+
+**Test:** Send or replay a fixture containing a heading, a TypeScript fenced block,
+a table, a blockquote, nested lists, Chinese text and emoji. Check widths 24, 40,
+80 and 100 in both regular and fullscreen modes, then open `/pituix-transcript`
+and the same saved session through `/pituix-resume` preview.
+
+Expected:
+- Code fence delimiters are hidden and code starts at the assistant body column.
+- Table header text is centered within the same columns used by its data rows.
+- Quote text is italic beside a visible quote rail.
+- CJK, emoji, ANSI syntax colors and long table cells stay within terminal width.
+- Live, transcript and resume-preview message bodies agree at each width.
+- `/pituix-default` restores Pi's native Markdown presentation; `/pituix` reapplies the adapter.
+
+Record the terminal name/version, Pi version, renderer mode, dimensions and a
+plain-text or screenshot capture for the issue evidence.
+
 ## Verification Checklist
 
 After testing, verify:
@@ -212,6 +230,9 @@ After testing, verify:
 - [ ] No regression in tool execution behavior
 - [ ] Performance is acceptable (no visible lag)
 - [ ] Works with both Unicode and ASCII icon modes
+- [ ] Markdown treatment agrees across live, transcript and resume preview
+- [ ] Markdown remains bounded at 24, 40, 80 and 100 columns
+- [ ] `/pituix-default` restores native Markdown rendering
 
 ## Debugging
 

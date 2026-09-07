@@ -17,6 +17,7 @@ import {
   TuiAltScreen,
   visibleWidth,
 } from "@earendil-works/pi-tui";
+import { styleReferenceMarkdownLines } from "../extensions/session/markdown-style.ts";
 import {
   ReferenceAssistantText,
   ReferenceUserMessage,
@@ -207,6 +208,96 @@ test("reference message rows retain raw prompts and render Markdown before addin
   assert.doesNotMatch(rendered, /# Heading|\*\*bold\*\*/);
   assert.match(rendered, / {2}.*bold text/);
   assert.match(rendered, /const x = 1/);
+});
+
+test("reference Markdown hides fences, aligns code, centers table headings and italicizes quotes", () => {
+  const source = [
+    "```ts",
+    'const greeting = "中文🙂";',
+    "```",
+    "",
+    "| Item | Description |",
+    "| --- | --- |",
+    "| Alpha | 中文🙂 value |",
+    "",
+    "> Quoted 中文🙂 body",
+  ].join("\n");
+  for (const width of [24, 40, 80, 100]) {
+    const component = new ReferenceAssistantText(source, theme);
+    const lines = component.render(width);
+    const output = lines.map(stripTerminalSequences);
+    assert.ok(lines.every((line) => visibleWidth(line) <= width));
+    assert.doesNotMatch(output.join("\n"), /```/);
+    assert.ok(output.some((line) => /^(?:⏺ | {2})const greeting = "/.test(line)));
+    const top = output.findIndex((line) => line.includes("┌"));
+    const divider = output.findIndex((line, index) => index > top && line.includes("├"));
+    assert.ok(top >= 0 && divider > top);
+    for (const row of output.slice(top + 1, divider)) {
+      for (const cell of row.slice(2).split("│").slice(0, -1)) {
+        const leading = cell.match(/^ */)?.[0].length ?? 0;
+        const trailing = cell.match(/ *$/)?.[0].length ?? 0;
+        assert.ok(Math.abs(leading - trailing) <= 1, `${width}: ${JSON.stringify(cell)}`);
+      }
+    }
+    const quote = lines.find((line) => stripTerminalSequences(line).includes("Quoted"));
+    assert.ok(quote?.includes("\x1b[3m"));
+    assert.ok(quote?.includes("\x1b[23m"));
+  }
+});
+
+test("quote italics honor NO_COLOR and explicit FORCE_COLOR", () => {
+  const savedNoColor = process.env.NO_COLOR;
+  const savedForceColor = process.env.FORCE_COLOR;
+  try {
+    process.env.NO_COLOR = "1";
+    delete process.env.FORCE_COLOR;
+    assert.ok(
+      !new ReferenceAssistantText("> quote", theme).render(40).join("").includes("\x1b[3m"),
+    );
+    process.env.FORCE_COLOR = "1";
+    assert.ok(new ReferenceAssistantText("> quote", theme).render(40).join("").includes("\x1b[3m"));
+  } finally {
+    if (savedNoColor === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = savedNoColor;
+    if (savedForceColor === undefined) delete process.env.FORCE_COLOR;
+    else process.env.FORCE_COLOR = savedForceColor;
+  }
+});
+
+test("wrapped fence language labels stay hidden in tiny assistant layouts", () => {
+  const response = new ReferenceAssistantText("```typescript\nVALUE_END\n```", theme);
+  for (const width of [1, 2, 3, 4, 5, 6, 8]) {
+    const output = plain(response, width);
+    assert.equal(output.replace(/[\s⏺]/gu, ""), "VALUE_END", `width ${width}`);
+    assert.ok(response.render(width).every((line) => visibleWidth(line) <= width));
+  }
+});
+
+test("Markdown presentation preserves ANSI, dimensions and source while adapting public output", () => {
+  const source = [
+    "\x1b[90m```ts\x1b[39m     ",
+    "  \x1b[34mconst\x1b[39m value = \x1b[32m'中文🙂'\x1b[39m;  ",
+    "\x1b[90m```\x1b[39m       ",
+    "┌───────┬──────────┐   ",
+    "│ Item  │ Text     │   ",
+    "├───────┼──────────┤   ",
+    "│ Alpha │ 中文🙂  │   ",
+    "└───────┴──────────┘   ",
+    "│ \x1b[90mquote 中文🙂\x1b[39m       ",
+  ];
+  const before = [...source];
+  const styled = styleReferenceMarkdownLines(source);
+  assert.deepEqual(source, before);
+  assert.equal(styled.length, source.length - 2);
+  assert.ok(styled[0].includes("\x1b[34m"));
+  assert.equal(stripTerminalSequences(styled[0]).startsWith("const"), true);
+  assert.match(stripTerminalSequences(styled[2]), /^│\s+Item\s+│\s+Text\s+│/);
+  assert.ok(styled.at(-1)?.includes("\x1b[3m"));
+  assert.ok(
+    styled.every((line, index) =>
+      index === 0 ? visibleWidth(line) === visibleWidth(source[1]) - 2 : visibleWidth(line) > 0,
+    ),
+  );
 });
 
 test("narrow assistant snapshots preserve complete text instead of clipping each row", () => {

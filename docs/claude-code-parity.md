@@ -73,9 +73,25 @@ a TypeScript fence, a three-column table, blockquotes and nested/ordered lists.
 Code content appeared without visible fence delimiters and started at the normal
 assistant body column. Table cells wrapped within their columns, including CJK
 and long tokens, and headings in table cells were centered. Quotes used an italic
-body and a vertical marker. These are observed differences from Pi's native
-Markdown styling, which Pi-TUIX continues to preserve; this change does not claim
-matching fence, heading, quote or syntax styles.
+body and a vertical marker. Pi-TUIX now composes those measured treatments over
+Pi's public Markdown output: it hides rendered fence rows, removes Pi's two-cell
+code indent, centers each wrapped table-header cell inside Pi's calculated column,
+and italicizes quote bodies while retaining the quote rail. Live messages,
+`/pituix-transcript`, and resume previews share the same adapter. Headings, table
+borders, list layout and token-level syntax colors still come from Pi's active
+Markdown theme and highlighter; exact color and font-weight parity is not claimed.
+
+A local Pi 0.85.1 fullscreen PTY replay then loaded a disposable one-message
+session with the current extension in offline mode at 80x40 and 40x70. At 80
+columns the table header cells rendered exactly as ` Item  `, fifteen spaces +
+`Description` + fifteen spaces, and ` Result ` inside Pi's borders. At 40 columns
+the wrapped header rendered ` Item `, five spaces + `Description` + six spaces,
+and ` Resu ` followed by `  lt  `. Both captures contained `Layout check`, code,
+table/quote rows and `FINAL_MARKER`, contained zero visible triple-backtick rows,
+and bounded every row to the PTY width. The raw stream contained SGR italic open
+and close sequences around the quote body, and no extension TypeError,
+ReferenceError or load failure. The fixture session used no provider request and
+executed no tools.
 
 The width audit found an independent Pi-TUIX bug: a zero-padding assistant at
 four columns displayed `ABCDEFGHIJKLMNOPQRSTUVWXYZ` as `AB EF IJ MN QR UV YZ`
@@ -524,8 +540,11 @@ remain a measured difference, rather than a claim of full syntax parity.
   At 100 columns, the sampled plain assistant line matches all cell text,
   foreground, background and inverse values in the reference. The sampled
   two-line user message matches text and background; one automatically wrapped
-  whitespace cell retains a different foreground. Complex Markdown and media
-  are not claimed to match fully.
+  whitespace cell retains a different foreground. Complex Markdown tests now
+  cover hidden fences, unindented code, centered table headings, italic quote
+  bodies, ANSI/CJK/emoji bounds and live/snapshot agreement at 24, 40, 80 and
+  100 columns. Pi-owned heading, border, list and syntax colors remain intentional
+  differences. Media is not claimed to match fully.
 - Live-view tests use public `TuiMainScreen` and `TuiAltScreen` instances to
   exercise both native renderers. They cover streamed/cache updates, original
   chat-container additions/removals, dock preservation, reversible wrapper

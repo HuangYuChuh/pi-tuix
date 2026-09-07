@@ -16,6 +16,7 @@ import {
   IMAGE_NUMBERS_ENTRY_TYPE,
   imageContentFingerprint,
 } from "../extensions/session/image-number-metadata.ts";
+import { ReferenceAssistantText } from "../extensions/session/message-view.ts";
 import {
   loadSessionMetadata,
   loadSessionPreview,
@@ -23,6 +24,7 @@ import {
   SessionPreviewContent,
 } from "../extensions/session/session-preview.ts";
 import { COMPLETION_ENTRY_TYPE } from "../extensions/stream/completion-entry.ts";
+import { complexMarkdown } from "./fixtures/markdown-layout.ts";
 
 initTheme("dark", false);
 const theme = {
@@ -194,6 +196,45 @@ test("saved preview renders recorded tools separately, diffs, metadata, media la
     assert.ok(content.render(width).every((line) => visibleWidth(line) <= width));
   content.invalidate();
   assert.match(render(), /Recorded response/);
+});
+
+test("saved preview shares the reference Markdown presentation at measured widths", () => {
+  const manager = SessionManager.inMemory("/snapshot-project");
+  manager.appendMessage(assistant([{ type: "text", text: complexMarkdown }]));
+  const snapshot = {
+    entries: manager.buildContextEntries(),
+    cwd: manager.getCwd(),
+    model: "fixture/model",
+    effort: "off",
+  };
+  const preview = new SessionPreviewContent(snapshot, theme, {} as TUI);
+  const expected = new ReferenceAssistantText(complexMarkdown, theme);
+  for (const width of [24, 40, 80, 100]) {
+    const lines = preview.render(width);
+    const output = lines.map(stripTerminalSequences).join("\n");
+    assert.ok(lines.every((line) => visibleWidth(line) <= width));
+    assert.doesNotMatch(output, /```/);
+    assert.match(output, /const greeting/);
+    const rows = output.split("\n");
+    const top = rows.findIndex((line) => line.includes("┌"));
+    const divider = rows.findIndex((line, index) => index > top && line.includes("├"));
+    assert.ok(top >= 0 && divider > top);
+    assert.deepEqual(
+      [1, 2, 3].map((column) =>
+        rows
+          .slice(top + 1, divider)
+          .map((line) => line.split("│")[column]?.trim() ?? "")
+          .join(""),
+      ),
+      ["Item", "Description", "Result"],
+    );
+    assert.match(output, /│.*quoted paragraph/);
+    for (const marker of ["Layout check", "FINAL_MARKER"])
+      assert.equal(
+        output.includes(marker),
+        expected.render(width).map(stripTerminalSequences).join("\n").includes(marker),
+      );
+  }
 });
 
 test("preview uses Pi's selected-branch and compaction projection", () => {
