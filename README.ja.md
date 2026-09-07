@@ -87,7 +87,7 @@ stream line は Turn ごとに thinking、応答、tool 実行を区別します
 
 ## ロードマップ
 
-1. **Shell（現在）:** header、footer、terminal title、theme、working state、reversible editor chrome。
+1. **Shell（現在）:** header、footer、theme、working state、reversible editor chrome。
 2. **Tool surface（現在）:** collapsed、preview、expanded に対応した Read/Bash/Edit/Write row、queued/running/success/error/cancelled 状態、展開可能な出力、diff summary。
 3. **Stream surface (現在):** thinking/responding/tool 状態、Turn 進捗、thinking level、context pressure。
 4. **Control surface (進行中):** steer/follow-up と読み取り専用 plan review を提供。approval と keyboard 操作は計画中。

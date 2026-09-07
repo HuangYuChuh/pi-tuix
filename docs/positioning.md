@@ -26,6 +26,7 @@ Pi-TUIX is a focused terminal UI layer for Pi Coding Agent. It brings a Claude C
 - session persistence or branching;
 - credentials and permissions;
 - model catalogues;
+- native terminal titles and their session/project/activity identity;
 - project file mutation outside Pi's existing tools.
 
 Pi stores and restores completion and attachment-number metadata through its public session API. These

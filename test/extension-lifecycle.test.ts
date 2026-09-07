@@ -359,7 +359,7 @@ test("plan panel follows Pi-TUIX enable and default lifecycle", async () => {
   assert.equal(widgets.at(-1), undefined);
 });
 
-test("saved disabled startup and settings use the same presentation state as commands", async () => {
+test("saved interface state stays synchronized without replacing native session titles", async () => {
   saveConfig({ ...structuredClone(DEFAULT_CONFIG), enabled: false, icons: { mode: "ascii" } });
   // biome-ignore lint/suspicious/noExplicitAny: Public lifecycle/command callbacks have different signatures.
   const handlers = new Map<string, (...args: any[]) => any>();
@@ -388,7 +388,8 @@ test("saved disabled startup and settings use the same presentation state as com
     bold: (text: string) => text,
     inverse: (text: string) => text,
   } as Theme;
-  let title = "";
+  const nativeTitle = "pi - Image acceptance - fixture";
+  let title = nativeTitle;
   let keys: string[] = [];
   let settingsText = "";
   const ui = {
@@ -433,13 +434,13 @@ test("saved disabled startup and settings use the same presentation state as com
     renderers.get(COMPLETION_ENTRY_TYPE)?.(entry, { expanded: false }, theme)?.render(100);
   assert.deepEqual(completion(), [], "saved state applies before session_start replays history");
   await handlers.get("session_start")?.({}, ctx);
-  assert.equal(title, "pi");
+  assert.equal(title, nativeTitle, "disabled startup preserves the host session title");
   assert.equal(editors.length, 0);
   await commands.get("pituix-settings")?.handler("", ctx);
   assert.match(settingsText, /Enabled\s+Off/);
   keys = ["\r", "\r", "\x1b"];
   await commands.get("pituix-settings")?.handler("", ctx);
-  assert.equal(title, "Pi-TUIX");
+  assert.equal(title, nativeTitle, "enabling through settings preserves the host session title");
   assert.equal(typeof editors.at(-1), "function");
   assert.equal(loadConfig().enabled, true);
   assert.match(completion()?.[0] ?? "", /^\* Worked/);
@@ -448,7 +449,7 @@ test("saved disabled startup and settings use the same presentation state as com
   await handlers.get("input")?.({ streamingBehavior: "followUp" }, ctx);
   assert.equal(statuses.get("pituix-queue"), "1 follow-up queued");
   await commands.get("pituix-settings")?.handler("", ctx);
-  assert.equal(title, "pi");
+  assert.equal(title, nativeTitle, "disabling through settings preserves the host session title");
   assert.equal(loadConfig().enabled, false);
   assert.equal(editors.at(-1), undefined);
   assert.equal(statuses.get("pituix-queue"), undefined);
@@ -457,11 +458,21 @@ test("saved disabled startup and settings use the same presentation state as com
   assert.deepEqual(records, []);
   assert.deepEqual(completion(), []);
   await commands.get("pituix")?.handler("", ctx);
+  assert.equal(title, nativeTitle, "enabling through the command preserves the host session title");
   assert.equal(loadConfig().enabled, true);
   assert.match(completion()?.[0] ?? "", /^\* Worked/);
   assert.match(notifications.at(-1) ?? "", /preview tools/);
   keys = [];
   await commands.get("pituix-settings")?.handler("", ctx);
   assert.match(settingsText, /Enabled\s+On/);
+  const renamedTitle = "pi - Renamed image acceptance - fixture";
+  title = renamedTitle; // A native rename/activity update remains owned by Pi.
+  await commands.get("pituix-default")?.handler("", ctx);
+  assert.equal(title, renamedTitle);
+  await commands.get("pituix")?.handler("", ctx);
+  assert.equal(title, renamedTitle);
+  await handlers.get("session_start")?.({}, ctx);
+  assert.equal(title, renamedTitle, "reload/resume does not replace the current native title");
   await handlers.get("session_shutdown")?.({}, ctx);
+  assert.equal(title, renamedTitle);
 });
