@@ -20,7 +20,7 @@ import {
   truncateToWidth,
 } from "@earendil-works/pi-tui";
 import type { PrepareImages } from "../../session/image-attachments.ts";
-import { ReferenceUserMessage } from "../../session/message-view.ts";
+import { ReferenceUserMessage, renderAssistantLines } from "../../session/message-view.ts";
 import type { OpenTuiEditor } from "./editor.ts";
 import { OpenTuiHeader } from "./header.ts";
 import { hasNativeMessages, LiveImagePresentation } from "./live-images.ts";
@@ -49,7 +49,9 @@ export class MarkdownObservation {
 
   getObservedPadding(component: Markdown): number | undefined {
     const read = this.reads.get(component);
-    return read ? Math.max(0, Math.floor((read.width - read.availableWidth) / 2)) : undefined;
+    return read && read.availableWidth > 1
+      ? Math.max(0, Math.floor((read.width - read.availableWidth) / 2))
+      : undefined;
   }
 
   read(component: Markdown, width: number): MarkdownRead | undefined {
@@ -189,34 +191,38 @@ export class LiveMessageMirror {
       return component.children.flatMap(flatten).flatMap((child) => {
         if (!(child instanceof Markdown)) return renderNative(child, width);
         const inset = width >= 4 ? 2 : 0;
+        const bodyWidth = Math.max(4, width - inset);
         const knownPadding = this.observation.getObservedPadding(child);
         let read = this.observation.read(
           child,
-          Math.max(4, knownPadding === undefined ? width : width - inset + knownPadding * 2),
+          knownPadding === undefined ? Math.max(4, width) : bodyWidth + knownPadding * 2,
         );
+        // A clamped one-cell content width cannot reveal the actual padding.
+        // Bounded wider probes measure it through the public callback only.
+        for (let probe = 0; read && read.availableWidth <= 1 && probe < 4; probe++) {
+          read = this.observation.read(child, read.width * 2);
+        }
         if (
           !read ||
+          read.availableWidth <= 1 ||
           (read.messageType !== "assistant" && read.messageType !== "assistant-thinking")
         )
           return renderNative(child, width);
         const padding = Math.max(0, Math.floor((read.width - read.availableWidth) / 2));
-        const target = Math.max(4, width - inset + padding * 2);
+        const target = bodyWidth + padding * 2;
         if (target !== read.width) read = this.observation.read(child, target);
         if (!read) return renderNative(child, width);
         const thinking = read.messageType === "assistant-thinking";
-        const marker = thinking ? (ascii ? "~" : "∴") : ascii ? "*" : "⏺";
         const availableWidth = read.availableWidth;
         const sourceLines = read.lines;
         return this.cached(child, sourceLines, width, theme, ascii, () =>
-          sourceLines.map((line, index) => {
-            const body = sliceByColumn(line, padding, Math.max(1, availableWidth), true);
-            const prefix = inset
-              ? index === 0
-                ? `${theme.fg(thinking ? "thinkingText" : "userMessageText", marker)} `
-                : "  "
-              : "";
-            return truncateToWidth(prefix + body, width, "");
-          }),
+          renderAssistantLines(
+            sourceLines.map((line) => sliceByColumn(line, padding, availableWidth, true)),
+            width,
+            theme,
+            ascii,
+            thinking,
+          ),
         );
       });
     }

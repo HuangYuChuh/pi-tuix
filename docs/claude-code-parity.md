@@ -64,6 +64,36 @@ is included in Pi-TUIX. The reference mascot is replaced with an original ASCII
   line was still rendered for that failed attempt. This is not evidence of a
   successful model turn or of model-driven Read/Edit/Write rendering.
 
+### Complex Markdown
+
+A further authenticated 2.1.263 capture rendered a disposable Markdown file at
+80x40, then resized its detailed transcript to 40x70 without another model
+request. The sample included headings, English/Chinese prose, emoji, inline code,
+a TypeScript fence, a three-column table, blockquotes and nested/ordered lists.
+Code content appeared without visible fence delimiters and started at the normal
+assistant body column. Table cells wrapped within their columns, including CJK
+and long tokens, and headings in table cells were centered. Quotes used an italic
+body and a vertical marker. These are observed differences from Pi's native
+Markdown styling, which Pi-TUIX continues to preserve; this change does not claim
+matching fence, heading, quote or syntax styles.
+
+The width audit found an independent Pi-TUIX bug: a zero-padding assistant at
+four columns displayed `ABCDEFGHIJKLMNOPQRSTUVWXYZ` as `AB EF IJ MN QR UV YZ`
+because a four-column Markdown body was clipped after adding two columns of
+chrome. Clamped padding could also yield blank body slices. Live messages and
+snapshot/preview rows now reflow that output and measure padding through the
+public callback. Tests check complete single-cell text from 1-100 columns,
+wide graphemes from two columns, wrapped table cells, styled links, and agreement
+between live and snapshot complex Markdown across repeated resizes. One-column
+views still cannot display two-column glyphs.
+
+An isolated Pi 0.84.4 session in Orca streamed the same fixture through an offline
+display provider. Normal, split and narrower split panes retained its code,
+wrapped table cells, Chinese text and final marker. The transcript snapshot
+matched the narrow live layout, and default/restore toggles plus widening the
+pane remained usable. This fixture made no model-network requests; the original
+real-provider terminal was kept separate.
+
 ### Image attachments
 
 A 100x40 authenticated session received a disposable 160x96 red/blue PNG through

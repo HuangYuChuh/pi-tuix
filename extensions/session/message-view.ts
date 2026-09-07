@@ -3,6 +3,7 @@ import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Markdown,
+  sliceByColumn,
   stripTerminalSequences,
   truncateToWidth,
   visibleWidth,
@@ -54,6 +55,39 @@ export class ReferenceUserMessage implements Component {
   invalidate(): void {}
 }
 
+/** Add chrome after Markdown layout, reflowing any minimum-width host output. */
+export function renderAssistantLines(
+  lines: readonly string[],
+  width: number,
+  theme: Theme,
+  ascii = false,
+  thinking = false,
+): string[] {
+  if (width <= 0) return [];
+  const inset = width >= 4 ? 2 : 0;
+  const bodyWidth = width - inset;
+  const body = lines.flatMap((line) => {
+    if (visibleWidth(line) <= bodyWidth) return [line];
+    // A one-column view cannot contain a wide glyph. Column slicing avoids the
+    // host wrapper's wide-glyph minimum while retaining every single-cell glyph.
+    if (bodyWidth === 1) {
+      return Array.from({ length: visibleWidth(line) }, (_, column) =>
+        sliceByColumn(line, column, 1, true),
+      );
+    }
+    return wrapTextWithAnsi(line, bodyWidth);
+  });
+  const marker = thinking ? (ascii ? "~" : "∴") : ascii ? "*" : "⏺";
+  return body.map((line, index) => {
+    const prefix = inset
+      ? index === 0
+        ? `${theme.fg(thinking ? "thinkingText" : "userMessageText", marker)} `
+        : "  "
+      : "";
+    return truncateToWidth(prefix + line, width, "");
+  });
+}
+
 /** Prefix the rendered Markdown, keeping headings, lists and code fences intact. */
 export class ReferenceAssistantText implements Component {
   private readonly markdown: Markdown;
@@ -81,15 +115,7 @@ export class ReferenceAssistantText implements Component {
     const inset = width >= 4 ? 2 : 0;
     // Pi's Markdown wrapper needs room for a wide glyph even in one-cell views.
     const lines = this.markdown.render(Math.max(4, width - inset));
-    const rendered = lines.map((line, index) => {
-      const marker = this.thinking ? (this.ascii ? "~" : "∴") : this.ascii ? "*" : "⏺";
-      const prefix = inset
-        ? index === 0
-          ? `${this.theme.fg(this.thinking ? "thinkingText" : "userMessageText", marker)} `
-          : "  "
-        : "";
-      return truncateToWidth(prefix + line, width, "");
-    });
+    const rendered = renderAssistantLines(lines, width, this.theme, this.ascii, this.thinking);
     if (!this.metadata) return rendered;
     const metadataWidth = Math.max(0, width - 2);
     const label = truncateToWidth(this.metadata, metadataWidth, "");

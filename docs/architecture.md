@@ -367,6 +367,16 @@ theme and icon mode. Invalidation propagates to the original components and
 clears presentation caches. Observed Markdown padding is reused to avoid
 alternating render widths when the host output padding differs from one cell.
 Streamed text, width and theme changes still refresh the affected display.
+Assistant chrome shares one final line-layout function with snapshot/preview
+messages. When the requested body is narrower than Pi's safe Markdown rendering
+width, it wraps the rendered rows rather than discarding their right edge.
+ANSI styles and links continue across those wrapped rows. A one-column view
+retains single-cell characters through column slicing; a two-cell glyph cannot
+be displayed at that width. A public Markdown callback whose available width
+is clamped to one cannot identify its padding, so the live adapter uses at most
+four wider probes before falling back to native rendering. Once measured,
+padding and safe content width determine subsequent renders without repeated
+probing. Components, source Markdown and the host parser remain unchanged.
 Large-history measurements cover this presentation layer rather than total
 terminal latency. Real-terminal multi-line/image selection needs broader
 coverage. User chrome observes source at this extension's position in the

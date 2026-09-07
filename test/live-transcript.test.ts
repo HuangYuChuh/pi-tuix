@@ -28,6 +28,7 @@ import {
   VStack,
   visibleWidth,
 } from "@earendil-works/pi-tui";
+import { ReferenceAssistantText } from "../extensions/session/message-view.ts";
 import { OpenTuiEditor } from "../extensions/shell/open-tui/editor.ts";
 import {
   createLiveTranscript,
@@ -35,6 +36,7 @@ import {
   LiveMessageMirror,
   MarkdownObservation,
 } from "../extensions/shell/open-tui/live-transcript.ts";
+import { complexMarkdown } from "./fixtures/markdown-layout.ts";
 
 initTheme("dark", false);
 const theme = {
@@ -206,6 +208,41 @@ test("message layout adapts public Markdown padding without alternating widths o
       assert.ok(observed);
       assert.deepEqual(f.mirror.render(f.assistant, width), first);
       assert.equal(f.observation.read(f.responseMarkdown, width - 2 + padding * 2), observed);
+    }
+  }
+});
+
+test("narrow assistant layouts keep every character across host padding and resizes", () => {
+  const source = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  for (const padding of [0, 1, 2, 3]) {
+    const f = fixture(undefined, padding);
+    f.responseMarkdown.setText(source);
+    for (const width of [1, 2, 3, 4, 5, 6, 8, 24, 80, 4, 80]) {
+      const lines = f.mirror.render(f.assistant, width);
+      assert.ok(lines.every((line) => visibleWidth(line) <= width));
+      assert.equal(
+        plain(lines).replace(/[^A-Z]/g, ""),
+        source,
+        `width ${width}, padding ${padding}`,
+      );
+    }
+  }
+});
+
+test("complex Markdown stays consistent between live messages and snapshots across resizes", () => {
+  const snapshot = new ReferenceAssistantText(complexMarkdown, theme);
+  for (const padding of [0, 1, 2, 3]) {
+    const f = fixture(undefined, padding);
+    f.responseMarkdown.setText(complexMarkdown);
+    for (const width of [2, 4, 5, 8, 12, 24, 40, 80, 100, 40, 100]) {
+      const lines = f.mirror.render(f.assistant, width);
+      assert.ok(lines.every((line) => visibleWidth(line) <= width));
+      assert.deepEqual(
+        plain(lines).trim(),
+        plain(snapshot.render(width)).trim(),
+        `width ${width}, padding ${padding}`,
+      );
+      assert.deepEqual(f.mirror.render(f.assistant, width), lines);
     }
   }
 });
