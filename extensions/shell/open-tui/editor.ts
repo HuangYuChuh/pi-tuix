@@ -8,7 +8,10 @@ import {
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import {
   CURSOR_MARKER,
+  decodeKittyPrintable,
   getKeybindings,
+  matchesKey,
+  parseKey,
   sliceByColumn,
   truncateToWidth,
   visibleWidth,
@@ -192,12 +195,17 @@ export class OpenTuiEditor extends CustomEditor {
     }
     if (this.handleTextImageLabel(data) || this.moveImageCursor(data)) return;
     this.imagePreferredColumn = undefined;
-    if (data === "?" && this.getText() === "") {
+    const key = parseKey(data);
+    const printable = decodeKittyPrintable(data) ?? data;
+    if (
+      (key === "?" || key === "shift+?" || printable === "?" || printable === "\uff1f") &&
+      this.getText() === ""
+    ) {
       this.helpVisible = !this.helpVisible;
       this.tui.requestRender();
       return;
     }
-    if (this.helpVisible && data === "\u001b") {
+    if (this.helpVisible && matchesKey(data, "escape")) {
       this.helpVisible = false;
       this.tui.requestRender();
       return;
@@ -403,8 +411,12 @@ export class OpenTuiEditor extends CustomEditor {
     // Autocomplete belongs to Pi; keep its rows after the input rules.
     result.push(...baseLines.slice(bottomIdx + 1));
     if (this.helpVisible) {
+      const pasteImageKey = keyText("app.clipboard.pasteImage");
       result.push(
         "  / commands    @ file paths    ! shell",
+        pasteImageKey
+          ? `  ${pasteImageKey} paste image    paste image path to attach`
+          : "  paste image path to attach",
         `  ${keyText("app.tools.expand")} expand tools    ${keyText("app.interrupt")} interrupt`,
         "  /pituix-settings appearance    /pituix-default restore Pi",
         "  /pituix-steer steer    /pituix-followup queue",

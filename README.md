@@ -78,6 +78,25 @@ A fresh editor continues numbering after user labels on the selected saved branc
 
 Closing a custom dialog that restores the unchanged draft on the same editor preserves collapsed text, attachments, cursor position and native undo. This does not transfer collapsed paste data to a replacement editor or a changed draft.
 
+### Pasting images on macOS
+
+Press `?` on an empty draft to see Pi's configured image-paste shortcut (normally **Control+V** on macOS). An input method's fullwidth question mark also opens help on an empty draft. These two workflows attach local images:
+
+- **Copy image contents:** open the image in Preview, select it with Command+A, then Command+C. Focus the Pi input and press Control+V, or your configured image-paste shortcut.
+- **Copy a file path:** select a local PNG/JPEG/GIF/WebP file in Finder and press Option+Command+C to copy its full path. Focus Pi and use the terminal's normal paste command, such as Command+V in Orca. Paste the path separately from your question.
+
+Check that an `[Image #N]` chip appears, then add your question and send. Command+V is handled by the terminal; copying a filename or file reference does not always provide image pixels or a usable path. Typing a path or `[Image #N]` by hand does not attach an image.
+
+| Symptom | What to check |
+| --- | --- |
+| Neither paste method creates a chip | Check that the image exists on the Mac running Pi. Remote clipboard software can provide a zero-byte placeholder instead of the actual file; complete the file transfer first. Finder's Edit > Show Clipboard can identify a file URL. A file URL alone does not establish that image bytes are available. |
+| A chip appears, but the model cannot see the image | Check that the provider actually supports image input and that the selected custom model declares `"input": ["text", "image"]` in Pi's `models.json`. Open native `/model` to reload an edited catalogue and reselect the model. Changing this declaration cannot give a text-only provider vision support. |
+| Large photos take a long time to send | Pi-TUIX captures the original file bytes. Resize a local copy before pasting if the original is large. |
+
+For comparison, `/pituix-default` restores Pi's native input; `/pituix` brings this interface back. Clipboard access, remote file transfer and model capabilities remain outside Pi-TUIX.
+
+### Commands
+
 These commands are reversible:
 
 | Command | Purpose |

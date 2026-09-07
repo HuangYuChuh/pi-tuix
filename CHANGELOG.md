@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use the reference syntax palette with Pi's public highlighter for added/context diff lines; retain the documented differences in token categories.
 
 ### Fixed
+- Show the configured native image-paste shortcut and local-path alternative in empty-input help; document macOS copying, remote clipboard placeholders and model image-capability checks.
+- Recognize fullwidth question marks, Kitty/xterm-encoded question keys and encoded Escape in shortcut help while preserving question marks inside an existing draft and Pi's interruption handling outside help.
 - Preserve collapsed long-text paste contents, image attachments, cursor position and native undo when a custom dialog restores the unchanged draft on the same editor.
 - Preserve Pi's native session/project terminal title across startup, settings changes and interface toggles; avoid replacing named sessions with static `Pi-TUIX` or `pi` tab titles.
 - Render resume previews as native modal overlays so fullscreen viewport keys reach the preview; preserve original focus, cancel pending reads, ignore late results, and parse/migrate session data only in memory.
