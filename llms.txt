@@ -19,6 +19,7 @@ Pi-TUIX is a presentation layer. Pi continues to own model requests, built-in to
 - Expandable ANSI-aware output and edit diff summaries
 - `pituix`, `pituix-default`, and `pituix-about` commands
 - `pituix-transcript` for a read-only conversation snapshot with tool expansion
+- `pituix-resume` for session search, recorded-branch filtering, Pi-native renaming, preview and resume
 - Bundled `pi-tuix-dark` theme
 
 ## Planned Features

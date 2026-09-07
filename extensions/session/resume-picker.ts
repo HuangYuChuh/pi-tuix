@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import {
   type ExtensionAPI,
   type ExtensionCommandContext,
+  keyText,
   type SessionInfo,
   SessionManager,
   type Theme,
@@ -18,6 +19,8 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
+import { readGitBranch } from "./git-branch.ts";
+import { renameSession } from "./rename-session.ts";
 import {
   loadSessionMetadata,
   loadSessionPreview,
@@ -75,10 +78,11 @@ export function formatSessionSize(bytes: number | undefined): string | undefined
   return `${value.toFixed(1)}${units[unit]}`;
 }
 
-/** A read-only view of public SessionInfo records. Loading and switching live in the command. */
+/** Session presentation and input state. All I/O lives in the command. */
 export class ResumePicker {
   focused = true;
   private readonly search = new Input();
+  private rename = new Input();
   private readonly options: {
     theme: Theme;
     ascii: boolean;
@@ -90,6 +94,10 @@ export class ResumePicker {
     onScopeChange: (all: boolean) => void;
     onPreviewChange?: (session: SessionInfo | undefined) => void;
     expandKey?: (data: string) => boolean;
+    renameKey?: (data: string) => boolean;
+    renameHint?: string;
+    onRename?: (session: SessionInfo, name: string) => void;
+    onRenameCancel?: () => void;
   };
   private sessions: readonly SessionInfo[] = [];
   private filtered: readonly SessionInfo[] = [];
@@ -102,6 +110,12 @@ export class ResumePicker {
   private previewError: string | undefined;
   private previewExpanded = false;
   private all = false;
+  private branchOnly = false;
+  private branchReady = false;
+  private currentBranch: string | undefined;
+  private renaming: SessionInfo | undefined;
+  private saving = false;
+  private renameError: string | undefined;
   private loading = true;
   private error: string | undefined;
   private finished = false;
@@ -116,6 +130,7 @@ export class ResumePicker {
   /** Read candidates outside render; the command owns asynchronous I/O. */
   metadataCandidates(): readonly SessionInfo[] {
     if (this.finished || this.loading) return [];
+    if (this.branchOnly) return this.currentBranch ? this.sessions : [];
     const count = Math.max(1, Math.min(200, Math.ceil(this.options.getRows())));
     const start = Math.max(
       0,
@@ -127,11 +142,41 @@ export class ResumePicker {
   setMetadata(path: string, metadata: SessionMetadata): void {
     if (this.finished) return;
     this.metadata.set(path, { byteSize: metadata.byteSize, gitBranch: metadata.gitBranch });
+    if (this.branchOnly) this.filter(true);
+  }
+
+  setCurrentBranch(branch: string | undefined): void {
+    if (this.finished) return;
+    this.currentBranch = branch;
+    this.branchReady = true;
+    this.filter(true);
+  }
+
+  applyRename(path: string, name: string): void {
+    if (this.finished) return;
+    this.sessions = this.sessions.map((session) =>
+      session.path === path ? { ...session, name } : session,
+    );
+    const previous = this.metadata.get(path);
+    if (previous) this.metadata.set(path, { gitBranch: previous.gitBranch });
+    this.filter(true);
+    if (this.renaming?.path === path) this.closeRename();
+  }
+
+  setRenameError(path: string, error: unknown): void {
+    if (this.finished || this.renaming?.path !== path) return;
+    this.saving = false;
+    this.renameError = `Could not rename session: ${plain(String(error))}`;
+  }
+
+  private closeRename(): void {
+    this.renaming = undefined;
+    this.saving = false;
+    this.renameError = undefined;
   }
 
   setSessions(sessions: readonly SessionInfo[]): void {
     if (this.finished) return;
-    const selectedPath = this.filtered[this.selected]?.path;
     this.previewCache = undefined;
     const unique = new Map(sessions.map((session) => [session.path, session]));
     this.sessions = [...unique.values()].sort(
@@ -139,9 +184,7 @@ export class ResumePicker {
     );
     this.loading = false;
     this.error = undefined;
-    this.filter();
-    const index = this.filtered.findIndex((session) => session.path === selectedPath);
-    if (index >= 0) this.selected = index;
+    this.filter(true);
   }
 
   setError(error: unknown): void {
@@ -175,22 +218,50 @@ export class ResumePicker {
     this.options.onPreviewChange?.(undefined);
   }
 
-  private filter(): void {
+  private filter(preserveSelection = false): void {
+    const selectedPath = this.filtered[this.selected]?.path;
     const words = this.search.getValue().toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
-    this.filtered = words.length
-      ? this.sessions.filter((session) => {
-          const text =
-            `${title(session)} ${session.cwd} ${session.allMessagesText}`.toLocaleLowerCase();
-          return words.every((word) => text.includes(word));
-        })
-      : this.sessions;
+    this.filtered = this.sessions.filter((session) => {
+      if (
+        this.branchOnly &&
+        (!this.currentBranch || this.metadata.get(session.path)?.gitBranch !== this.currentBranch)
+      )
+        return false;
+      const text =
+        `${title(session)} ${session.cwd} ${session.allMessagesText}`.toLocaleLowerCase();
+      return words.every((word) => text.includes(word));
+    });
+    const index = preserveSelection
+      ? this.filtered.findIndex((session) => session.path === selectedPath)
+      : -1;
+    if (index >= 0) this.selected = index;
     this.selected = Math.min(this.selected, Math.max(0, this.filtered.length - 1));
-    this.previewOffset = 0;
+    if (!preserveSelection) this.previewOffset = 0;
+    if (this.preview && selectedPath !== this.filtered[this.selected]?.path) this.closePreview();
   }
 
   handleInput(data: string): void {
     if (this.finished) return;
     const keys = getKeybindings();
+    if (this.renaming) {
+      if (keys.matches(data, "tui.select.cancel")) {
+        this.options.onRenameCancel?.();
+        this.closeRename();
+      } else if (!this.saving && keys.matches(data, "tui.select.confirm")) {
+        const name = this.rename
+          .getValue()
+          .replace(/[\r\n]/g, " ")
+          .trim();
+        if (!name) return;
+        if (name === this.renaming.name) this.closeRename();
+        else {
+          this.saving = true;
+          this.renameError = undefined;
+          this.options.onRename?.(this.renaming, name);
+        }
+      } else if (!this.saving) this.rename.handleInput(data);
+      return;
+    }
     if (keys.matches(data, "tui.select.cancel")) {
       if (this.preview) this.closePreview();
       else if (this.searching && this.search.getValue()) {
@@ -243,6 +314,16 @@ export class ResumePicker {
       this.loading = true;
       this.error = undefined;
       this.options.onScopeChange(this.all);
+    } else if (matchesKey(data, Key.ctrl("b"))) {
+      this.branchOnly = !this.branchOnly;
+      this.filter(true);
+    } else if (this.options.renameKey?.(data) && this.options.onRename && !this.loading) {
+      this.renaming = this.filtered[this.selected];
+      this.rename = new Input();
+      // Public paste handling initializes both text and the trailing cursor.
+      this.rename.handleInput(
+        `\x1b[200~${plain(this.renaming?.name ?? "").replace(/\s+/g, " ")}\x1b[201~`,
+      );
     } else if (confirm) this.choose();
     else if ((up || down || pageUp || pageDown) && !this.loading && this.filtered.length) {
       const count = this.filtered.length;
@@ -280,11 +361,16 @@ export class ResumePicker {
     const { theme, ascii } = this.options;
     const rows = Math.max(1, Math.floor(this.options.getRows()));
     const compact = rows < 14;
+    const panelRows = compact ? rows : Math.min(rows, 20);
     const inset = width >= 16 ? "   " : "";
     const inner = Math.max(1, width - inset.length * 2);
     const accent = (text: string) => theme.fg("mdLink", text);
     const muted = (text: string) => theme.fg("muted", text);
     const clip = (line: string) => truncateToWidth(line, width, "");
+    const finishPanel = (lines: string[]) =>
+      [...lines, ...Array<string>(Math.max(0, panelRows - lines.length)).fill("")]
+        .slice(0, panelRows)
+        .map(clip);
     const separator = ascii ? " | " : " · ";
     const metadata = (session: SessionInfo, preview = false) => {
       const details = this.metadata.get(session.path);
@@ -302,7 +388,7 @@ export class ResumePicker {
       ].join(separator);
     };
     const count =
-      !this.searching && this.filtered.length > 1
+      !this.searching && !this.renaming && this.filtered.length > 1
         ? ` (${this.selected + 1} of ${this.filtered.length})`
         : "";
     const heading = compact
@@ -374,21 +460,43 @@ export class ResumePicker {
         `${inset}${frame(`${ascii ? "+" : "╭"}${rule}${ascii ? "+" : "╮"}`)}`,
         `${inset}${frame(ascii ? "|" : "│")} ${ascii ? "/" : "⌕"} ${fitted}${" ".repeat(Math.max(0, queryWidth - visibleWidth(fitted)))} ${frame(ascii ? "|" : "│")}`,
         `${inset}${frame(`${ascii ? "+" : "╰"}${rule}${ascii ? "+" : "╯"}`)}`,
-        `${inset}  ${muted(this.all ? "All projects" : plain(basename(this.options.cwd)))}`,
+        `${inset}  ${muted((this.all ? "All projects" : plain(basename(this.options.cwd))) + (this.branchOnly && this.currentBranch ? separator + plain(this.currentBranch) : ""))}`,
         "",
       );
     } else heading.push(`${inset}/${fitted}`);
+    if (this.renaming) {
+      this.rename.focused = this.focused && !this.saving;
+      const nameWidth = Math.max(1, inner - 2);
+      const name = this.rename.getValue()
+        ? (this.rename.render(Math.max(4, nameWidth + 2))[0] ?? "").slice(2)
+        : muted(
+            `${this.rename.focused ? CURSOR_MARKER + theme.inverse("E") : "E"}nter new session name`,
+          );
+      const body = [
+        `${inset}  ${theme.bold("Rename session:")}`,
+        ...(!compact ? [""] : []),
+        `${inset}  ${truncateToWidth(name, nameWidth, "")}`,
+        ...(this.renameError
+          ? wrapTextWithAnsi(theme.fg("error", this.renameError), inner)
+              .slice(0, Math.max(0, panelRows - heading.length - (compact ? 3 : 4)))
+              .map((line) => inset + line)
+          : []),
+        `${inset}  ${muted(this.saving ? "Saving session name..." : `Enter to save${separator}Esc to cancel`)}`,
+      ];
+      return finishPanel(rows < 4 ? [body[compact ? 1 : 2]] : [...heading, ...body]);
+    }
     const hint = this.searching
       ? `Type to search${separator}Enter to select${separator}Esc to clear`
-      : `Ctrl+A for ${this.all ? "current project" : "all projects"}${separator}Space to preview${separator}Type to search${separator}Enter to resume${separator}Esc to cancel`;
+      : `Ctrl+A to show ${this.all ? "current project" : "all projects"}${separator}Ctrl+B to ${this.branchOnly ? "show all branches" : "only show current branch"}${separator}Space to preview${this.options.onRename ? `${separator}${this.options.renameHint ?? "Ctrl+R"} to rename` : ""}${separator}Type to search${separator}Esc to cancel`;
     const hints = compact
       ? [clip(`${inset}${muted(hint)}`)]
-      : wrapTextWithAnsi(muted(hint), inner)
-          .slice(0, 2)
-          .map((line) => inset + line);
-    const budget = Math.max(1, rows - heading.length - hints.length - (compact ? 0 : 1));
+      : wrapTextWithAnsi(muted(hint), Math.max(1, inner - 2))
+          .slice(0, 3)
+          .map((line) => `${inset}  ${line}`);
+    const tail = !compact && panelRows >= 18 ? 2 : 0;
+    const budget = Math.max(1, panelRows - heading.length - hints.length - tail);
     const rowHeight = compact ? 1 : 3;
-    this.pageSize = Math.max(1, Math.floor(budget / rowHeight));
+    this.pageSize = Math.max(1, Math.min(compact ? Infinity : 3, Math.floor(budget / rowHeight)));
     const start = Math.max(
       0,
       Math.min(this.selected - Math.floor(this.pageSize / 2), this.filtered.length - this.pageSize),
@@ -396,24 +504,38 @@ export class ResumePicker {
     const body: string[] = [];
     if (this.loading) body.push(`${inset}  ${muted("Loading sessions...")}`);
     else if (this.error) body.push(`${inset}${theme.fg("error", this.error)}`);
+    else if (this.branchOnly && !this.branchReady)
+      body.push(`${inset}  ${muted("Reading current Git branch...")}`);
+    else if (this.branchOnly && !this.currentBranch)
+      body.push(`${inset}  ${muted("Current Git branch unavailable")}`);
     else if (!this.filtered.length)
-      body.push(`${inset}  ${muted(query ? "No matching sessions" : "No saved sessions")}`);
+      body.push(
+        `${inset}  ${muted(this.branchOnly && this.sessions.some((session) => !this.metadata.has(session.path)) ? "Reading recorded session branches..." : query || this.branchOnly ? "No matching sessions" : "No saved sessions")}`,
+      );
     else
       for (let i = start; i < Math.min(this.filtered.length, start + this.pageSize); i++) {
         const session = this.filtered[i];
         const active = i === this.selected && !this.searching;
-        const prefix = active ? `${ascii ? ">" : "❯"} ` : "  ";
+        const prefix = active
+          ? `${ascii ? ">" : "❯"} `
+          : i === start && start > 0
+            ? `${ascii ? "^" : "↑"} `
+            : i === start + this.pageSize - 1 && i < this.filtered.length - 1
+              ? `${ascii ? "v" : "↓"} `
+              : "  ";
         const current = session.path === this.options.currentPath ? " [current]" : "";
         const label = `${truncateToWidth(title(session), Math.max(1, inner - 2 - current.length), "")}${current}`;
         body.push(`${inset}${active ? accent(prefix + label) : prefix + label}`);
         if (!compact) body.push(`${inset}  ${muted(metadata(session))}`, "");
       }
     if (rows < 4) return (this.searching ? [`${inset}/${fitted}`] : body).slice(0, rows).map(clip);
-    return [...heading, ...body, ...(!compact ? [""] : []), ...hints].slice(0, rows).map(clip);
+    if (!compact) while (body.length < this.pageSize * rowHeight) body.push("");
+    return finishPanel([...heading, ...body, ...hints]);
   }
 
   invalidate(): void {
     this.search.invalidate();
+    this.rename.invalidate();
     this.previewContent?.invalidate();
     this.previewCache = undefined;
   }
@@ -441,9 +563,10 @@ export function registerResumePicker(
     session: SessionInfo,
     signal: AbortSignal,
   ) => Promise<SessionMetadata> = loadSessionMetadata,
+  services: { readBranch?: typeof readGitBranch; rename?: typeof renameSession } = {},
 ): void {
   pi.registerCommand("pituix-resume", {
-    description: "Search, preview and resume Pi sessions",
+    description: "Search, filter, rename, preview and resume Pi sessions",
     handler: async (_args, ctx: ExtensionCommandContext) => {
       if (!ctx.hasUI) return;
       const currentPath = ctx.sessionManager.getSessionFile();
@@ -452,35 +575,45 @@ export function registerResumePicker(
       let path: string | undefined;
       let closed = false;
       let previewLoad: AbortController | undefined;
+      let renameLoad: AbortController | undefined;
       const metadataLoad = new AbortController();
       try {
         path = await ctx.ui.custom<string | undefined>(
           (tui, theme, keys, done) => {
             let current: SessionInfo[] = [];
             let all: SessionInfo[] | undefined;
+            let allProjects = false;
             const requested = new Set<string>();
             const previewMetadata = new Set<string>();
-            const pending: SessionInfo[] = [];
+            let pending: SessionInfo[] = [];
+            const generations = new Map<string, number>();
             let reading = 0;
             const loadMetadata = () => {
-              for (const session of view.metadataCandidates()) {
-                if (requested.has(session.path)) continue;
-                requested.add(session.path);
-                pending.push(session);
-              }
+              pending = view.metadataCandidates().filter((session) => !requested.has(session.path));
               const pump = () => {
                 if (closed) return;
                 while (reading < 2 && pending.length) {
                   const session = pending.shift();
                   if (!session) break;
+                  requested.add(session.path);
+                  const generation = generations.get(session.path);
                   reading++;
                   void readMetadata(session, metadataLoad.signal)
                     .then((metadata) => {
-                      if (!closed && !previewMetadata.has(session.path))
+                      if (
+                        !closed &&
+                        generations.get(session.path) === generation &&
+                        !previewMetadata.has(session.path)
+                      )
                         view.setMetadata(session.path, metadata);
                     })
                     .catch(() => {
-                      /* A missing/unreadable file keeps its catalogue row usable. */
+                      if (
+                        !closed &&
+                        generations.get(session.path) === generation &&
+                        !previewMetadata.has(session.path)
+                      )
+                        view.setMetadata(session.path, {});
                     })
                     .finally(() => {
                       reading--;
@@ -493,16 +626,16 @@ export function registerResumePicker(
               };
               pump();
             };
-            const load = async (allProjects: boolean) => {
+            const load = async (scope: boolean) => {
               try {
-                if (allProjects) {
+                if (scope) {
                   all ??= [
                     ...current,
                     ...(await Promise.all([catalog.listAll(), catalog.listAll(sessionDir)])).flat(),
                   ];
                 } else current = await catalog.list(ctx.cwd, sessionDir);
                 if (!closed) {
-                  view.setSessions(allProjects ? (all ?? []) : current);
+                  view.setSessions(scope ? (all ?? []) : current);
                   loadMetadata();
                 }
               } catch (error) {
@@ -520,10 +653,42 @@ export function registerResumePicker(
                 closed = true;
                 done(selection);
               },
-              onScopeChange: (allProjects) => {
+              onScopeChange: (scope) => {
+                allProjects = scope;
                 void load(allProjects);
               },
               expandKey: (data) => keys.matches(data, "app.tools.expand"),
+              renameKey: (data) => keys.matches(data, "app.session.rename"),
+              renameHint: keyText("app.session.rename"),
+              onRenameCancel: () => renameLoad?.abort(),
+              onRename: (session, name) => {
+                renameLoad?.abort();
+                const request = new AbortController();
+                renameLoad = request;
+                void (services.rename ?? renameSession)(session, name, request.signal, {
+                  path: ctx.sessionManager.getSessionFile(),
+                  id: ctx.sessionManager.getSessionId(),
+                  setName: (value) => pi.setSessionName(value),
+                })
+                  .then(async () => {
+                    if (closed || request.signal.aborted || renameLoad !== request) return;
+                    generations.set(session.path, (generations.get(session.path) ?? 0) + 1);
+                    requested.delete(session.path);
+                    previewMetadata.delete(session.path);
+                    view.applyRename(session.path, name);
+                    // Refresh authoritative ordering and size without resuming.
+                    current = current.map((item) =>
+                      item.path === session.path ? { ...item, name } : item,
+                    );
+                    all = undefined;
+                    await load(allProjects);
+                  })
+                  .catch((error) => {
+                    if (closed || request.signal.aborted || renameLoad !== request) return;
+                    view.setRenameError(session.path, error);
+                    tui.requestRender();
+                  });
+              },
               onPreviewChange: (session) => {
                 previewLoad?.abort();
                 previewLoad = undefined;
@@ -548,6 +713,14 @@ export function registerResumePicker(
                   });
               },
             });
+            void (services.readBranch ?? readGitBranch)(ctx.cwd, metadataLoad.signal)
+              .catch(() => undefined)
+              .then((branch) => {
+                if (closed) return;
+                view.setCurrentBranch(branch);
+                loadMetadata();
+                tui.requestRender();
+              });
             void load(false);
             return {
               get focused() {
@@ -575,6 +748,7 @@ export function registerResumePicker(
       } finally {
         closed = true;
         previewLoad?.abort();
+        renameLoad?.abort();
         metadataLoad.abort();
         hooks.onClose();
       }

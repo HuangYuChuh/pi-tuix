@@ -54,6 +54,12 @@ is included in Pi-TUIX. The reference mascot is replaced with an original ASCII
   size units. The list heading includes selected index/total. Preview footers
   use shorter relative time (`2h ago`), message count and the recorded branch,
   while list rows use longer relative time, branch and file size.
+  Ctrl+B toggles the current-branch filter and appends the branch to the project
+  label. Ctrl+R replaces the rows with `Rename session:`, the existing name or
+  an empty placeholder, and Enter/Esc hints. Cancelling leaves the name unchanged;
+  saving and reopening prefills the new name. At 100x40, the separator stays on
+  row 21, rename label/input/hint on rows 28/30/31. The list displays three rows
+  with an edge arrow when more entries exist; its hints start on row 37.
 - A model request failed with an expired-login message. A completion-duration
   line was still rendered for that failed attempt. This is not evidence of a
   successful model turn or of model-driven Read/Edit/Write rendering.
@@ -130,7 +136,7 @@ broadly than the observed reference.
 | Effort above the prompt | Custom editor, `thinking_level_select`, `model_select` | Implemented; displays Pi's effective level and actual cycle binding |
 | Searchable settings page | `ctx.ui.custom`, public `Input` | Reference frame, filtering, focus navigation and value alignment implemented for Pi-TUIX settings |
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
-| Searchable resume picker | Public session catalogue, parser/context helpers, modal UI and `ctx.switchSession` | Rich preview includes tools, diffs, model/time and completion rows; list sizes and recorded Git branches implemented. Branch filtering, rename and rendered binary media remain gaps; old runs without branch observations stay unknown |
+| Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Binary media remains labelled; old runs without branch observations stay unknown |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -176,6 +182,21 @@ remain a measured difference, rather than a claim of full syntax parity.
 ## Validation
 
 - TypeScript compilation against Pi 0.84.4 and Biome checks.
+- Resume controls tests cover branch indexing beyond the visible window,
+  selection stability, search/scope combinations, unavailable Git, unreadable
+  files, queue replacement, aborts and stale results. Rename tests cover native
+  paste/cursor handling, configured bindings, cancel/blank/unchanged drafts,
+  exactly-once confirmation, error retry, active-session delegation and stale
+  file sizes. Filesystem tests verify one native name entry with unchanged
+  existing bytes/model context, reject missing/replaced/future files, and check
+  Pi-owned legacy migration only after confirmation. ANSI/CJK and fixed-frame
+  tests cover tiny through normal sizes.
+  Actual Pi 0.85.1 at 100x40 and Pi 0.84.4 at 80x24 exercise branch filtering,
+  prefilled rename, cancellation and saving. The 100-column list and rename
+  frames now retain the observed row positions. Cancelling leaves all fixture
+  bytes and mtimes unchanged; saved and live renames append only native name
+  records. Resuming from preview and `/pituix-default` still work, with the new
+  name visible in Pi's native interface.
 - Session metadata tests cover measured byte formatting, ANSI/CJK bounds, unknown
   historical branches, compaction and abandoned paths, bounded concurrent reads,
   cancellation and late-read ordering. Disposable Git tests cover unborn and

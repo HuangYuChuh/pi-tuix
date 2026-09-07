@@ -14,6 +14,7 @@ import {
   TuiMainScreen,
   visibleWidth,
 } from "@earendil-works/pi-tui";
+import type { renameSession } from "../extensions/session/rename-session.ts";
 import {
   formatSessionSize,
   ResumePicker,
@@ -164,6 +165,8 @@ function harness(
     resumeFailure?: boolean;
     readPreview?: (session: SessionInfo, signal: AbortSignal) => Promise<SessionPreviewSnapshot>;
     readMetadata?: (session: SessionInfo, signal: AbortSignal) => Promise<SessionMetadata>;
+    readBranch?: (cwd: string, signal?: AbortSignal) => Promise<string | undefined>;
+    rename?: typeof renameSession;
   } = {},
 ) {
   let handler: ((args: string, ctx: ExtensionCommandContext) => Promise<void>) | undefined;
@@ -172,6 +175,7 @@ function harness(
   const loads: (string | undefined)[] = [];
   const notifications: string[] = [];
   const resumed: ExtensionCommandContext[] = [];
+  const renamed: string[] = [];
   const previewReads: { session: SessionInfo; signal: AbortSignal }[] = [];
   const replacement = {
     cwd: "/new-project",
@@ -183,6 +187,9 @@ function harness(
       registerCommand(name, command) {
         assert.equal(name, "pituix-resume");
         handler = command.handler;
+      },
+      setSessionName: (name: string) => {
+        renamed.push(name);
       },
     } as ExtensionAPI,
     {
@@ -212,6 +219,7 @@ function harness(
         : { entries: [], cwd: session.cwd, model: "Recorded model", effort: "off" };
     },
     options.readMetadata ?? (async () => ({})),
+    { readBranch: options.readBranch ?? (async () => "main"), rename: options.rename },
   );
   const ctx = {
     hasUI: true,
@@ -219,6 +227,7 @@ function harness(
     sessionManager: {
       getSessionFile: () => options.current ?? "/current.jsonl",
       getSessionDir: () => "/custom/sessions",
+      getSessionId: () => sessions[0].id,
     },
     ui: {
       custom: (factory: (...args: unknown[]) => View, uiOptions: unknown) =>
@@ -239,7 +248,8 @@ function harness(
               theme,
               {
                 matches: (data: string, action: string) =>
-                  action === "app.tools.expand" && data === "\x0f",
+                  (action === "app.tools.expand" && data === "\x0f") ||
+                  (action === "app.session.rename" && data === "\x12"),
               },
               done,
             ),
@@ -275,6 +285,7 @@ function harness(
     loads,
     notifications,
     resumed,
+    renamed,
     previewReads,
     replacement,
     get renders() {
@@ -320,6 +331,299 @@ test("resume list and preview display recorded metadata in reference order witho
       assert.ok(lines.every((line) => !line.includes("\x1b]0;")));
     }
   }
+});
+
+test("branch filtering waits for recorded metadata, preserves selection as results arrive and excludes unknown branches", () => {
+  const { view, selected } = setup();
+  view.handleInput("\x02");
+  assert.match(text(view), /Reading current Git branch/);
+  assert.deepEqual(view.metadataCandidates(), []);
+  view.setCurrentBranch("main");
+  assert.match(text(view), /Reading recorded session branches/);
+  assert.equal(view.metadataCandidates().length, 3);
+  view.setMetadata(sessions[2].path, { gitBranch: "main" });
+  assert.match(text(view), /❯ Session 3/);
+  view.setMetadata(sessions[0].path, { gitBranch: "main" });
+  view.setMetadata(sessions[1].path, {});
+  assert.match(text(view), /❯ Session 3/);
+  assert.doesNotMatch(text(view), /Session 2/);
+  view.handleInput("\x02");
+  assert.match(text(view), /Session 2/);
+  assert.match(text(view), /❯ Session 3/);
+  view.handleInput("\x02");
+  view.handleInput(" ");
+  view.setMetadata(sessions[2].path, { gitBranch: "elsewhere" });
+  assert.match(text(view), /Resume session/);
+  assert.doesNotMatch(text(view), /Session preview|Session 3/);
+  view.handleInput("\r");
+  assert.deepEqual(selected, [sessions[0].path]);
+});
+
+test("branch filtering distinguishes unavailable, loading and empty results and composes with search/scope", () => {
+  const { view, scopes } = setup();
+  view.setCurrentBranch(undefined);
+  view.handleInput("\x02");
+  assert.match(text(view), /Current Git branch unavailable/);
+  view.setCurrentBranch("main");
+  for (const item of sessions) view.setMetadata(item.path, {});
+  assert.match(text(view), /No matching sessions/);
+  view.setMetadata(sessions[1].path, { gitBranch: "main" });
+  view.handleInput("Request 2");
+  view.handleInput("\r");
+  view.handleInput("\x01");
+  assert.deepEqual(scopes, [true]);
+  const outside = session(4, { cwd: "/other", allMessagesText: "Request 2" });
+  view.setSessions([...sessions, outside]);
+  view.setMetadata(outside.path, { gitBranch: "main" });
+  assert.match(text(view), /All projects · main/);
+  assert.match(text(view), /Session 4/);
+  assert.doesNotMatch(text(view), /Session 1|Session 3/);
+});
+
+test("branch indexing reaches beyond the visible window and drops pending catalogue work on filter/scope change", async () => {
+  const reads: number[] = [];
+  const h = harness({
+    list: async () => Array.from({ length: 100 }, (_, index) => session(index + 1)),
+    readMetadata: async (item) => {
+      const index = Number(item.id.split("-")[1]);
+      reads.push(index);
+      if (index === 99) throw new Error("unreadable");
+      return { gitBranch: index === 100 ? "main" : "different" };
+    },
+  });
+  const run = h.run();
+  await tick();
+  assert.ok(reads.length < 100);
+  h.views[0].handleInput("\x02");
+  await tick();
+  assert.equal(reads.length, 100);
+  assert.match(h.views[0].render(100).map(stripTerminalSequences).join("\n"), /❯ Session 100/);
+  h.views[0].handleInput("\x1b");
+  await run;
+
+  const pending: { item: SessionInfo; resolve: (metadata: SessionMetadata) => void }[] = [];
+  const other = harness({
+    list: async () => Array.from({ length: 500 }, (_, index) => session(index + 1)),
+    readMetadata: (item) => new Promise((resolve) => pending.push({ item, resolve })),
+  });
+  const otherRun = other.run();
+  await tick();
+  other.views[0].handleInput("\x02");
+  other.views[0].handleInput("\x02");
+  other.views[0].handleInput("Request 400");
+  pending[0].resolve({});
+  await tick();
+  assert.equal(pending[2].item.id, "session-400", "old queued rows do not delay the new search");
+  for (let i = 0; i < 3; i++) other.views[0].handleInput("\x1b");
+  await otherRun;
+  for (const request of pending.slice(1)) request.resolve({});
+  await tick();
+});
+
+test("current branch reads abort with the picker and cannot redraw a closed view", async () => {
+  let signal: AbortSignal | undefined;
+  let resolve!: (branch: string) => void;
+  const h = harness({
+    readBranch: (_cwd, request) => {
+      signal = request;
+      return new Promise((done) => {
+        resolve = done;
+      });
+    },
+  });
+  const run = h.run();
+  await tick();
+  h.views[0].handleInput("\x1b");
+  await run;
+  assert.ok(signal?.aborted);
+  const renders = h.renders;
+  resolve("late");
+  await tick();
+  assert.equal(h.renders, renders);
+});
+
+test("rename prefills names, cancels without I/O, preserves public input editing and saves exactly once", async () => {
+  let records = sessions;
+  const saves: string[] = [];
+  const h = harness({
+    list: async () => records,
+    rename: async (item, name) => {
+      saves.push(name);
+      records = records.map((record) =>
+        record.path === item.path ? { ...record, name, modified: new Date(now) } : record,
+      );
+    },
+  });
+  const run = h.run();
+  await tick();
+  const page = h.views[0];
+  page.handleInput("\x1b[B");
+  page.handleInput("\x12");
+  const output = () => page.render(100).map(stripTerminalSequences).join("\n");
+  assert.match(output(), /Rename session:[\s\S]*Session 2[\s\S]*Enter to save/);
+  page.handleInput(" ignored");
+  page.handleInput("\x1b");
+  assert.deepEqual(saves, []);
+  assert.match(output(), /❯ Session 2/);
+  page.handleInput("\x12");
+  page.handleInput("\x01");
+  page.handleInput("\x0b");
+  page.handleInput("\r");
+  assert.deepEqual(saves, [], "blank confirmation performs no write");
+  page.handleInput("\x1b[200~  Renamed 中文  \x1b[201~");
+  page.handleInput("\r");
+  page.handleInput("\r");
+  assert.match(output(), /Saving session name/);
+  await tick();
+  assert.deepEqual(saves, ["Renamed 中文"]);
+  assert.match(output(), /❯ Renamed 中文/);
+  assert.match(output(), /Resume session \(1 of 3\)/);
+  assert.deepEqual(h.calls, ["open"]);
+  page.handleInput("\x12");
+  assert.match(output(), /Rename session:[\s\S]*Renamed 中文/);
+  page.handleInput("\r");
+  assert.deepEqual(saves, ["Renamed 中文"], "unchanged name closes without another write");
+  page.handleInput("\x1b");
+  await run;
+});
+
+test("rename failure keeps the draft for retry, cancellation aborts pending writes and ignores late results", async () => {
+  let attempts = 0;
+  let signal: AbortSignal | undefined;
+  let resolve!: () => void;
+  const h = harness({
+    rename: async (_item, _name, request) => {
+      signal = request;
+      if (++attempts === 1) throw new Error("File unavailable");
+      return new Promise((done) => {
+        resolve = done;
+      });
+    },
+  });
+  const run = h.run();
+  await tick();
+  const page = h.views[0];
+  page.handleInput("\x12");
+  page.handleInput(" renamed");
+  page.handleInput("\r");
+  await tick();
+  assert.match(
+    page.render(100).map(stripTerminalSequences).join("\n"),
+    /Could not rename session: Error: File unavailable/,
+  );
+  page.handleInput("\r");
+  assert.equal(attempts, 2);
+  page.handleInput("\x1b");
+  assert.ok(signal?.aborted);
+  page.handleInput("\x1b");
+  await run;
+  const renders = h.renders;
+  resolve();
+  await tick();
+  assert.equal(h.renders, renders);
+  assert.deepEqual(h.calls, ["open", "close"]);
+  assert.deepEqual(h.notifications, []);
+});
+
+test("rename delegates the current session to ExtensionAPI and invalidates old metadata after a save", async () => {
+  const h = harness({ current: sessions[0].path });
+  const run = h.run();
+  await tick();
+  h.views[0].handleInput("\x12");
+  h.views[0].handleInput(" renamed");
+  h.views[0].handleInput("\r");
+  await tick();
+  assert.deepEqual(h.renamed, ["Session 1 renamed"]);
+  h.views[0].handleInput("\x1b");
+  await run;
+
+  const reads: { session: SessionInfo; resolve: (metadata: SessionMetadata) => void }[] = [];
+  const other = harness({
+    readMetadata: (session) => new Promise((resolve) => reads.push({ session, resolve })),
+    rename: async () => {},
+  });
+  const otherRun = other.run();
+  await tick();
+  other.views[0].handleInput("\x12");
+  other.views[0].handleInput(" renamed");
+  other.views[0].handleInput("\r");
+  await tick();
+  reads[1].resolve({});
+  await tick();
+  assert.equal(reads[2].session.path, sessions[0].path);
+  reads[2].resolve({ byteSize: 4096 });
+  await tick();
+  reads[0].resolve({ byteSize: 1024 });
+  await tick();
+  assert.match(other.views[0].render(100).map(stripTerminalSequences).join("\n"), /4.0KB/);
+  assert.doesNotMatch(other.views[0].render(100).map(stripTerminalSequences).join("\n"), /1.0KB/);
+  other.views[0].handleInput("\x1b");
+  await otherRun;
+  for (const request of reads.slice(3)) request.resolve({});
+  await tick();
+});
+
+test("rename input and errors stay within ANSI/CJK bounds and use the configured shortcut", () => {
+  for (const rows of [1, 2, 3, 4, 8, 12, 14, 24, 40]) {
+    for (const ascii of [false, true]) {
+      const view = new ResumePicker({
+        theme,
+        ascii,
+        cwd: "/project",
+        getRows: () => rows,
+        done() {},
+        onScopeChange() {},
+        onRename() {},
+        renameKey: (data) => data === "\x14",
+        renameHint: "Ctrl+T",
+      });
+      view.setSessions([session(1, { name: undefined })]);
+      view.handleInput("\x12");
+      assert.doesNotMatch(text(view), /Rename session:/);
+      view.handleInput("\x14");
+      if (rows >= 14) assert.match(text(view), /Enter new session name/);
+      view.handleInput("\x1b[200~中文很长的会话名称\x1b[201~");
+      view.setRenameError(sessions[0].path, new Error("\x1b]0;title\x07错误 ".repeat(20)));
+      for (const width of [0, 1, 2, 4, 12, 24, 40, 80, 100]) {
+        const lines = view.render(width);
+        assert.ok(lines.length <= rows);
+        assert.ok(lines.every((line) => visibleWidth(line) <= width));
+        assert.ok(!lines.join("\n").includes("\x1b]0;"));
+        if (ascii) assert.doesNotMatch(lines.join("\n"), /[❯⌕╭╮╰╯─▔·]/);
+      }
+    }
+  }
+});
+
+test("reference list keeps three rows and a stable frame through filtering and rename", () => {
+  const view = new ResumePicker({
+    theme,
+    ascii: false,
+    cwd: "/project",
+    getRows: () => 38,
+    done() {},
+    onScopeChange() {},
+    onRename() {},
+    renameKey: (data) => data === "\x12",
+  });
+  view.setSessions(Array.from({ length: 8 }, (_, i) => session(i + 1)));
+  const lines = () => view.render(100).map(stripTerminalSequences);
+  const list = lines();
+  assert.equal(list.length, 20);
+  assert.match(list[7], /❯ Session 1/);
+  assert.match(list[13], /↓ Session 3/);
+  assert.match(list[16], /^ {5}Ctrl\+A/);
+  view.handleInput("\x1b[6~");
+  assert.match(lines()[7], /↑ Session 3/);
+  view.handleInput("\x12");
+  assert.equal(lines().length, 20);
+  assert.match(lines()[7], /Rename session:/);
+  assert.match(lines()[9], /Session 4/);
+  assert.match(lines()[10], /Enter to save/);
+  view.handleInput("\x1b");
+  view.handleInput("absent");
+  assert.equal(lines().length, 20);
+  assert.match(lines()[7], /No matching sessions/);
 });
 
 test("metadata I/O stays bounded, never blocks navigation, and aborts without late redraws", async () => {

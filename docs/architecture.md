@@ -58,8 +58,8 @@ no extra model message. Missing Git and unavailable branch data are omitted;
 unborn branches and detached HEAD are supported. Lifecycle changes abort pending
 observations, so a result cannot attach to a replacement session.
 These records are UI metadata, excluded by Pi's model-context builder. Pi owns
-storage, ordering, branching, compaction and restoration; Pi-TUIX neither writes
-session files nor modifies messages. Existing histories without these records
+storage, ordering, branching, compaction and restoration; Pi-TUIX never directly
+writes session files or modifies messages. Existing histories without these records
 are not backfilled. No records are added in the default UI or non-TUI modes.
 Cancellation has a separate interruption prompt, including Pi's error-form
 AbortError case. Imported records with invalid fields or unknown versions are
@@ -135,10 +135,25 @@ in 1024-based units; preview footers show short relative time, message count and
 recorded branch. The latest completion on the saved parent chain supplies the
 branch even when compaction hides that older UI entry from the transcript.
 Abandoned paths cannot supply it, and current Git state never fills missing
-historical data. Metadata is read only for a bounded window near the visible
-selection with at most two concurrent file reads. Closing aborts those reads and
-discards queued work; late results cannot overwrite a newer preview snapshot.
+historical data. Metadata normally loads for a bounded window near the visible
+selection. Ctrl+B filters by the current Git branch, observed once on opening;
+while active it reads metadata across the selected catalogue scope. Missing
+observations are excluded, and unavailable Git/loading/empty states are distinct.
+At most two file reads run at once. Changing search/scope/filter discards queued
+rows that are no longer needed. Closing aborts reads and discards queued work;
+late results cannot overwrite a newer preview snapshot or post-rename size.
 Only small metadata fields are cached, not the preview's full parsed history.
+The normal list keeps up to three entries and a stable 20-row frame shared with
+search and rename; short terminals use a compact layout. The configured public
+`app.session.rename` binding opens a draft using the public Input component.
+Esc cancels; Enter confirms one write. The current session delegates through
+`pi.setSessionName`, preserving host state/events. Other selections validate the
+file identity/format before `SessionManager.open().appendSessionInfo()`; Pi owns
+the name entry and any legacy migration, just as in its native selector.
+Opening the picker or a preview never invokes that persistence path. Cancelled
+validation does not write, errors retain the draft for retry, and saving refreshes
+the public catalogue without switching sessions. Names remain usable after
+disabling or removing Pi-TUIX.
 The custom view closes before
 `ctx.switchSession(path)` replaces the runtime; late load callbacks are ignored,
 and no captured session-bound object is used after a successful replacement.

@@ -32,6 +32,10 @@ entries stay outside model context and need no migration when Pi-TUIX is removed
 Owning the UI payload does not transfer session persistence or branching to the
 extension.
 
+Session renaming is a presentation control over Pi's public name APIs. Pi owns
+the resulting native name entries and any legacy-file migration; selecting,
+searching, filtering and previewing do not write session files.
+
 ## Design principles
 
 ### Scan before reading

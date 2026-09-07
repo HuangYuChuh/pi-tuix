@@ -62,7 +62,9 @@ The working line shows elapsed time and reported output tokens when available. A
 
 `/pituix-resume` searches saved Pi sessions. Type to filter, press Enter to select a result, then Enter again to resume. Space opens a read-only conversation preview with individual tool results, diffs, recorded model/time and completion rows. Use arrows, PgUp/PgDn, Home/End or the wheel to scroll and Ctrl+O to expand details. Esc returns to the list; Ctrl+A switches project scope. Pi performs the actual session switch. The preview uses Pi's active-branch/compaction projection and labels binary attachments; it never executes recorded tools or rewrites session files. Native `/resume` and `/tree` remain available.
 
-Session rows show file size and the Git branch recorded when a run ended. Preview footers show message count and that same recorded branch. Old runs without a branch observation stay blank, even if the current checkout has a branch. Metadata loads asynchronously near the visible selection and stops when the picker closes.
+Session rows show file size and the Git branch recorded when a run ended. Preview footers show message count and that same recorded branch. Ctrl+B filters the list to the current Git branch; older sessions without a recorded branch are excluded. Metadata loads asynchronously near the visible selection, or across the selected project scope while branch filtering, with at most two concurrent reads. Closing stops queued work.
+
+Ctrl+R (or Pi's configured session rename binding) edits the selected session's name. Enter saves through Pi's public session API; Esc cancels the draft. Saving a name refreshes the list without resuming the session. The active session uses Pi's live setter, and other sessions use Pi's native name entries. Confirmed renaming of legacy files may invoke Pi's normal format migration; search, filtering and previews remain read-only.
 
 The main conversation uses reference-style user and assistant rows in both regular and fullscreen terminal modes, while retaining Pi's editor, streaming output, tools, notifications, widgets and queue. Fullscreen scrolling, prompt navigation, search and mouse selection use Pi's native viewport over the same styled document; closing search retains the matched location. Regular mode uses terminal scrollback. Pi's settings can switch between modes during a session. `/pituix-default` restores the native interface in that session.
 
@@ -80,7 +82,7 @@ These commands are reversible:
 | `/pituix-about` | Show the package and compatible Pi version |
 | `/pituix-status` | Toggle compact hints and detailed session statistics |
 | `/pituix-model` | Choose a Pi model and thinking level in the numbered picker |
-| `/pituix-resume` | Search, preview and resume saved Pi sessions |
+| `/pituix-resume` | Search, filter, rename, preview and resume saved Pi sessions |
 | `/pituix-session` | Navigate entries in the current Pi session tree |
 | `/pituix-transcript` | Read a scrollable snapshot with message and tool detail |
 | `/pituix-settings` | Open shell, footer, icon, and telemetry settings |

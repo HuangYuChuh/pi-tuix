@@ -103,3 +103,7 @@ The same payload may record the Git branch observed at run end for session-picke
 display. Old runs without that observation remain unknown; opening a picker never
 backfills history from the current checkout. File sizes are read from the selected
 session data without creating a second session catalogue or persistence layer.
+The picker also exposes Pi's existing session naming through public APIs after
+explicit confirmation. Pi owns the native name entry and any legacy migration;
+opening, searching, filtering and previewing remain read-only. These controls
+do not introduce a separate session format or require migration on removal.
