@@ -13,6 +13,7 @@ import { useAsciiChrome } from "../shell/open-tui/icons.ts";
 
 export type DisplayMode = "collapsed" | "preview" | "expanded";
 export type ToolStatus = "QUEUED" | "RUNNING" | "OK" | "ERROR" | "CANCELLED";
+export type ToolDetailLine = string | ((width: number) => string);
 
 export interface ToolSummary {
   action: string; // 工具名（READ/BASH/EDIT/WRITE）
@@ -30,10 +31,10 @@ export interface ToolSummary {
 export class ThreeLayerToolView implements Component {
   private mode: DisplayMode;
   private summary: ToolSummary;
-  private details: string[];
+  private details: ToolDetailLine[];
   private theme: Theme;
 
-  constructor(mode: DisplayMode, summary: ToolSummary, details: string[], theme: Theme) {
+  constructor(mode: DisplayMode, summary: ToolSummary, details: ToolDetailLine[], theme: Theme) {
     this.mode = mode;
     this.summary = summary;
     this.details = details;
@@ -57,8 +58,12 @@ export class ThreeLayerToolView implements Component {
     }
 
     const branch = useAsciiChrome() ? "  L  " : "  ⎿  ";
-    const detailLine = (line: string, first = false) =>
-      truncateToWidth(`${first ? branch : "     "}${line}`, safeWidth);
+    const detailLine = (line: ToolDetailLine, first = false) => {
+      const prefix = first ? branch : "     ";
+      const content =
+        typeof line === "string" ? line : line(Math.max(0, safeWidth - visibleWidth(prefix)));
+      return truncateToWidth(`${prefix}${content}`, safeWidth);
+    };
     if (this.summary.resultSummary) {
       lines.push(detailLine(this.theme.fg("dim", this.summary.resultSummary), true));
     }

@@ -104,9 +104,16 @@ Observed dark-theme colors:
 | Successful tool marker | `#4eba65` |
 | User-message background | `#373737` |
 | User-message text | `#ffffff` |
+| Diff text | `#f8f8f2` |
+| Removed gutter / row / changed token | `#dc5a5a` / `#3d0100` / `#5c0200` |
+| Added gutter / row / changed token | `#50c850` / `#022800` / `#044700` |
+| Syntax keyword / function / operator | `#f92672` / `#a6e22e` / `#fd971f` |
 
-These colors are applied to corresponding theme roles. Other syntax and status
-colors retain Pi-TUIX's existing accessible palette.
+These colors are applied to corresponding theme roles and the diff adapter.
+Additional syntax roles follow the same Monokai palette; Pi's public highlighter
+still determines token categories. This does not yet reproduce every reference
+syntax token. For example, Pi groups a TypeScript function declaration more
+broadly than the observed reference.
 
 ## Implementation and remaining gaps
 
@@ -123,7 +130,7 @@ colors retain Pi-TUIX's existing accessible palette.
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `setWidget` | Latest completion duration/clock and interruption branch implemented; historical per-response rows are not reproduced |
 | Queued follow-up count | `input` events, `setStatus` | Observational count; Pi owns delivery |
-| Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state`, public `renderDiff` | Result branches, compact Read counts, numbered Write previews and Update diffs implemented |
+| Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state`, public `renderDiff`/`highlightCode` | Result branches, compact Read counts, numbered Write previews and numbered Update diffs with row/word backgrounds implemented |
 | Adjacent Read/Bash summaries | Finalized message/tool events, public session branch, per-row invalidation | Implemented for adjacent successful calls; paths deduplicated, expanded calls retained, resumed sessions reconstructed |
 | Tool expansion | `options.expanded`, configured `app.tools.expand` | Implemented; no invented E binding |
 | Execution, errors, cancellation | Original tool `execute` functions | Delegated unchanged |
@@ -144,8 +151,13 @@ Group summaries also retain a compact target list and explicit success status;
 errors, cancellation, images and truncated results are never hidden in a group.
 Expanded Read can reveal the file body, an intentional Pi-TUIX affordance beyond
 the observed reference count-only result. Diff layout follows the reference
-number/marker order, while word highlighting uses Pi's public formatter rather
-than reproducing Claude's syntax palette exactly.
+number/marker order. The adapter reads changed-token ranges from Pi's public
+formatter and replaces inverse video with stronger backgrounds. Removed lines
+use plain code text; added/context lines use Pi's public syntax highlighter.
+The dark reference theme receives these backgrounds, with distinct 256-color
+fallbacks. Other themes retain native diff styling, and `NO_COLOR` disables the
+additional paint unless color is explicitly forced. Syntax token boundaries
+remain a measured difference, rather than a claim of full syntax parity.
 
 ## Validation
 
@@ -188,6 +200,15 @@ than reproducing Claude's syntax palette exactly.
 - Concurrent-tool state tests cover repeated tool names, out-of-order completion,
   duplicated/late events and cancellation cleanup; lifecycle wiring verifies
   that the working message retains the remaining active tool.
+- Diff tests cover changed-token offsets, RGB operands containing SGR-like
+  values, explicit `+/-` gutters, background reset after truncation, CJK/emoji,
+  256-color fallback, no-color mode, unknown formats and theme restoration.
+  Actual 80x24 and 100x40 Pi runs replayed an official Edit result from the saved
+  fixture. For both changed lines (`return a - b` / `return a + b`), every cell's
+  text, foreground, background and inverse state matched the corresponding
+  Claude capture at each width, including the seven-cell right margin.
+  Context-line syntax still differs as described above. Native restoration was
+  checked in the 80-column host after displaying these colored rows.
 - Successful Claude Read/Bash/Edit/Write calls and approval dialogs are now
   observed. Full cross-product visual parity remains incomplete; the tool
   presentation gaps above are based on these authenticated observations.

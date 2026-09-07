@@ -126,6 +126,14 @@ Read previews show a count, Write previews add line numbers, and Edit uses the
 public `renderDiff` formatter for word highlights. A guarded presentation
 adapter moves recognized diff line numbers before the change marker while
 preserving ANSI sequences; unrecognized formats pass through unchanged.
+For the reference dark theme, `diff-view` reads inverse-video token ranges from
+that public output, then paints row and token backgrounds at the available
+width. Added/context lines use public `highlightCode`; removed lines stay plain.
+The tool view accepts pure width-dependent detail-line callbacks so backgrounds
+can fill the observed code pane without rendering side effects. Color resets,
+256-color fallback and `NO_COLOR` handling stay in this adapter. Other themes
+continue using the original public diff styling. Syntax token categories remain
+Pi-owned and are not yet identical to the reference. No new dependency is added.
 Adjacent successful Read/Bash calls share a compact count summary. The grouping
 adapter observes public finalized messages and tool completion events, and
 rehydrates metadata from `sessionManager.getBranch()` on startup/navigation.

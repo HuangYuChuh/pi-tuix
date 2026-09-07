@@ -11,18 +11,12 @@ import {
   type ExtensionAPI,
   type ReadToolDetails,
   type ReadToolInput,
-  renderDiff,
   type Theme,
   type ToolRenderResultOptions,
   type WriteToolInput,
 } from "@earendil-works/pi-coding-agent";
-import {
-  Box,
-  type Component,
-  sliceByColumn,
-  stripTerminalSequences,
-  visibleWidth,
-} from "@earendil-works/pi-tui";
+import { Box, type Component } from "@earendil-works/pi-tui";
+import { numberedDiff } from "./diff-view.ts";
 import {
   type DisplayMode,
   diffStats,
@@ -150,23 +144,6 @@ function numberedLines(content: string, theme: Theme): string[] {
     (line, index) =>
       `${theme.fg("dim", String(index + 1).padStart(digits))} ${theme.fg("toolOutput", line)}`,
   );
-}
-
-function numberedDiff(diff: string, theme: Theme): string[] {
-  const rows = splitLines(renderDiff(diff)).map((styled) => ({
-    styled,
-    prefix: stripTerminalSequences(styled).match(/^([+ -])(\s*\d+) /),
-  }));
-  const digits = Math.max(2, ...rows.map(({ prefix }) => prefix?.[2].trim().length ?? 0));
-  return rows.map(({ styled, prefix }) => {
-    // Unknown host formats retain their original presentation.
-    if (!prefix) return styled;
-    const sign = prefix[1];
-    const color =
-      sign === "+" ? "toolDiffAdded" : sign === "-" ? "toolDiffRemoved" : "toolDiffContext";
-    const body = sliceByColumn(styled, prefix[0].length, visibleWidth(styled));
-    return `${theme.fg("dim", prefix[2].trim().padStart(digits))} ${theme.fg(color, sign)}${body}`;
-  });
 }
 
 interface SharedPresentationState {
@@ -459,7 +436,7 @@ export function createThreeLayerEditDefinition(
 
       // 详情：优先显示 diff，否则显示错误输出
       const detailLines = details?.diff
-        ? numberedDiff(details.diff, theme)
+        ? numberedDiff(details.diff, theme, args.path)
         : context.isError
           ? formatLines(splitLines(output), theme)
           : [];

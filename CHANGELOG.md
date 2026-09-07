@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add elapsed working feedback, reported output-token counts, and temporary settled-run completion/interruption lines; retain duration through automatic retries.
 - Match observed user-message background/text and successful tool-marker colors through the public theme.
 - Add a searchable resume picker with public Pi session metadata, text previews, project scope switching, and host-delegated session restoration through `/pituix-resume`.
+- Match observed Edit row and changed-token backgrounds, gutter colors and right margin; preserve source characters, theme fallback, no-color mode and distinct 256-color fills.
+- Use the reference syntax palette with Pi's public highlighter for added/context diff lines; retain the documented differences in token categories.
 
 ### Fixed
 - Use configured tool expansion bindings instead of the unregistered E hint.
