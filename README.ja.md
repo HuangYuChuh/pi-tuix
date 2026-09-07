@@ -11,7 +11,7 @@
 > [!NOTE]
 > この翻訳はコミュニティによって管理されています。誤りがあれば PR を歓迎します。現在の [`README.md`](README.md) に基づいています。
 
-> **ステータス:** 初期開発段階です。`pi-tuix` はまだ npm に公開されていません。
+> **ステータス:** 現在のソースバージョンは `0.1.1`（未リリース）です。`pi-tuix` は npm に公開されていないため、ローカルのチェックアウトからインストールしてください。
 
 **Pi-TUIX** は Pi Coding Agent 向けのオープンソース Terminal UI 拡張です。長時間のコーディングセッションを見やすく整理しながら、モデルリクエスト、組み込みツール、セッション、権限、provider 連携は引き続き Pi が管理します。
 
@@ -43,17 +43,19 @@ Pi はローカルパスをユーザー設定に保存し、すべてのプロ�
 
 ### npm からのインストール
 
-Pi-TUIX はまだ npm に公開されていないため、現時点では `pi install npm:pi-tuix` は使用できません。公開後の手順は[リリース手順](docs/releasing.md)に記載します。
+Pi-TUIX はまだ npm に公開されていません。`v0.1.0` はソースタグであり npm リリースではないため、現時点では `pi install npm:pi-tuix` は使用できません。公開後の手順は[リリース手順](docs/releasing.md)に記載します。
 
 インストール元の切り替えは[開発版ガイド](docs/development.md)、開発版・prerelease・stable の規則は[リリース手順](docs/releasing.md)を参照してください。
 
-## 0.1.0 stable release
+## 現在の開発版
 
-`0.1.0` は Pi の公開 `ExtensionAPI` を通じて header、footer、terminal title、working indicator、editor chrome、および三層の Read/Bash/Edit/Write 表示を提供します。tool execution は変更せず Pi に委譲します。既定は preview で、先頭2行と末尾2行を表示します。collapsed は要約のみ、expanded は全出力または diff を表示します。
+現在のソースは、Pi の公開 `ExtensionAPI` を通じて header、footer、working indicator、editor chrome、および三層の Read/Bash/Edit/Write 表示を提供します。terminal title は Pi 本来の session/project 表示を保ちます。tool execution は変更せず Pi に委譲します。既定は preview で、先頭2行と末尾2行を表示します。collapsed は要約のみ、expanded は全出力または diff を表示します。
 
 Editor border は `READY/WORKING`、入力行数、文字数を表示します。Pi の公開 `CustomEditor` を継承するため、submit、history、autocomplete、paste、app shortcut はそのまま維持されます。
 
 各 tool row は action、target、state、`ATTENTION/CLEAR` を明示します。Read/Bash は出力量、Edit は diff stats、Write は書き込み行数を要約し、展開すると ANSI-aware な幅制約のある詳細を確認できます。
+
+`/pituix-resume` は保存済み session の検索、Git branch による絞り込み、名前変更、読み取り専用 preview と Pi による復元を提供します。`/pituix-transcript` は現在の conversation の読み取り専用 snapshot を開きます。どちらも記録済みの tool を再実行したり、session file を書き換えたりしません。PNG/JPEG/GIF/WebP のローカル path または Pi の image-paste action は editor 内の image chip にでき、Pi の公開 input transformation を通じて送信時の byte を渡します。
 
 | コマンド | 目的 |
 | --- | --- |
@@ -63,6 +65,12 @@ Editor border は `READY/WORKING`、入力行数、文字数を表示します�
 | `/pituix-three-layer` | 三層 tool renderer を使用 |
 | `/pituix-mode <collapsed\|preview\|expanded>` | tool detail mode を設定（既定は preview） |
 | `/pituix-about` | package と互換性のある Pi バージョンを表示 |
+| `/pituix-status` | compact hint と詳細な session 統計を切り替え |
+| `/pituix-model` | Pi model と thinking level を選択 |
+| `/pituix-resume` | 保存済み session を検索、preview、rename、resume |
+| `/pituix-session` | 現在の Pi session tree を移動 |
+| `/pituix-transcript` | conversation と tool detail の snapshot を表示 |
+| `/pituix-settings` | shell、footer、icon、telemetry の設定を開く |
 | `/pituix-steer <message>` | 実行中のタスクへ即時に修正指示を送る |
 | `/pituix-followup <message>` | 現在の実行後に処理するメッセージをキューへ追加 |
 | `/pituix-queue` | Pi に保留中のメッセージがあるか表示 |

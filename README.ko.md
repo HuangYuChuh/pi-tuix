@@ -11,7 +11,7 @@
 > [!NOTE]
 > 이 번역은 커뮤니티에서 관리합니다. 오류가 있다면 PR을 보내 주세요. 현재 [`README.md`](README.md)를 기준으로 합니다.
 
-> **상태:** 초기 개발 단계입니다. `pi-tuix`는 아직 npm에 배포되지 않았습니다.
+> **상태:** 현재 소스 버전은 `0.1.1`(미출시)입니다. `pi-tuix`는 npm에 배포되지 않았으므로 로컬 체크아웃에서 설치해야 합니다.
 
 **Pi-TUIX**는 Pi Coding Agent를 위한 오픈 소스 terminal UI 확장입니다. 긴 코딩 세션을 더 명확하고 조밀하게 보여 주면서도 모델 요청, 내장 도구, 세션, 권한 및 provider 연동은 계속 Pi가 관리합니다.
 
@@ -43,17 +43,19 @@ Pi는 로컬 경로를 사용자 설정에 저장하고 모든 프로젝트에�
 
 ### npm 설치
 
-Pi-TUIX는 아직 npm에 배포되지 않았으므로 현재 `pi install npm:pi-tuix`를 사용할 수 없습니다. 배포 후 절차는 [릴리스 절차](docs/releasing.md)에 안내됩니다.
+Pi-TUIX는 아직 npm에 배포되지 않았습니다. `v0.1.0`은 소스 태그이며 npm 릴리스가 아니므로 현재 `pi install npm:pi-tuix`를 사용할 수 없습니다. 배포 후 절차는 [릴리스 절차](docs/releasing.md)에 안내됩니다.
 
 설치 소스 전환은 [개발 버전 가이드](docs/development.md), 개발·prerelease·stable 채널 규칙은 [릴리스 절차](docs/releasing.md)를 참조하세요.
 
-## 0.1.0 안정 릴리스
+## 현재 개발 버전
 
-`0.1.0`은 Pi의 공개 `ExtensionAPI`를 통해 header, footer, terminal title, working indicator, editor chrome 및 3단계 Read/Bash/Edit/Write 표시를 제공합니다. tool execution은 변경 없이 Pi에 위임합니다. 기본 preview는 앞 2줄과 뒤 2줄을 표시하며, collapsed는 요약만, expanded는 전체 출력 또는 diff를 표시합니다.
+현재 소스는 Pi의 공개 `ExtensionAPI`를 통해 header, footer, working indicator, editor chrome 및 3단계 Read/Bash/Edit/Write 표시를 제공합니다. terminal title은 Pi의 원래 session/project 표시를 유지합니다. tool execution은 변경 없이 Pi에 위임합니다. 기본 preview는 앞 2줄과 뒤 2줄을 표시하며, collapsed는 요약만, expanded는 전체 출력 또는 diff를 표시합니다.
 
 Editor border는 `READY/WORKING`, 입력 줄 수 및 문자 수를 표시합니다. Pi의 공개 `CustomEditor`를 확장하므로 submit, history, autocomplete, paste 및 app shortcut 동작이 유지됩니다.
 
 각 tool row는 action, target, state 및 `ATTENTION/CLEAR`를 명확히 표시합니다. Read/Bash는 출력 크기, Edit는 diff stats, Write는 작성된 줄 수를 요약하며, 펼치면 ANSI-aware 너비 제한이 적용된 세부 정보를 볼 수 있습니다.
+
+`/pituix-resume`은 저장된 session의 검색, Git branch 필터, 이름 변경, 읽기 전용 preview 및 Pi가 수행하는 복원을 제공합니다. `/pituix-transcript`는 현재 conversation의 읽기 전용 snapshot을 엽니다. 두 기능 모두 기록된 tool을 재실행하거나 session file을 수정하지 않습니다. PNG/JPEG/GIF/WebP 로컬 path 또는 Pi image-paste action은 editor의 image chip으로 삽입할 수 있으며, 전송 시 Pi의 공개 input transformation으로 이미지 byte를 전달합니다.
 
 | 명령 | 용도 |
 | --- | --- |
@@ -63,6 +65,12 @@ Editor border는 `READY/WORKING`, 입력 줄 수 및 문자 수를 표시합니�
 | `/pituix-three-layer` | 3단계 tool renderer 사용 |
 | `/pituix-mode <collapsed\|preview\|expanded>` | tool detail mode 설정, 기본값은 preview |
 | `/pituix-about` | package 및 호환 Pi 버전 표시 |
+| `/pituix-status` | compact hint와 상세 session 통계 전환 |
+| `/pituix-model` | Pi model과 thinking level 선택 |
+| `/pituix-resume` | 저장된 session 검색, preview, 이름 변경 및 복원 |
+| `/pituix-session` | 현재 Pi session tree 탐색 |
+| `/pituix-transcript` | conversation과 tool detail의 snapshot 표시 |
+| `/pituix-settings` | shell, footer, icon, telemetry 설정 열기 |
 | `/pituix-steer <message>` | 실행 중인 작업에 즉시 수정 지시 전송 |
 | `/pituix-followup <message>` | 현재 실행 후 처리할 메시지를 큐에 추가 |
 | `/pituix-queue` | Pi에 대기 중인 메시지가 있는지 표시 |
