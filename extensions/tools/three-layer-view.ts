@@ -13,6 +13,7 @@ import { useAsciiChrome } from "../shell/open-tui/icons.ts";
 
 export type DisplayMode = "collapsed" | "preview" | "expanded";
 export type ToolStatus = "QUEUED" | "RUNNING" | "OK" | "ERROR" | "CANCELLED";
+export type ToolDetailLine = string | ((width: number) => string);
 
 export interface ToolSummary {
   action: string; // 工具名（READ/BASH/EDIT/WRITE）
@@ -20,6 +21,8 @@ export interface ToolSummary {
   status: ToolStatus;
   meta?: string; // 元信息（行数/时长/diff统计）
   attention: boolean; // 是否需要关注（错误时）
+  resultSummary?: string;
+  previewDetails?: boolean;
 }
 
 /**
@@ -28,10 +31,10 @@ export interface ToolSummary {
 export class ThreeLayerToolView implements Component {
   private mode: DisplayMode;
   private summary: ToolSummary;
-  private details: string[];
+  private details: ToolDetailLine[];
   private theme: Theme;
 
-  constructor(mode: DisplayMode, summary: ToolSummary, details: string[], theme: Theme) {
+  constructor(mode: DisplayMode, summary: ToolSummary, details: ToolDetailLine[], theme: Theme) {
     this.mode = mode;
     this.summary = summary;
     this.details = details;
@@ -54,6 +57,18 @@ export class ThreeLayerToolView implements Component {
       return lines;
     }
 
+    const branch = useAsciiChrome() ? "  L  " : "  ⎿  ";
+    const detailLine = (line: ToolDetailLine, first = false) => {
+      const prefix = first ? branch : "     ";
+      const content =
+        typeof line === "string" ? line : line(Math.max(0, safeWidth - visibleWidth(prefix)));
+      return truncateToWidth(`${prefix}${content}`, safeWidth);
+    };
+    if (this.summary.resultSummary) {
+      lines.push(detailLine(this.theme.fg("dim", this.summary.resultSummary), true));
+    }
+    if (this.mode === "preview" && this.summary.previewDetails === false) return lines;
+
     // === Preview 模式：前2 + 后2 ===
     if (this.mode === "preview") {
       const visibleLines =
@@ -62,28 +77,28 @@ export class ThreeLayerToolView implements Component {
           : [...this.details.slice(0, 2), ...this.details.slice(-2)];
       const hidden = Math.max(0, this.details.length - visibleLines.length);
 
-      visibleLines.slice(0, 2).forEach((line) => {
-        lines.push(truncateToWidth(`  ${line}`, safeWidth));
+      visibleLines.slice(0, 2).forEach((line, index) => {
+        lines.push(detailLine(line, index === 0 && !this.summary.resultSummary));
       });
 
       if (hidden > 0) {
         const hiddenLine = this.theme.fg(
           "dim",
-          `  ... ${hidden} more lines hidden (${keyText("app.tools.expand") || "/pituix-mode expanded"} to expand)`,
+          `     ... ${hidden} more lines hidden (${keyText("app.tools.expand") || "/pituix-mode expanded"} to expand)`,
         );
         lines.push(truncateToWidth(hiddenLine, safeWidth));
       }
 
       visibleLines.slice(2).forEach((line) => {
-        lines.push(truncateToWidth(`  ${line}`, safeWidth));
+        lines.push(detailLine(line));
       });
 
       return lines;
     }
 
     // === Expanded 模式：完整输出 ===
-    this.details.forEach((line) => {
-      lines.push(truncateToWidth(`  ${line}`, safeWidth));
+    this.details.forEach((line, index) => {
+      lines.push(detailLine(line, index === 0 && !this.summary.resultSummary));
     });
 
     return lines;
@@ -102,7 +117,7 @@ export class ThreeLayerToolView implements Component {
     const statusText = this.statusStyle(this.summary.status, `[${statusLabel}]`);
 
     let suffix = statusText;
-    if (this.summary.meta) {
+    if (this.summary.meta && (this.mode === "collapsed" || !this.summary.resultSummary)) {
       suffix += ` ${this.theme.fg("dim", this.summary.meta)}`;
     }
     if (this.summary.attention) {

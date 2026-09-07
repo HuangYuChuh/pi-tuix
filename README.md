@@ -52,7 +52,11 @@ The editor extends Pi's public `CustomEditor`, preserving submission, history, a
 
 The effective thinking level appears above the prompt with Pi's configured shortcut. `/pituix-settings` opens searchable preference tabs: type to filter, press Enter to select a result, then Enter or Space to change it. Tab switches categories; Escape clears the query, leaves search, then closes the page.
 
-Each tool row keeps the action, target, state, and attention signal visible. The default preview shows the first and last two detail lines; collapsed mode keeps only the summary, and expanded mode reveals the full output or diff. Read and Bash results summarize output size, Edit reports diff statistics, and Write reports the written line count. All views use ANSI-aware width constraints.
+Each tool row keeps the action, target, state, and attention signal visible. Read defaults to a line-count result branch; Bash shows output, Edit uses an `Update` heading with a numbered diff, and Write previews numbered content. Long previews show the first and last two detail lines. Collapsed mode keeps the summary; expanded mode reveals the full output or diff, including Read contents. Errors retain their details. All views use ANSI-aware width constraints.
+
+Adjacent successful Read/Bash calls combine into a count summary, deduplicating file paths while counting each shell call. Expand tools to reveal every call. Errors, cancellation, images, and truncated results remain separate; assistant text and other tools separate groups. Grouping is reconstructed from Pi's public session branch when resuming.
+
+In the reference dark theme, Edit diffs use numbered `+/-` gutters, full-row backgrounds and stronger changed-word backgrounds. Added/context lines use Pi's syntax highlighter. Other themes retain Pi's diff styling; 256-color and no-color terminals have explicit fallbacks.
 
 These commands are reversible:
 
@@ -60,8 +64,8 @@ These commands are reversible:
 | --- | --- |
 | `/pituix` | Enable or restore the Pi-TUIX shell |
 | `/pituix-default` | Restore Pi's default TUI components |
-| `/pituix-compact` | Use the original compact tool renderer |
-| `/pituix-three-layer` | Use the three-layer tool renderer |
+| `/pituix-compact` | Collapse reference-style tools to summary rows |
+| `/pituix-three-layer` | Show reference-style tool previews with expansion |
 | `/pituix-mode <collapsed\|preview\|expanded>` | Set the tool detail display mode; preview is the default |
 | `/pituix-about` | Show the package and compatible Pi version |
 | `/pituix-status` | Toggle compact hints and detailed session statistics |

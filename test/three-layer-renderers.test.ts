@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   type AgentToolResult,
+  createBashToolDefinition,
+  createEditToolDefinition,
+  createReadToolDefinition,
   createWriteToolDefinition,
+  initTheme,
+  renderDiff,
   type Theme,
+  ToolExecutionComponent,
 } from "@earendil-works/pi-coding-agent";
-import { type Component, stripTerminalSequences } from "@earendil-works/pi-tui";
+import { Box, type Component, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import {
   createThreeLayerBashDefinition,
   createThreeLayerEditDefinition,
@@ -22,9 +31,12 @@ import {
   truncatePath,
 } from "../extensions/tools/three-layer-view.ts";
 
+initTheme("dark", false);
+
 const theme = {
   bold: (text: string) => text,
   fg: (_color: string, text: string) => text,
+  bg: (_color: string, text: string) => text,
 } as Theme;
 
 function render(component: Component | undefined, width = 80): string[] {
@@ -32,7 +44,7 @@ function render(component: Component | undefined, width = 80): string[] {
   return component
     .render(width)
     .map(stripTerminalSequences)
-    .map((line) => line.replace(/^⏺/, "*"));
+    .map((line) => line.replace(/^⏺/, "*").replace("  ⎿  ", "  L  "));
 }
 
 function context<T>(args: T, overrides: Record<string, unknown> = {}) {
@@ -94,23 +106,28 @@ test("three-layer view renders collapsed, preview, and expanded without duplicat
   const preview = render(new ThreeLayerToolView("preview", summary, details, theme));
   assert.deepEqual(preview, [
     "* Read(README.md) [OK] 6 lines",
-    "  one",
-    "  two",
-    "  ... 2 more lines hidden (/pituix-mode expanded to expand)",
-    "  five",
-    "  six",
+    "  L  one",
+    "     two",
+    "     ... 2 more lines hidden (/pituix-mode expanded to expand)",
+    "     five",
+    "     six",
   ]);
 
   const shortPreview = render(
     new ThreeLayerToolView("preview", summary, ["one", "two", "three"], theme),
   );
-  assert.deepEqual(shortPreview, ["* Read(README.md) [OK] 6 lines", "  one", "  two", "  three"]);
+  assert.deepEqual(shortPreview, [
+    "* Read(README.md) [OK] 6 lines",
+    "  L  one",
+    "     two",
+    "     three",
+  ]);
 
   const expanded = render(new ThreeLayerToolView("expanded", summary, details, theme));
   assert.equal(expanded.length, 7);
   assert.deepEqual(
     expanded.slice(1),
-    details.map((line) => `  ${line}`),
+    details.map((line, index) => `${index === 0 ? "  L  " : "     "}${line}`),
   );
 });
 
@@ -118,8 +135,7 @@ test("three-layer renderers expose tool-specific summaries and states", () => {
   const mode: ToolRendererMode = { enabled: true, defaultMode: "preview" };
   const read = createThreeLayerReadDefinition("C:\\workspace", mode);
   const readLines = previewResult(read, { path: "src/index.ts" }, "one\ntwo\nthree\nfour\nfive");
-  assert.match(readLines[0] ?? "", /Read\(src\/index\.ts\) \[OK\] 5 lines/);
-  assert.match(readLines[3] ?? "", /hidden/);
+  assert.deepEqual(readLines, ["* Read(src/index.ts) [OK]", "  L  Read 5 lines"]);
 
   const bash = createThreeLayerBashDefinition("C:\\workspace", mode);
   const bashLines = render(
@@ -146,8 +162,13 @@ test("three-layer renderers expose tool-specific summaries and states", () => {
       >[3],
     ),
   );
-  assert.match(editLines[0] ?? "", /Edit\(src\/app\.ts\) \[OK\] \+1 -1/);
-  assert.deepEqual(editLines.slice(1), ["  @@", "  -old", "  +new"]);
+  assert.match(editLines[0] ?? "", /Update\(src\/app\.ts\) \[OK\]/);
+  assert.deepEqual(editLines.slice(1), [
+    "  L  Added 1 line, removed 1 line",
+    "     @@",
+    "     -old",
+    "     +new",
+  ]);
 
   const write = createThreeLayerWriteDefinition("C:\\workspace", mode);
   const writeLines = render(
@@ -158,8 +179,12 @@ test("three-layer renderers expose tool-specific summaries and states", () => {
       context({ path: "out.txt", content: "one\ntwo" }),
     ),
   );
-  assert.match(writeLines[0] ?? "", /Write\(out\.txt\) \[OK\] 2 lines written/);
-  assert.equal(writeLines.length, 1);
+  assert.deepEqual(writeLines, [
+    "* Write(out.txt) [OK]",
+    "  L  Wrote 2 lines to out.txt",
+    "      1 one",
+    "      2 two",
+  ]);
 });
 
 test("three-layer renderers mark errors, cancellations, and empty output", () => {
@@ -248,7 +273,9 @@ test("three-layer definitions retain Pi execution functions and disabled fallbac
   assert.ok(original.renderCall);
   const fallback = definition.renderCall(params, theme, context(params));
   const expected = original.renderCall(params, theme, context(params));
-  assert.deepEqual(render(fallback), render(expected));
+  const frame = new Box(1, 1);
+  frame.addChild(expected);
+  assert.deepEqual(render(fallback), render(frame));
 });
 
 test("result replaces its pending row and disabling restores the host shell", () => {
@@ -269,5 +296,236 @@ test("result replaces its pending row and disabling restores the host shell", ()
   assert.deepEqual(call.render(80), []);
   assert.match(render(output)[0] ?? "", /OK/);
   mode.enabled = false;
-  assert.notEqual(definition.renderShell, "self");
+  assert.equal(definition.renderShell, "self");
+});
+
+test("reference result branches retain expansion, numbered Write contents, and failure detail", () => {
+  const mode: ToolRendererMode = { enabled: true, defaultMode: "preview" };
+  const read = createThreeLayerReadDefinition(process.cwd(), mode);
+  const args = { path: "sample.ts" };
+  const expanded = render(
+    read.renderResult?.(
+      result("one\ntwo"),
+      { expanded: true, isPartial: false },
+      theme,
+      context(args),
+    ),
+  );
+  assert.deepEqual(expanded, [
+    "* Read(sample.ts) [OK]",
+    "  L  Read 2 lines",
+    "     one",
+    "     two",
+  ]);
+  const failedRead = render(
+    read.renderResult?.(
+      result("File not found"),
+      { expanded: false, isPartial: false },
+      theme,
+      context(args, { isError: true }),
+    ),
+  );
+  assert.match(failedRead[0] ?? "", /ERROR.*ATTENTION/);
+  assert.equal(failedRead[1], "  L  File not found");
+  const write = createThreeLayerWriteDefinition(process.cwd(), mode);
+  const writeArgs = { path: "notes.txt", content: "one\ntwo\nthree\nfour\nfive\nsix\n" };
+  const component = write.renderResult?.(
+    result("ok"),
+    { expanded: false, isPartial: false },
+    theme,
+    context(writeArgs),
+  );
+  const lines = render(component);
+  assert.equal(lines[1], "  L  Wrote 6 lines to notes.txt");
+  assert.equal(lines[2], "      1 one");
+  assert.equal(lines[3], "      2 two");
+  assert.match(lines[4] ?? "", /2 more lines/);
+  assert.equal(lines[5], "      5 five");
+  assert.equal(lines[6], "      6 six");
+  for (const width of [0, 1, 2, 8, 24, 40, 80, 120])
+    assert.ok(component?.render(width).every((line) => visibleWidth(line) <= width));
+  const writing = render(
+    write.renderResult?.(
+      result(""),
+      { expanded: false, isPartial: true },
+      theme,
+      context(writeArgs),
+    ),
+  );
+  assert.match(writing[0] ?? "", /RUNNING/);
+  assert.match(writing[1] ?? "", /Writing 6 lines/);
+  const failedWrite = render(
+    write.renderResult?.(
+      result("Permission denied\nCannot write notes.txt"),
+      { expanded: false, isPartial: false },
+      theme,
+      context(writeArgs, { isError: true }),
+    ),
+  );
+  assert.match(failedWrite[0] ?? "", /ERROR.*ATTENTION/);
+  assert.equal(failedWrite[1], "  L  Permission denied");
+  assert.ok(!failedWrite.join("\n").includes("  1 one"));
+  mode.defaultMode = "collapsed";
+  assert.match(
+    render(
+      write.renderResult?.(
+        result("ok"),
+        { expanded: false, isPartial: false },
+        theme,
+        context(writeArgs),
+      ),
+    )[0] ?? "",
+    /6 lines written/,
+  );
+});
+
+test("every reference tool retains the official executor and schema", () => {
+  const cwd = process.cwd();
+  const mode: ToolRendererMode = { enabled: true, defaultMode: "preview" };
+  const read = createReadToolDefinition(cwd);
+  const bash = createBashToolDefinition(cwd);
+  const edit = createEditToolDefinition(cwd);
+  const write = createWriteToolDefinition(cwd);
+  const pairs = [
+    [read, createThreeLayerReadDefinition(cwd, mode, read)],
+    [bash, createThreeLayerBashDefinition(cwd, mode, bash)],
+    [edit, createThreeLayerEditDefinition(cwd, mode, edit)],
+    [write, createThreeLayerWriteDefinition(cwd, mode, write)],
+  ] as const;
+  for (const [original, wrapped] of pairs) {
+    assert.equal(wrapped.execute, original.execute);
+    assert.equal(wrapped.parameters, original.parameters);
+    assert.equal(wrapped.prepareArguments, original.prepareArguments);
+  }
+});
+
+test("live host tool components restore native frames and results after mode changes", () => {
+  const cwd = process.cwd();
+  const mode: ToolRendererMode = { enabled: true, defaultMode: "preview" };
+  const fixtures = [
+    { definition: createThreeLayerReadDefinition(cwd, mode), args: { path: "sample.ts" } },
+    { definition: createThreeLayerBashDefinition(cwd, mode), args: { command: "printf test" } },
+    {
+      definition: createThreeLayerEditDefinition(cwd, mode),
+      args: { path: "sample.ts", edits: [{ oldText: "old", newText: "new" }] },
+    },
+    {
+      definition: createThreeLayerWriteDefinition(cwd, mode),
+      args: { path: "sample.ts", content: "one\ntwo\nthree\nfour\nfive\n" },
+    },
+  ];
+  const ui = { requestRender() {} } as ConstructorParameters<typeof ToolExecutionComponent>[5];
+  for (const { definition, args } of fixtures) {
+    for (const isError of [false, true]) {
+      const output = { ...result(isError ? "fixture error" : "fixture output"), isError };
+      const custom = new ToolExecutionComponent(
+        definition.name,
+        "fixture",
+        args,
+        {},
+        definition,
+        ui,
+        cwd,
+      );
+      const native = new ToolExecutionComponent(
+        definition.name,
+        "native",
+        args,
+        {},
+        undefined,
+        ui,
+        cwd,
+      );
+      custom.updateResult(output);
+      native.updateResult(output);
+      const before = render(custom, 100);
+      mode.enabled = false;
+      custom.invalidate();
+      for (const expanded of [false, true]) {
+        custom.setExpanded(expanded);
+        native.setExpanded(expanded);
+        for (const width of [12, 40, 100]) {
+          assert.deepEqual(render(custom, width), render(native, width), definition.name);
+        }
+      }
+      mode.enabled = true;
+      custom.setExpanded(false);
+      custom.invalidate();
+      assert.deepEqual(render(custom, 100), before, definition.name);
+    }
+  }
+});
+
+test("a native running renderer receives completion after switching presentation modes", () => {
+  const mode: ToolRendererMode = { enabled: false, defaultMode: "preview" };
+  const original = createBashToolDefinition(process.cwd());
+  const updates: boolean[] = [];
+  original.renderResult = (_result, options) => {
+    updates.push(options.isPartial);
+    return { render: () => ["native output"], invalidate() {} };
+  };
+  const definition = createThreeLayerBashDefinition(process.cwd(), mode, original);
+  const args = { command: "fixture" };
+  const shared = context(args, { isPartial: true });
+  definition.renderResult?.(result("running"), { expanded: false, isPartial: true }, theme, shared);
+  mode.enabled = true;
+  shared.isPartial = false;
+  const final = definition.renderResult?.(
+    result("complete"),
+    { expanded: false, isPartial: false },
+    theme,
+    shared,
+  );
+  assert.deepEqual(updates, [true, false]);
+  assert.match(render(final)[0] ?? "", /\[OK\]/);
+  definition.renderResult?.(
+    result("complete"),
+    { expanded: true, isPartial: false },
+    theme,
+    shared,
+  );
+  assert.deepEqual(updates, [true, false]);
+});
+
+test("official Edit execution produces a numbered reference diff without changing its result", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pituix-diff-"));
+  try {
+    await writeFile(
+      join(dir, "sample.ts"),
+      "export function sum(a: number, b: number): number {\n  return a - b;\n}\n",
+    );
+    const mode: ToolRendererMode = { enabled: true, defaultMode: "preview" };
+    const definition = createThreeLayerEditDefinition(dir, mode);
+    const args = { path: "sample.ts", edits: [{ oldText: "a - b", newText: "a + b" }] };
+    const actual = await definition.execute(
+      "edit-fixture",
+      args,
+      undefined,
+      undefined,
+      {} as never,
+    );
+    assert.match(await readFile(join(dir, "sample.ts"), "utf8"), /return a \+ b/);
+    const originalResult = structuredClone(actual);
+    const component = definition.renderResult?.(
+      actual,
+      { expanded: true, isPartial: false },
+      theme,
+      context(args) as never,
+    );
+    const lines = render(component);
+    assert.match(lines[0] ?? "", /Update\(sample\.ts\) \[OK\]/);
+    assert.equal(lines[1], "  L  Added 1 line, removed 1 line");
+    assert.match(lines.join("\n"), /2 -.*return a - b/);
+    assert.match(lines.join("\n"), /2 \+.*return a \+ b/);
+    const inverseCount = (value: string) => value.split("\u001b[7m").length - 1;
+    assert.equal(
+      inverseCount(component?.render(100).join("\n") ?? ""),
+      inverseCount(renderDiff(actual.details?.diff ?? "")),
+    );
+    for (const width of [1, 2, 12, 24, 80])
+      assert.ok(component?.render(width).every((line) => visibleWidth(line) <= width));
+    assert.deepEqual(actual, originalResult);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
