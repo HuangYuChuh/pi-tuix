@@ -231,6 +231,15 @@ remain a measured difference, rather than a claim of full syntax parity.
 
 ## Validation
 
+- Orca acceptance on 2026-09-07 reproduced native collapsed-paste data loss when
+  a non-overlay public custom dialog restored the unchanged raw draft on the
+  same editor. The editor now preserves that state through public methods.
+  Pi 0.84.4 fullscreen retained identical expanded-text hashes and all 100 CJK
+  lines across dialog dismissal, then delivered the exact text and one original
+  PNG to a disposable local provider. Regressions cover image and text-only
+  drafts, repeated restoration, cursor position, native undo, narrow widths and
+  changed/literal drafts. Replacement editors and modified raw drafts do not
+  receive an old editor's collapsed-paste registry.
 - Orca acceptance on 2026-09-07 exercised Pi 0.85.1 regular mode with a disposable
   local fixture provider: PNG/GIF batch paste, native follow-up/steering take-back,
   editing/requeue, Esc cancellation and resubmission. One queued GIF plus a

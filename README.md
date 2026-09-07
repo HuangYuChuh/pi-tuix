@@ -76,6 +76,8 @@ Pasting a PNG/JPEG/GIF/WebP path, or using Pi's native clipboard-image action, i
 
 A fresh editor continues numbering after user labels on the selected saved branch. A successful image paste also checks labels in the current visible draft; discarded text and live text-only messages do not consume numbers. Delivered chips save a small display-only number annotation through Pi, so unrelated literal labels cannot renumber their attachments after sending or resuming. The annotation contains no source paths or image bytes and stays outside model context. Long text pastes still use Pi's native labels and separate counter.
 
+Closing a custom dialog that restores the unchanged draft on the same editor preserves collapsed text, attachments, cursor position and native undo. This does not transfer collapsed paste data to a replacement editor or a changed draft.
+
 These commands are reversible:
 
 | Command | Purpose |
