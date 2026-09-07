@@ -135,28 +135,26 @@ broadly than the observed reference.
 | Tool expansion | `options.expanded`, configured `app.tools.expand` | Implemented; no invented E binding |
 | Execution, errors, cancellation | Original tool `execute` functions | Delegated unchanged |
 | Default UI restoration | Public unset/reset methods | Implemented and tested |
-| User/assistant transcript chrome | Public message components, identity Markdown transformer, editor focus, custom overlay | Implemented in the fullscreen live view and `/pituix-transcript`; regular mode stays native |
+| User/assistant transcript chrome | Public document/message containers and identity Markdown transformer | Implemented in regular/fullscreen modes and `/pituix-transcript`; original host containers retained |
 | Native model command, transcript navigation, resume | Native Pi commands/components | Retained; `/pituix-model` and `/pituix-resume` provide custom selection surfaces |
 | Claude permission modes and approval dialogs | Pi trust/permission semantics differ | Not emulated |
 | Claude-specific settings tabs and preferences | Extension-specific settings available | Pi-TUIX categories retained; Claude account/runtime controls are not emulated |
 | MCP group summaries and cross-session agents | No universal renderer hook for other extensions | Not reproduced |
 | Claude checkpoint/rewind behavior | Pi owns sessions, branches, tool execution | Not reproduced |
-| Fullscreen layout and wheel behavior | Public overlay, `ScrollView`, component tree and keybindings | Live document/dock projection with page, prompt and vertical wheel scrolling; narrow cursor protected; no private-field patch |
+| Fullscreen layout and wheel behavior | Public container composition, native viewport and semantic prompt zones | Native page/wheel/prompt navigation, search and selection share the decorated document; regular/fullscreen switching verified |
 
 Pi exposes `ui_prompt_start` and `ui_prompt_end` for blocking extension prompts.
 They do not provide a replacement renderer for all host permission decisions.
-An initial command-context confirmation probe did not emit those events and
-appeared behind the overlay. The integrated view instead observes the owned
-editor's public focus property, yielding to native confirmations and selectors.
-It resumes after the host returns focus and forwards normal input to that same
-editor. Notifications, foreign widgets, pending messages, tool execution,
-cancellation and session replacement were verified through actual Pi sessions.
-Unrecognized public component shapes render natively. Fullscreen search also
-temporarily displays Pi's transcript and keeps its own scroll position; closing
-search returns to the live view's prior position. Regular-mode message chrome,
-mouse-copy fidelity, large-history performance and mode transitions are still
-outside the validated live-view coverage. Later user Markdown transformers
-are not reflected in raw user chrome; assistant rendering preserves the chain.
+The main view uses reversible public document-child wrappers, retaining Pi's
+original chat, header, editor and dock containers. Native confirmations,
+selectors and input retain their focus behavior. Pi's fullscreen viewport and
+regular renderer consume the same decorated document, so search closes at its
+matched location and native mode switching is available. Standard OSC 133 zones
+retain semantic prompt navigation. Unrecognized shapes render natively. No
+persistent main-view overlay, separate scroll position or focus observer remains.
+Later user Markdown transformers are not reflected in raw user chrome;
+assistant rendering preserves the host chain. Multi-line/image selection across
+real terminal emulators remains less thoroughly verified than the text fixture.
 
 Tool headings retain explicit status and attention text for accessibility.
 Group summaries also retain a compact target list and explicit success status;
@@ -236,22 +234,28 @@ remain a measured difference, rather than a claim of full syntax parity.
   two-line user message matches text and background; one automatically wrapped
   whitespace cell retains a different foreground. Complex Markdown and media
   are not claimed to match fully.
-- Live-view tests cover public component fallback, streamed Markdown cache
-  updates, preservation of opaque tools/notifications, queue/status/footer
-  composition, focus teardown, page/prompt/wheel navigation, following behavior,
-  ANSI/CJK width and crowded docks from 1 to 40 rows. Actual 100x40 runs verify
-  original Read/Bash/Edit/Write execution, errors, partial output, queue display
-  and delivery, foreign widgets, confirmation cancellation, settings/model
-  selectors, tool expansion and native restoration. An 80x24 session actually
-  resumes a saved fixture, scrolls grouped results and search matches, and
-  cancels a running arithmetic tool while retaining the interruption prompt.
-  New-session and reload commands preserve the live view, but retain the host's
-  temporary-theme reset described below. The deterministic provider fixtures
-  are excluded from the package and make no model-network requests.
-  The user's installed Pi 0.85.1 also loads the package at 80x24 and verifies
-  live user/assistant rows, Bash cancellation, native confirmation cancellation,
-  focus recovery and default restoration. The full regression suite remains
-  pinned to Pi 0.84.4; this newer-host check is an interactive smoke test.
+- Live-view tests use public `TuiMainScreen` and `TuiAltScreen` instances to
+  exercise both native renderers. They cover streamed/cache updates, original
+  chat-container additions/removals, dock preservation, reversible wrapper
+  cleanup, native focus, page/prompt/wheel navigation and stream following.
+  Native search returns to its matched location. Simulated SGR drag events
+  copy the exact displayed `Line 31` text through the public clipboard callback.
+  ANSI/CJK bounds, theme/icon changes, semantic-zone order and Markdown padding
+  from zero to three cells are covered.
+  Actual Pi 0.84.4 regular-mode runs at 100x40 verify Read/Bash/Edit/Write,
+  partial output, error handling, follow-up display/delivery, tool expansion
+  and default restoration. The installed Pi 0.85.1 at 80x24 verifies fullscreen
+  search retention, native mode switching in both directions, regular-mode
+  confirmation cancellation and restoration. That host also resumes a saved
+  fixture, starts a new session, reloads the extension and cancels an arithmetic
+  tool with the cached presentation active. Temporary-theme reset
+  after native session/reload commands remains a gap. Deterministic provider
+  fixtures make no model-network requests and are excluded from the package.
+- A disposable 800-message, 5,600-line benchmark measured static presentation
+  redraws before/after caching on the same machine: median about 201.6 ms versus
+  0.24 ms over eight warmed renders. Initial rendering was about 234 ms after
+  caching. These measure only the message presentation layer, excluding the
+  native renderer, terminal I/O and emulator; they are not whole-UI frame times.
 - Resume-picker tests cover public session scope, filtering, native input paste,
   preview navigation, two-step selection, loading failures, late callback
   cleanup, single switch delegation, and ANSI/CJK width/height bounds. Actual

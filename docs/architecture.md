@@ -118,8 +118,8 @@ Binary attachments receive type labels; foreign tool renderers are not copied.
 Rendering performs no I/O. The reader owns only scroll/expansion state, returns
 to the same editor, and remains separate from the live view and resume preview.
 
-The fullscreen main view uses a public `TUI.showOverlay` presentation over the
-host's unchanged component tree. A version-local adapter recognizes public
+The main view composes reversible presentation containers into the public
+document tree. A version-local adapter recognizes public
 `Container.children`, `UserMessageComponent` and `AssistantMessageComponent`
 instances. It traverses only plain concatenating containers. Opaque components,
 including tools, media and notifications, retain their native render methods.
@@ -129,25 +129,35 @@ text receives prompt chrome. Assistant Markdown is prefixed after rendering,
 preserving the host's Markdown parsing, highlighting and transformer chain.
 Unknown layouts or missing callbacks fall back to native rendering. Package
 imports go through Pi's extension loader so component identities share the host
-UI runtime. No host children, fields, methods or prototypes are replaced.
+UI runtime. The adapter wraps the document's direct children through public
+`Container.children`. It retains the original document, header and chat
+containers, so Pi continues adding and removing messages through the same
+references. Each presentation container also keeps its source as a public
+child, preserving mounted-component discovery and native invalidation. Teardown
+unwraps only this mount's components and preserves later additions and ordering.
+No private fields, methods or prototypes are patched.
 
-The overlay forwards editing to the same installed `OpenTuiEditor`. An observer
-on that owned editor's public `focused` property hides the view for native
-dialogs, settings, model selection and search. Focus returns through a queued
-callback, with teardown guards for disable, reload and session replacement.
-The view renders native dock components, retaining queue messages, working
-status, foreign widgets and footer; cramped docks prioritize the active cursor.
-Its public `ScrollView` tracks page, prompt and vertical wheel navigation.
-Streaming follows the end until the user scrolls away; a new agent run resumes
-following. Pi still owns message creation, queue delivery and tool execution.
-The mirror has no provider, session-file or shell I/O.
+Both renderer modes consume that same document. Fullscreen paging, wheel input,
+prompt navigation, search, selection and copying therefore stay in Pi's native
+viewport. Standard OSC 133 prompt zones are retained around the restyled user
+rows. Search closes at its matched location, and native settings can switch
+between regular and fullscreen mode without a persistent overlay blocking the
+transition. Regular mode retains terminal scrollback. The editor, dock, queue,
+status, foreign widgets and dialogs use their original host composition and
+focus handling. A public `TuiAltScreen.scrollToBottom` capability resumes
+following for a new run. The adapter owns no second viewport or focus observer,
+and performs no provider, session-file or shell I/O.
 
-This adapter is enabled for fullscreen mode. Regular-mode scrollback stays
-native. Native search remains usable, with its own scroll position; closing it
-returns to the mirror's previous position. Mouse-copy fidelity, large-history
-performance and terminal-mode transitions still need broader validation. User
-chrome observes the source at this extension's position in the transformer
-chain, so later user-text transformers are not reflected in that raw-text view.
+Static message rows are cached by public source/rendered-line identity, width,
+theme and icon mode. Invalidation propagates to the original components and
+clears presentation caches. Observed Markdown padding is reused to avoid
+alternating render widths when the host output padding differs from one cell.
+Streamed text, width and theme changes still refresh the affected display.
+Large-history measurements cover this presentation layer rather than total
+terminal latency. Real-terminal multi-line/image selection needs broader
+coverage. User chrome observes source at this extension's position in the
+transformer chain, so later user-text transformers are not reflected in that
+raw-text view.
 
 Tool definitions keep the public `renderShell: "self"` option stable.
 Each built-in tool is registered once. `/pituix-compact` selects collapsed

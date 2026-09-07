@@ -7,30 +7,32 @@ import {
   getMarkdownTheme,
   initTheme,
   type KeybindingsManager,
+  type MarkdownTransformer,
   type Theme,
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import {
   Box,
-  type Component,
   Container,
   CURSOR_MARKER,
   type EditorTheme,
   Markdown,
-  type OverlayHandle,
-  type OverlayOptions,
+  ScrollView,
   Spacer,
   stripTerminalSequences,
+  type Terminal,
   Text,
   type TUI,
+  TuiAltScreen,
+  TuiMainScreen,
+  VStack,
   visibleWidth,
 } from "@earendil-works/pi-tui";
 import { OpenTuiEditor } from "../extensions/shell/open-tui/editor.ts";
 import {
   createLiveTranscript,
-  fitLiveDock,
+  LiveDocumentPresentation,
   LiveMessageMirror,
-  LiveTranscriptView,
   MarkdownObservation,
 } from "../extensions/shell/open-tui/live-transcript.ts";
 
@@ -41,7 +43,7 @@ const theme = {
 } as Theme;
 const plain = (lines: string[]) => lines.map(stripTerminalSequences).join("\n");
 
-function fixture() {
+function fixture(transform?: MarkdownTransformer, outputPad = 1) {
   const observation = new MarkdownObservation();
   const mirror = new LiveMessageMirror(
     observation,
@@ -54,7 +56,11 @@ function fixture() {
   // and native component identities are also checked through the real TUI.
   const userMarkdown = new Markdown("# raw request", 0, 0, getMarkdownTheme(), undefined, {
     transform: (text, availableWidth) =>
-      observation.transform(text, { messageType: "user", isStreaming: false, availableWidth }),
+      (transform ?? observation.transform)(text, {
+        messageType: "user",
+        isStreaming: false,
+        availableWidth,
+      }),
   });
   const box = new Box(1, 1);
   box.addChild(userMarkdown);
@@ -63,13 +69,13 @@ function fixture() {
   const assistant = new AssistantMessageComponent();
   const responseMarkdown = new Markdown(
     "# Response\n\n- **First** item",
-    1,
+    outputPad,
     0,
     getMarkdownTheme(),
     undefined,
     {
       transform: (text, availableWidth) =>
-        observation.transform(text, {
+        (transform ?? observation.transform)(text, {
           messageType: "assistant",
           isStreaming: true,
           availableWidth,
@@ -87,38 +93,18 @@ function fixture() {
   return { observation, mirror, user, userMarkdown, assistant, responseMarkdown, document };
 }
 
-function editor() {
+function editor(tui?: TUI) {
   const input = new OpenTuiEditor(
-    {
-      terminal: { rows: 40, write() {} },
-      requestRender() {},
-      setShowHardwareCursor() {},
-    } as unknown as TUI,
+    tui ??
+      ({
+        terminal: { rows: 40, write() {} },
+        requestRender() {},
+        setShowHardwareCursor() {},
+      } as unknown as TUI),
     { borderColor: (text: string) => text, selectList: {} } as EditorTheme,
     { matches: () => false } as unknown as KeybindingsManager,
   );
   return input;
-}
-
-function viewport(rows = 24) {
-  const f = fixture();
-  const input = editor();
-  input.focused = true;
-  const inputContainer = new Container();
-  inputContainer.addChild(input);
-  const queue = new Container();
-  queue.addChild(new Text("FOLLOW-UP QUEUED", 0, 0));
-  const status = new Container();
-  status.addChild(new Text("Working 3s", 0, 0));
-  const footer = new Container();
-  footer.addChild(new Text("MODEL / CONTEXT", 0, 0));
-  const tui = {
-    children: [f.document, queue, status, inputContainer, footer],
-    terminal: { rows },
-    requestRender() {},
-  } as unknown as TUI;
-  const view = new LiveTranscriptView(tui, input, f.mirror);
-  return { ...f, input, tui, view, queue, status };
 }
 
 test("live mirror preserves Markdown structure, raw user text and opaque host notifications/tools", () => {
@@ -167,6 +153,63 @@ test("Markdown observation handles a host-populated cache and streamed setText w
   );
 });
 
+test("static message layout is reused while streaming, width, ASCII and theme changes invalidate its display", () => {
+  const f = fixture();
+  let paints = 0;
+  let ascii = false;
+  let current = {
+    ...theme,
+    fg: (_color: string, text: string) => {
+      paints++;
+      return `\x1b[31m${text}\x1b[39m`;
+    },
+  } as Theme;
+  const mirror = new LiveMessageMirror(
+    f.observation,
+    () => current,
+    () => ascii,
+  );
+  const view = new LiveDocumentPresentation(f.document, mirror);
+  const initial = view.render(80);
+  assert.ok(paints > 0);
+  paints = 0;
+  assert.deepEqual(view.render(80), initial);
+  assert.equal(paints, 0);
+  f.responseMarkdown.setText("new streamed text");
+  assert.match(plain(view.render(80)), /⏺ new streamed text/);
+  f.userMarkdown.setText("new user text");
+  assert.match(plain(view.render(80)), /❯ new user text/);
+  ascii = true;
+  assert.match(plain(view.render(80)), /^> new user text/);
+  assert.match(plain(view.render(80)), /\* new streamed text/);
+  const narrow = view.render(12);
+  assert.ok(narrow.every((line) => visibleWidth(line) <= 12));
+  current = {
+    ...current,
+    fg: (_color: string, text: string) => `\x1b[32m${text}\x1b[39m`,
+  } as Theme;
+  assert.ok(view.render(80).join("").includes("\x1b[32m"));
+  current.fg = (_color, text) => `\x1b[34m${text}\x1b[39m`;
+  view.invalidate();
+  assert.ok(view.render(80).join("").includes("\x1b[34m"));
+});
+
+test("message layout adapts public Markdown padding without alternating widths on static redraws", () => {
+  for (const padding of [0, 1, 2, 3]) {
+    const f = fixture(undefined, padding);
+    f.responseMarkdown.setText("A long streamed response 中文 ".repeat(12));
+    for (const width of [12, 40, 80]) {
+      const first = f.mirror.render(f.assistant, width);
+      assert.match(plain(first), /⏺ A long/);
+      assert.ok(first.every((line) => visibleWidth(line) <= width));
+      const observed = f.observation.read(f.responseMarkdown, width - 2 + padding * 2);
+      assert.ok(observed);
+      assert.deepEqual(f.mirror.render(f.assistant, width), first);
+      assert.equal(f.observation.read(f.responseMarkdown, width - 2 + padding * 2), observed);
+    }
+  }
+});
+
 test("unknown message shapes and absent Markdown callbacks fall back to original public renderers", () => {
   const f = fixture();
   const native = new UserMessageComponent("Native fallback");
@@ -178,140 +221,321 @@ test("unknown message shapes and absent Markdown callbacks fall back to original
   assert.match(plain(f.mirror.render(custom, 40)), /Extension-owned/);
 });
 
-test("live viewport retains native queue/status/editor/footer and follows streamed output only at the end", () => {
-  const h = viewport(12);
-  h.responseMarkdown.setText(Array.from({ length: 45 }, (_, i) => `Line ${i}`).join("\n\n"));
-  let text = plain(h.view.render(80));
-  for (const label of ["Line 44", "FOLLOW-UP QUEUED", "Working 3s", "MODEL / CONTEXT"])
-    assert.ok(text.includes(label), label);
-  h.view.handleInput("\x1b[5~");
-  text = plain(h.view.render(80));
-  assert.doesNotMatch(text, /Line 44/);
-  h.responseMarkdown.setText(Array.from({ length: 50 }, (_, i) => `Line ${i}`).join("\n\n"));
-  assert.doesNotMatch(plain(h.view.render(80)), /Line 49/);
-  h.view.handleInput("\x1b[<65;1;2M");
-  assert.notEqual(plain(h.view.render(80)), text);
-  for (let i = 0; i < 30; i++) h.view.handleInput("\x1b[6~");
-  assert.match(plain(h.view.render(80)), /Line 49/);
-  h.view.handleInput("hello 中文");
-  assert.equal(h.input.getText(), "hello 中文");
-  h.view.handleInput("\x1b[H");
-  assert.doesNotMatch(plain(h.view.render(80)), /Line 49/);
-  h.view.followLatest();
-  assert.match(plain(h.view.render(80)), /Line 49/);
-});
-
-test("live prompt navigation follows public message boundaries without editing the draft", () => {
-  const h = viewport(10);
-  for (const name of ["second", "third"]) {
-    const user = new UserMessageComponent("unused");
-    // Use the same public observation callback for this viewport.
-    const markdown = new Markdown(`${name} request`, 0, 0, getMarkdownTheme(), undefined, {
-      transform: (text, availableWidth) =>
-        h.observation.transform(text, { messageType: "user", isStreaming: false, availableWidth }),
-    });
-    const box = new Box(1, 1);
-    box.addChild(markdown);
-    user.clear();
-    user.addChild(box);
-    h.document.addChild(new Text("spacer\n".repeat(12), 0, 0));
-    h.document.addChild(user);
-  }
-  h.document.addChild(new Text("tail\n".repeat(12), 0, 0));
-  h.input.setText("unsent draft");
-  h.view.render(80);
-  for (const expected of ["third request", "second request", "raw request"]) {
-    h.view.handleInput("\x1b[1;5A");
-    assert.match(plain(h.view.render(80)).split("\n")[0], new RegExp(expected));
-  }
-  h.view.handleInput("\x1b[1;5B");
-  assert.match(plain(h.view.render(80)).split("\n")[0], /second request/);
-  assert.equal(h.input.getText(), "unsent draft");
-});
-
-test("live viewport adapts resized ANSI/CJK messages and prioritizes the cursor in a crowded dock", () => {
-  const h = viewport();
-  h.responseMarkdown.setText("中文🙂 é\n\n".repeat(15));
-  h.input.setText("第一行\n第二行\n第三行");
-  h.queue.addChild(new Text("Queued\n".repeat(30), 0, 0));
-  for (const rows of [1, 2, 3, 4, 8, 24, 40]) {
-    Object.defineProperty(h.tui.terminal, "rows", { value: rows, configurable: true });
-    for (const width of [0, 1, 2, 3, 4, 12, 40, 80, 100]) {
-      const lines = h.view.render(width);
-      assert.ok(lines.length <= rows, `${width}x${rows}`);
-      assert.ok(
-        lines.every((line) => visibleWidth(line) <= width),
-        `${width}x${rows}`,
-      );
-      if (width >= 4) assert.ok(lines.join("").includes(CURSOR_MARKER), `cursor ${width}x${rows}`);
-    }
-  }
-  assert.deepEqual(
-    fitLiveDock([["queue"], ["rule", `${CURSOR_MARKER}draft`, "rule"], ["footer"]], 1, 2),
-    [`${CURSOR_MARKER}draft`, "footer"],
-  );
-});
-
-test("live viewport rejects unrecognized host layout instead of hiding content", () => {
-  const h = viewport();
-  assert.equal(h.view.supportsLayout(), true);
-  h.tui.children = [new Text("Unrecognized host layout", 0, 0)];
-  assert.equal(h.view.supportsLayout(), false);
-  assert.deepEqual(h.view.render(80), []);
-});
-
-test("live mounting yields to native focus, resumes after a dialog, and cannot reopen after cleanup", async () => {
-  let transformer: unknown;
+function harness(mode: "regular" | "fullscreen" = "fullscreen", rows = 24) {
+  let transform: MarkdownTransformer | undefined;
   const runtime = createLiveTranscript({
     registerMarkdownTransformer(value) {
-      transformer = value;
+      transform = value;
     },
   } as ExtensionAPI);
-  assert.equal(typeof transformer, "function");
-  const h = viewport();
-  let view: (Component & { focused?: boolean }) | undefined;
-  let options: OverlayOptions | undefined;
-  let focusCount = 0;
-  let hidden = false;
-  let focused = false;
-  const handle = {
-    isFocused: () => focused,
-    focus() {
-      focusCount++;
-      focused = true;
-      if (view) view.focused = true;
+  const f = fixture(transform);
+  // Keep Pi's original document/chat references, as the actual host does.
+  const chat = new Container();
+  chat.children = f.document.children;
+  f.document.children = [chat];
+  let receive = (_data: string) => {};
+  let copied = "";
+  const writes: string[] = [];
+  const terminal: Terminal = {
+    columns: 80,
+    rows,
+    kittyProtocolActive: false,
+    start(onInput) {
+      receive = onInput;
     },
-    hide() {
-      hidden = true;
-      focused = false;
+    stop() {},
+    drainInput: async () => {},
+    write: (data) => {
+      writes.push(data);
     },
-  } as OverlayHandle;
-  h.tui.showOverlay = (component, opts) => {
-    view = component;
-    options = opts ?? {};
-    return handle;
+    moveBy() {},
+    hideCursor() {},
+    showCursor() {},
+    clearLine() {},
+    clearFromCursor() {},
+    clearScreen() {},
+    setTitle() {},
+    setProgress() {},
   };
-  Object.defineProperty(h.tui, "mode", { value: "fullscreen", configurable: true });
-  const dispose = runtime.mount(h.tui, h.input, { ui: { theme } } as ExtensionContext, () => false);
+  const tui =
+    mode === "fullscreen"
+      ? new TuiAltScreen(terminal, false, undefined, {
+          copyOnSelect: false,
+          copySelection: async (text) => {
+            copied = text;
+            return true;
+          },
+        })
+      : new TuiMainScreen(terminal);
+  const input = editor(tui);
+  const inputContainer = new Container();
+  inputContainer.addChild(input);
+  const queue = new Container();
+  queue.addChild(new Text("FOLLOW-UP QUEUED", 0, 0));
+  const status = new Container();
+  status.addChild(new Text("Working 3s", 0, 0));
+  const footer = new Container();
+  footer.addChild(new Text("MODEL / CONTEXT", 0, 0));
+  const dock = new Container();
+  dock.children = [queue, status, inputContainer, footer];
+  tui.addChild(f.document);
+  for (const child of dock.children) tui.addChild(child);
+  if (tui instanceof TuiAltScreen) {
+    tui.setLayoutRoot(
+      new VStack([
+        {
+          component: new ScrollView(f.document, {
+            primary: true,
+            follow: "end",
+            scrollbar: "hidden",
+          }),
+          basis: 0,
+          grow: 1,
+          minSize: 1,
+        },
+        { component: dock, basis: "auto", grow: 0, shrink: 1, minSize: 1 },
+      ]),
+    );
+  }
+  tui.setFocus(input);
+  const dispose = runtime.mount(tui, input, { ui: { theme } } as ExtensionContext, () => false);
+  return {
+    ...f,
+    chat,
+    tui,
+    terminal,
+    dock,
+    queue,
+    input,
+    runtime,
+    dispose,
+    writes,
+    copied: () => copied,
+    send(data: string) {
+      receive(data);
+      tui.renderNow();
+    },
+    close() {
+      dispose();
+      tui.stop();
+    },
+  };
+}
+
+test("both native modes share live message presentation without changing dock, focus or source containers", async () => {
+  for (const mode of ["regular", "fullscreen"] as const) {
+    const h = harness(mode);
+    const root = [...h.tui.children];
+    const messages = [...h.chat.children];
+    await Promise.resolve();
+    try {
+      assert.deepEqual(h.tui.children, root);
+      assert.deepEqual(h.chat.children, messages);
+      assert.ok(h.document.children[0] instanceof LiveDocumentPresentation);
+      assert.equal(h.tui.getFocusedComponent(), h.input);
+      assert.equal(h.tui.hasOverlay(), false);
+      h.tui.start();
+      h.tui.renderNow();
+      const text = plain(h.writes);
+      for (const label of [
+        "❯ # raw request",
+        "⏺ Response",
+        "FOLLOW-UP QUEUED",
+        "Working 3s",
+        "MODEL / CONTEXT",
+      ])
+        assert.ok(text.includes(label), `${mode}: ${label} in ${text}`);
+      h.chat.addChild(new Text("NEW HOST NOTIFICATION", 0, 0));
+      assert.match(plain(h.document.render(80)), /NEW HOST NOTIFICATION/);
+      h.chat.removeChild(h.assistant);
+      assert.doesNotMatch(plain(h.document.render(80)), /Response/);
+      h.chat.addChild(h.assistant);
+      h.responseMarkdown.setText("Streaming updated 中文");
+      assert.match(plain(h.document.render(80)), /⏺ Streaming updated 中文/);
+      h.dispose();
+      assert.deepEqual(h.document.children, [h.chat]);
+      assert.equal(plain(h.document.render(80)), plain(h.chat.render(80)));
+    } finally {
+      h.close();
+    }
+  }
+});
+
+test("native search retains its selected location after closing and mouse copy uses the decorated document", async () => {
+  const h = harness();
+  assert.ok(h.tui instanceof TuiAltScreen);
+  h.responseMarkdown.setText(Array.from({ length: 60 }, (_, i) => `Line ${i}`).join("\n\n"));
   await Promise.resolve();
-  assert.equal(focusCount, 1);
-  assert.ok(view);
-  assert.ok(options);
-  assert.equal(options.visible?.(80, 24), true);
-  view.focused = false;
-  focused = false;
-  assert.equal(options.visible?.(80, 24), false);
-  h.input.focused = true;
+  h.tui.start();
+  h.tui.renderNow();
+  try {
+    h.send("\x1b[H");
+    assert.equal(h.tui.viewportTop, 0);
+    h.send("\x1b[102;6u");
+    assert.equal(h.tui.hasOverlay(), true);
+    h.send("Line 31");
+    assert.ok(h.tui.viewportTop > 0);
+    const matchedTop = h.tui.viewportTop;
+    h.send("\x1b");
+    assert.equal(h.tui.viewportTop, matchedTop);
+    assert.equal(h.tui.hasOverlay(), false);
+    assert.equal(h.tui.getFocusedComponent(), h.input);
+    const documentLines = h.document.render(80).map(stripTerminalSequences);
+    const target = documentLines.findIndex((line) => line.trim() === "Line 31");
+    const row = target - h.tui.viewportTop + 1;
+    assert.ok(row > 0 && row <= h.terminal.rows - h.dock.render(80).length);
+    h.send(`\x1b[<0;3;${row}M`);
+    h.send(`\x1b[<32;10;${row}M`);
+    h.send(`\x1b[<0;10;${row}m`);
+    assert.equal(await h.tui.copyActiveSelectionToClipboard(), true);
+    assert.equal(h.copied().trim(), "Line 31");
+  } finally {
+    h.close();
+  }
+});
+
+test("native viewport keeps page, wheel, prompt navigation and stream following", async () => {
+  const h = harness();
+  assert.ok(h.tui instanceof TuiAltScreen);
+  h.responseMarkdown.setText(Array.from({ length: 50 }, (_, i) => `Line ${i}`).join("\n\n"));
   await Promise.resolve();
-  assert.equal(focusCount, 2);
-  h.input.focused = false;
-  h.input.focused = true;
-  dispose();
+  h.tui.start();
+  h.tui.renderNow();
+  try {
+    const end = h.tui.viewportTop;
+    h.send("\x1b[5~");
+    assert.ok(h.tui.viewportTop < end);
+    const page = h.tui.viewportTop;
+    h.send("\x1b[<64;5;3M");
+    assert.ok(h.tui.viewportTop < page);
+    const scrolled = h.tui.viewportTop;
+    h.responseMarkdown.setText(Array.from({ length: 55 }, (_, i) => `Line ${i}`).join("\n\n"));
+    h.tui.renderNow();
+    assert.equal(h.tui.viewportTop, scrolled);
+    h.send("\x1b[1;5A");
+    assert.equal(h.tui.viewportTop, 0);
+    h.runtime.followLatest();
+    h.tui.renderNow();
+    assert.equal(h.tui.isFollowingOutput, true);
+    assert.ok(h.tui.viewportTop > end);
+    h.send("draft 中文");
+    assert.equal(h.input.getText(), "draft 中文");
+  } finally {
+    h.close();
+  }
+});
+
+test("native dialogs receive focus without a second focus observer or persistent overlay", async () => {
+  const h = harness();
   await Promise.resolve();
-  assert.equal(hidden, true);
-  assert.equal(focusCount, 2);
-  assert.equal(options.visible?.(80, 24), false);
-  Object.defineProperty(h.tui, "mode", { value: "regular" });
-  runtime.mount(h.tui, h.input, { ui: { theme } } as ExtensionContext, () => false)();
-  assert.equal(focusCount, 2);
+  try {
+    const dialog = new Text("NATIVE CONFIRMATION", 0, 0);
+    const overlay = h.tui.showOverlay(dialog);
+    assert.equal(h.tui.getFocusedComponent(), dialog);
+    assert.equal(h.input.focused, false);
+    overlay.hide();
+    assert.equal(h.tui.getFocusedComponent(), h.input);
+    assert.equal(h.input.focused, true);
+    assert.equal(h.tui.hasOverlay(), false);
+  } finally {
+    h.close();
+  }
+});
+
+test("document composition is reversible without losing later additions, removals or reordering", async () => {
+  const h = harness("regular");
+  const second = new Container();
+  second.addChild(new Text("SECOND", 0, 0));
+  h.document.addChild(second);
+  await Promise.resolve();
+  const later = new Text("ADDED LATER", 0, 0);
+  const [firstWrapper, secondWrapper] = h.document.children;
+  h.document.children = [later, secondWrapper, firstWrapper];
+  h.dispose();
+  assert.deepEqual(h.document.children, [later, second, h.chat]);
+  const other = harness("regular");
+  other.dispose();
+  await Promise.resolve();
+  assert.deepEqual(other.document.children, [other.chat]);
+  h.close();
+  other.close();
+});
+
+test("a repeated old teardown cannot detach a replacement mount's native follow behavior", async () => {
+  const h = harness();
+  assert.ok(h.tui instanceof TuiAltScreen);
+  h.responseMarkdown.setText("Long response\n\n".repeat(60));
+  await Promise.resolve();
+  h.tui.start();
+  h.tui.renderNow();
+  h.dispose();
+  const disposeReplacement = h.runtime.mount(
+    h.tui,
+    h.input,
+    { ui: { theme } } as ExtensionContext,
+    () => false,
+  );
+  await Promise.resolve();
+  try {
+    h.tui.scrollToTop();
+    h.dispose();
+    h.runtime.followLatest();
+    h.tui.renderNow();
+    assert.ok(h.tui.viewportTop > 0);
+    assert.equal(h.tui.isFollowingOutput, true);
+  } finally {
+    disposeReplacement();
+    h.close();
+  }
+});
+
+test("unrecognized roots remain native and native invalidation reaches the original message components", async () => {
+  const h = harness();
+  h.tui.children = [new Text("UNRECOGNIZED", 0, 0)];
+  await Promise.resolve();
+  assert.deepEqual(h.document.children, [h.chat]);
+  h.close();
+  const f = fixture();
+  let invalidations = 0;
+  const component = {
+    render: () => ["OPAQUE"],
+    invalidate() {
+      invalidations++;
+    },
+  };
+  new LiveDocumentPresentation(component, f.mirror).invalidate();
+  assert.equal(invalidations, 1);
+});
+
+test("document presentation preserves ANSI/CJK bounds and ordered semantic prompt zones", () => {
+  const f = fixture();
+  f.userMarkdown.setText("第一行🙂 é\n第二行 ".repeat(20));
+  f.responseMarkdown.setText("# 中文🙂 é\n\n- More text".repeat(20));
+  const content = new LiveDocumentPresentation(f.document, f.mirror);
+  for (const width of [0, 1, 2, 3, 4, 12, 40, 80, 100]) {
+    const lines = content.render(width);
+    assert.ok(
+      lines.every((line) => visibleWidth(line) <= width),
+      `width ${width}`,
+    );
+  }
+  for (const source of ["one", "one\ntwo"]) {
+    f.userMarkdown.setText(source);
+    const joined = f.mirror.render(f.user, 80).join("\n");
+    const start = joined.indexOf("\x1b]133;A\x07");
+    const end = joined.indexOf("\x1b]133;B\x07");
+    const final = joined.indexOf("\x1b]133;C\x07");
+    assert.ok(start >= 0 && start < end && end < final);
+  }
+  const input = editor();
+  input.focused = true;
+  input.setText("第一行\n第二行\n第三行");
+  for (const width of [4, 12, 40, 80]) {
+    const lines = input.render(width);
+    assert.ok(
+      lines.some((line) => line.includes(CURSOR_MARKER)),
+      `cursor ${width}`,
+    );
+    assert.ok(lines.every((line) => visibleWidth(line) <= width));
+  }
 });

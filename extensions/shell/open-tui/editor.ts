@@ -71,7 +71,6 @@ export function renderPromptRule(
 }
 
 export class OpenTuiEditor extends CustomEditor {
-  private readonly focusListeners = new Set<(focused: boolean) => void>();
   private helpVisible = false;
   private ascii: boolean;
   private readonly getBorder: (s: string) => string;
@@ -88,19 +87,6 @@ export class OpenTuiEditor extends CustomEditor {
     getPromptStatus: (width: number) => string = () => "",
   ) {
     super(tui, editorTheme, keybindings, { paddingX: 0 });
-    // Focus is a public component property. Observe our own editor instance so
-    // a presentation overlay can yield to native dialogs and resume afterward.
-    let focused = this.focused;
-    Object.defineProperty(this, "focused", {
-      configurable: true,
-      enumerable: true,
-      get: () => focused,
-      set: (next: boolean) => {
-        if (next === focused) return;
-        focused = next;
-        for (const listener of this.focusListeners) listener(next);
-      },
-    });
     this.cursorStyle = cursorStyle;
     this.ascii = ascii;
     this.getPromptStatus = getPromptStatus;
@@ -115,11 +101,6 @@ export class OpenTuiEditor extends CustomEditor {
   setIconMode(mode: IconMode): void {
     this.ascii = useAsciiChrome(mode);
     this.tui.requestRender();
-  }
-
-  onFocusChange(listener: (focused: boolean) => void): () => void {
-    this.focusListeners.add(listener);
-    return () => this.focusListeners.delete(listener);
   }
 
   override setPaddingX(_padding: number): void {

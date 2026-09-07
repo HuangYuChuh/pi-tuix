@@ -90,7 +90,7 @@ provider, permission, transcript, or session ownership to Pi-TUIX. Successful
 reference tool workflows have now been observed through a separately configured
 Claude Code gateway. The model picker reads Pi's scoped/available models and
 delegates selection to Pi; it does not maintain a separate model catalogue.
-Fullscreen validation now includes live message presentation over Pi's public
-component tree. Pi still owns transcript components, sessions, input and queue
-delivery; Pi-TUIX owns only the reversible view and its scrolling state. Regular
-mode, native search position and remaining fidelity gaps are tracked separately.
+Live message presentation composes reversible wrappers through Pi's public
+component tree in both terminal modes. Pi still owns the original transcript
+containers, sessions, input, queue delivery and native scrolling/search state.
+Pi-TUIX owns the message styling and its disposable layout caches.

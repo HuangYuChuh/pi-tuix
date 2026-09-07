@@ -11,16 +11,11 @@ import {
   Box,
   type Component,
   Container,
-  CURSOR_MARKER,
-  getKeybindings,
-  isKeyRelease,
   Markdown,
-  type OverlayHandle,
-  ScrollView,
   sliceByColumn,
   type TUI,
+  type TuiAltScreen,
   truncateToWidth,
-  visibleWidth,
 } from "@earendil-works/pi-tui";
 import { ReferenceUserMessage } from "../../session/message-view.ts";
 import type { OpenTuiEditor } from "./editor.ts";
@@ -47,6 +42,11 @@ export class MarkdownObservation {
     }
     return source;
   };
+
+  getObservedPadding(component: Markdown): number | undefined {
+    const read = this.reads.get(component);
+    return read ? Math.max(0, Math.floor((read.width - read.availableWidth) / 2)) : undefined;
+  }
 
   read(component: Markdown, width: number): MarkdownRead | undefined {
     const previous = this.active;
@@ -89,11 +89,25 @@ function contains(component: Component, predicate: (child: Component) => boolean
   );
 }
 
+function renderNative(component: Component, width: number): string[] {
+  const lines = component.render(Math.max(4, width));
+  return width < 4 ? lines.map((line) => truncateToWidth(line, width, "")) : lines;
+}
+
+interface CachedMessage {
+  source: string | string[];
+  width: number;
+  theme: Theme;
+  ascii: boolean;
+  lines: string[];
+}
+
 /** Read public components; opaque components retain their own render methods. */
 export class LiveMessageMirror {
   private readonly observation: MarkdownObservation;
   private readonly getTheme: () => Theme;
   private readonly getAscii: () => boolean;
+  private cache = new WeakMap<Markdown, CachedMessage>();
 
   constructor(observation: MarkdownObservation, getTheme: () => Theme, getAscii: () => boolean) {
     this.observation = observation;
@@ -101,11 +115,36 @@ export class LiveMessageMirror {
     this.getAscii = getAscii;
   }
 
-  render(component: Component, width: number, prompts?: number[], offset = 0): string[] {
+  private cached(
+    component: Markdown,
+    source: string | string[],
+    width: number,
+    theme: Theme,
+    ascii: boolean,
+    render: () => string[],
+  ): string[] {
+    const previous = this.cache.get(component);
+    if (
+      previous?.source === source &&
+      previous.width === width &&
+      previous.theme === theme &&
+      previous.ascii === ascii
+    )
+      return previous.lines;
+    const lines = render();
+    this.cache.set(component, { source, width, theme, ascii, lines });
+    return lines;
+  }
+
+  invalidate(): void {
+    this.cache = new WeakMap();
+  }
+
+  render(component: Component, width: number): string[] {
     if (width <= 0) return [];
     const theme = this.getTheme();
+    const ascii = this.getAscii();
     if (component instanceof UserMessageComponent) {
-      prompts?.push(offset);
       const [box] = component.children;
       // Version-local shape check: an unfamiliar public component layout is
       // rendered by Pi intact, never traversed through private fields.
@@ -113,222 +152,101 @@ export class LiveMessageMirror {
         const [markdown] = box.children;
         if (markdown instanceof Markdown) {
           const read = this.observation.read(markdown, Math.max(4, width - 2));
-          if (read?.messageType === "user")
-            return new ReferenceUserMessage(read.source, theme, this.getAscii()).render(width);
+          if (read?.messageType === "user") {
+            return this.cached(markdown, read.source, width, theme, ascii, () => {
+              const lines = new ReferenceUserMessage(read.source, theme, ascii).render(width);
+              // Preserve the standard semantic prompt zones used by Pi's native
+              // prompt navigation and terminal scrollback integrations.
+              if (lines.length) {
+                lines[0] = `\x1b]133;A\x07${lines[0]}`;
+                lines[lines.length - 1] = `${lines[lines.length - 1]}\x1b]133;B\x07\x1b]133;C\x07`;
+              }
+              return lines;
+            });
+          }
         }
       }
-      return component.render(Math.max(4, width));
+      return renderNative(component, width);
     }
     if (component instanceof AssistantMessageComponent) {
       return component.children.flatMap(flatten).flatMap((child) => {
-        if (!(child instanceof Markdown)) return child.render(Math.max(4, width));
-        let read = this.observation.read(child, Math.max(4, width));
+        if (!(child instanceof Markdown)) return renderNative(child, width);
+        const inset = width >= 4 ? 2 : 0;
+        const knownPadding = this.observation.getObservedPadding(child);
+        let read = this.observation.read(
+          child,
+          Math.max(4, knownPadding === undefined ? width : width - inset + knownPadding * 2),
+        );
         if (
           !read ||
           (read.messageType !== "assistant" && read.messageType !== "assistant-thinking")
         )
-          return child.render(Math.max(4, width));
+          return renderNative(child, width);
         const padding = Math.max(0, Math.floor((read.width - read.availableWidth) / 2));
-        const inset = width >= 4 ? 2 : 0;
         const target = Math.max(4, width - inset + padding * 2);
         if (target !== read.width) read = this.observation.read(child, target);
-        if (!read) return child.render(Math.max(4, width));
+        if (!read) return renderNative(child, width);
         const thinking = read.messageType === "assistant-thinking";
-        const marker = thinking ? (this.getAscii() ? "~" : "∴") : this.getAscii() ? "*" : "⏺";
+        const marker = thinking ? (ascii ? "~" : "∴") : ascii ? "*" : "⏺";
         const availableWidth = read.availableWidth;
-        return read.lines.map((line, index) => {
-          const body = sliceByColumn(line, padding, Math.max(1, availableWidth), true);
-          const prefix = inset
-            ? index === 0
-              ? `${theme.fg(thinking ? "thinkingText" : "userMessageText", marker)} `
-              : "  "
-            : "";
-          return truncateToWidth(prefix + body, width, "");
-        });
+        const sourceLines = read.lines;
+        return this.cached(child, sourceLines, width, theme, ascii, () =>
+          sourceLines.map((line, index) => {
+            const body = sliceByColumn(line, padding, Math.max(1, availableWidth), true);
+            const prefix = inset
+              ? index === 0
+                ? `${theme.fg(thinking ? "thinkingText" : "userMessageText", marker)} `
+                : "  "
+              : "";
+            return truncateToWidth(prefix + body, width, "");
+          }),
+        );
       });
     }
     if (plainContainer(component)) {
       const lines: string[] = [];
-      for (const child of component.children)
-        lines.push(...this.render(child, width, prompts, offset + lines.length));
+      for (const child of component.children) lines.push(...this.render(child, width));
       return lines;
     }
-    return component.render(Math.max(4, width));
+    return renderNative(component, width);
   }
 }
 
-/** Keep the active cursor and native footer visible when dock widgets grow. */
-export function fitLiveDock(
-  groups: readonly string[][],
-  editorIndex: number,
-  budget: number,
-): string[] {
-  if (budget <= 0) return [];
-  const fitted = groups.map((lines) => [...lines]);
-  let excess = fitted.reduce((sum, lines) => sum + lines.length, 0) - budget;
-  const footerIndex = fitted.length - 1;
-  const trim = (index: number, minimum: number) => {
-    const lines = fitted[index];
-    const count = Math.min(Math.max(0, excess), Math.max(0, lines.length - minimum));
-    if (count) {
-      lines.splice(0, count);
-      excess -= count;
-    }
-  };
-  for (let i = 0; i < fitted.length; i++) if (i !== editorIndex && i !== footerIndex) trim(i, 0);
-  if (footerIndex !== editorIndex) trim(footerIndex, budget > 1 ? 1 : 0);
-  if (excess > 0) {
-    const lines = fitted[editorIndex] ?? [];
-    const keep = Math.max(1, lines.length - excess);
-    const cursor = lines.findIndex((line) => line.includes(CURSOR_MARKER));
-    const start = Math.max(0, Math.min(cursor < 0 ? 0 : cursor, lines.length - keep));
-    fitted[editorIndex] = lines.slice(start, start + keep);
-  }
-  return fitted.flat().slice(0, budget);
-}
-
-interface LiveEditor extends Component {
-  focused: boolean;
-  handleInput(data: string): void;
-  onFocusChange(listener: (focused: boolean) => void): () => void;
-}
-
-export class LiveTranscriptView implements Component {
-  private readonly tui: TUI;
-  private readonly editor: LiveEditor;
+/** A public container keeps its source mounted for host focus and invalidation. */
+export class LiveDocumentPresentation extends Container {
+  readonly source: Component;
   private readonly mirror: LiveMessageMirror;
-  private readonly scroll: ScrollView;
-  private documentRows = 1;
-  private promptRows: number[] = [];
 
-  constructor(tui: TUI, editor: LiveEditor, mirror: LiveMessageMirror) {
-    this.tui = tui;
-    this.editor = editor;
+  constructor(source: Component, mirror: LiveMessageMirror) {
+    super();
+    this.source = source;
     this.mirror = mirror;
-    this.scroll = new ScrollView(
-      { render: () => [], invalidate() {} },
-      { follow: "end", scrollbar: "hidden" },
-    );
+    this.addChild(source);
   }
 
-  get focused(): boolean {
-    return this.editor.focused;
-  }
-  set focused(value: boolean) {
-    this.editor.focused = value;
+  override render(width: number): string[] {
+    return this.mirror.render(this.source, width);
   }
 
-  supportsLayout(): boolean {
-    const [document, ...dock] = this.tui.children;
-    return Boolean(
-      document &&
-        plainContainer(document) &&
-        contains(
-          document,
-          (component) =>
-            component instanceof OpenTuiHeader ||
-            component instanceof UserMessageComponent ||
-            component instanceof AssistantMessageComponent,
-        ) &&
-        !contains(document, (component) => component === this.editor) &&
-        dock.some((component) => contains(component, (child) => child === this.editor)),
-    );
-  }
-
-  render(width: number): string[] {
-    if (width <= 0 || !this.supportsLayout()) return [];
-    const [document, ...dock] = this.tui.children;
-    const rows = Math.max(1, this.tui.terminal.rows);
-    const editorIndex = dock.findIndex((component) =>
-      contains(component, (child) => child === this.editor),
-    );
-    const dockLines = fitLiveDock(
-      dock.map((component) => component.render(Math.max(4, width))),
-      editorIndex,
-      Math.max(1, rows - (rows >= 4 ? 1 : 0)),
-    );
-    this.documentRows = Math.max(0, rows - dockLines.length);
-    this.promptRows = [];
-    const documentLines = this.mirror.render(document, width, this.promptRows);
-    this.scroll.updateLayout(documentLines.length, this.documentRows, () =>
-      this.tui.requestRender(),
-    );
-    const visible = documentLines.slice(
-      this.scroll.scrollTop,
-      this.scroll.scrollTop + this.documentRows,
-    );
-    while (visible.length < this.documentRows) visible.push("");
-    return [...visible, ...dockLines].slice(0, rows).map((line) => {
-      const text = truncateToWidth(line, width, "");
-      return text + " ".repeat(Math.max(0, width - visibleWidth(text)));
-    });
-  }
-
-  handleInput(data: string): void {
-    const keys = getKeybindings();
-    const release = isKeyRelease(data);
-    // Only standard vertical wheel reports are consumed. Mouse selection and
-    // hyperlinks remain handled by Pi against the composited screen.
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: Standard terminal SGR mouse report.
-    const wheel = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])$/.exec(data);
-    if (wheel && Number(wheel[1]) & 64 && (Number(wheel[1]) & 3) < 2) {
-      if (wheel[4] === "M" && Number(wheel[3]) <= this.documentRows)
-        this.scroll.scrollBy(Number(wheel[1]) & 1 ? 3 : -3);
-      return;
-    }
-    const page = Math.max(1, this.documentRows - 2);
-    const movements = [
-      ["tui.altScreen.pageUp", -page],
-      ["tui.altScreen.pageDown", page],
-      ["tui.altScreen.halfPageUp", -Math.max(1, Math.floor(this.documentRows / 2))],
-      ["tui.altScreen.halfPageDown", Math.max(1, Math.floor(this.documentRows / 2))],
-      ["tui.altScreen.lineUp", -1],
-      ["tui.altScreen.lineDown", 1],
-    ] as const;
-    for (const [key, amount] of movements)
-      if (keys.matches(data, key)) {
-        if (!release) this.scroll.scrollBy(amount);
-        return;
-      }
-    if (keys.matches(data, "tui.altScreen.top")) {
-      if (!release) this.scroll.scrollToStart();
-      return;
-    }
-    if (keys.matches(data, "tui.altScreen.bottom")) {
-      if (!release) this.scroll.scrollToEnd();
-      return;
-    }
-    for (const [key, direction] of [
-      ["tui.altScreen.previousPrompt", -1],
-      ["tui.altScreen.nextPrompt", 1],
-    ] as const) {
-      if (!keys.matches(data, key)) continue;
-      if (!release) {
-        const positions = direction < 0 ? [...this.promptRows].reverse() : this.promptRows;
-        const target = positions.find((row) =>
-          direction < 0 ? row < this.scroll.scrollTop : row > this.scroll.scrollTop,
-        );
-        if (target !== undefined) this.scroll.scrollTo(target);
-      }
-      return;
-    }
-    this.editor.handleInput(data);
-  }
-
-  invalidate(): void {}
-
-  followLatest(): void {
-    this.scroll.scrollToEnd();
+  override invalidate(): void {
+    this.mirror.invalidate();
+    super.invalidate();
   }
 }
 
 export function createLiveTranscript(pi: ExtensionAPI) {
   const observation = new MarkdownObservation();
-  const views = new Set<LiveTranscriptView>();
+  const mounted = new Set<TUI>();
   pi.registerMarkdownTransformer(observation.transform);
   return {
     followLatest(): void {
-      for (const view of views) view.followLatest();
+      for (const tui of mounted) {
+        // These are public TuiAltScreen members. The host can supply a stable
+        // TUI reference, so use a capability check instead of instanceof.
+        const viewport = tui as TUI & Partial<Pick<TuiAltScreen, "scrollToBottom">>;
+        if (tui.mode === "fullscreen" && typeof viewport.scrollToBottom === "function")
+          viewport.scrollToBottom();
+      }
     },
     mount(
       tui: TUI,
@@ -336,39 +254,53 @@ export function createLiveTranscript(pi: ExtensionAPI) {
       ctx: ExtensionContext,
       getAscii: () => boolean,
     ): () => void {
-      // Inline-mode scrollback and full-screen overlays have different contracts.
-      // Keep the inline host intact until that projection is independently tested.
-      if (tui.mode !== "fullscreen") return () => {};
-      const view = new LiveTranscriptView(
-        tui,
-        editor,
-        new LiveMessageMirror(observation, () => ctx.ui.theme, getAscii),
-      );
-      views.add(view);
       let alive = true;
-      let overlay: OverlayHandle | undefined;
-      const focus = () => {
-        if (alive && editor.focused && view.supportsLayout() && !overlay?.isFocused())
-          overlay?.focus();
-      };
-      const unsubscribe = editor.onFocusChange((focused) => {
-        if (focused) queueMicrotask(focus);
+      let document: Container | undefined;
+      const wrappers = new Set<LiveDocumentPresentation>();
+      // The editor factory runs before Pi puts that editor into its container.
+      // Wait for that public composition to finish before recognizing the root.
+      queueMicrotask(() => {
+        if (!alive || !Array.isArray(tui.children)) return;
+        const [candidate, ...dock] = tui.children;
+        if (
+          !candidate ||
+          !plainContainer(candidate) ||
+          !contains(
+            candidate,
+            (child) =>
+              child instanceof OpenTuiHeader ||
+              child instanceof UserMessageComponent ||
+              child instanceof AssistantMessageComponent,
+          ) ||
+          contains(candidate, (child) => child === editor) ||
+          !dock.some((child) => contains(child, (component) => component === editor))
+        )
+          return;
+        document = candidate;
+        const mirror = new LiveMessageMirror(observation, () => ctx.ui.theme, getAscii);
+        // Wrap document children, retaining the original document and message
+        // containers. Pi continues appending/removing messages through those
+        // original references. Both native renderer modes see this same tree.
+        document.children = document.children.map((source) => {
+          const wrapper = new LiveDocumentPresentation(source, mirror);
+          wrappers.add(wrapper);
+          return wrapper;
+        });
+        mounted.add(tui);
+        tui.requestRender();
       });
-      overlay = tui.showOverlay(view, {
-        width: "100%",
-        maxHeight: "100%",
-        row: 0,
-        col: 0,
-        margin: 0,
-        visible: () =>
-          alive && tui.mode === "fullscreen" && editor.focused && view.supportsLayout(),
-      });
-      queueMicrotask(focus);
       return () => {
+        if (!alive) return;
         alive = false;
-        views.delete(view);
-        unsubscribe();
-        overlay?.hide();
+        mounted.delete(tui);
+        if (!document) return;
+        // Only unwrap this mount's own components. Preserve later host/extension
+        // additions, removals and reordering rather than restoring a stale list.
+        document.children = document.children.map((child) =>
+          child instanceof LiveDocumentPresentation && wrappers.has(child) ? child.source : child,
+        );
+        wrappers.clear();
+        tui.requestRender();
       };
     },
   };
