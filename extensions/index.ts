@@ -28,6 +28,7 @@ import {
   type ToolRendererMode as ThreeLayerMode,
 } from "./tools/renderers-v2.ts";
 import type { DisplayMode } from "./tools/three-layer-view.ts";
+import { ToolGroupRuntime } from "./tools/tool-groups.ts";
 
 const PACKAGE_NAME = "Pi-TUIX";
 
@@ -57,9 +58,11 @@ function applyPiTuix(
 export default function piTuix(pi: ExtensionAPI): void {
   // 工具渲染模式配置
   const toolMode: ToolRendererMode = { enabled: false };
+  const groups = new ToolGroupRuntime();
   const threeLayerMode: ThreeLayerMode = {
     enabled: false,
     defaultMode: "preview" as DisplayMode, // collapsed | preview | expanded
+    groups,
   };
 
   const subagentActivity = createSubagentActivityObserver(pi);
@@ -71,9 +74,16 @@ export default function piTuix(pi: ExtensionAPI): void {
   // 注册两套渲染器（可切换）
   registerCompactToolRenderers(pi, toolMode);
   const toolRenderers = registerThreeLayerToolRenderers(pi, threeLayerMode);
+  const hydrateGroups = (ctx: ExtensionContext) => {
+    groups.reset(ctx.cwd);
+    if (ctx.mode === "tui") {
+      for (const entry of ctx.sessionManager?.getBranch?.() ?? []) groups.recordEntry(entry);
+    }
+  };
 
   pi.on("session_start", (_event, ctx) => {
     toolRenderers.clear();
+    hydrateGroups(ctx);
     shell.handleSessionStart(ctx);
     clearPlan(plan);
     plan.visible = true;
@@ -131,14 +141,31 @@ export default function piTuix(pi: ExtensionAPI): void {
   });
   pi.on("tool_execution_start", (event) => startTool(workflow, event.toolName));
   pi.on("tool_execution_end", (event, ctx) => {
+    const affected = groups.complete(event.toolCallId, event.result, event.isError);
+    if (threeLayerMode.enabled && affected.length) toolRenderers.invalidate(affected);
     finishTool(workflow, event.isError);
     shell.handleRefresh(ctx);
   });
-  pi.on("message_end", (_event, ctx) => shell.handleRefresh(ctx));
-  pi.on("session_compact", (_event, ctx) => shell.handleRefresh(ctx));
-  pi.on("session_tree", (_event, ctx) => shell.handleRefresh(ctx));
+  pi.on("message_end", (event, ctx) => {
+    if (ctx.mode === "tui") {
+      const affected = groups.recordMessage(event.message);
+      if (threeLayerMode.enabled && affected.length) toolRenderers.invalidate(affected);
+    }
+    shell.handleRefresh(ctx);
+  });
+  pi.on("session_compact", (_event, ctx) => {
+    hydrateGroups(ctx);
+    toolRenderers.invalidate();
+    shell.handleRefresh(ctx);
+  });
+  pi.on("session_tree", (_event, ctx) => {
+    hydrateGroups(ctx);
+    toolRenderers.invalidate();
+    shell.handleRefresh(ctx);
+  });
   pi.on("session_shutdown", (_event, ctx) => {
     toolRenderers.clear();
+    groups.reset(ctx.cwd);
     shell.handleSessionShutdown(ctx);
   });
 

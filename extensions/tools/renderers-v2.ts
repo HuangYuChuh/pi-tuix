@@ -32,11 +32,13 @@ import {
   type ToolSummary,
   truncatePath,
 } from "./three-layer-view.ts";
+import { GroupedToolView, type ToolGroupRuntime } from "./tool-groups.ts";
 
 export interface ToolRendererMode {
   enabled: boolean;
   defaultMode: DisplayMode; // collapsed | preview | expanded
   observe?: (toolCallId: string, invalidate: () => void) => void;
+  groups?: ToolGroupRuntime;
 }
 
 type ReadDefinition = ReturnType<typeof createReadToolDefinition>;
@@ -276,7 +278,16 @@ export function createThreeLayerReadDefinition(
       // 准备详情行
       const detailLines = formatLines(splitLines(output), theme);
 
-      return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
+      const view = new ThreeLayerToolView(displayMode, summary, detailLines, theme);
+      return mode.groups
+        ? new GroupedToolView(
+            context.toolCallId,
+            view,
+            mode.groups,
+            displayMode === "expanded",
+            theme,
+          )
+        : view;
     },
   };
 }
@@ -354,7 +365,16 @@ export function createThreeLayerBashDefinition(
       const displayMode: DisplayMode = options.expanded ? "expanded" : mode.defaultMode;
       const detailLines = formatLines(splitLines(output), theme);
 
-      return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
+      const view = new ThreeLayerToolView(displayMode, summary, detailLines, theme);
+      return mode.groups
+        ? new GroupedToolView(
+            context.toolCallId,
+            view,
+            mode.groups,
+            displayMode === "expanded",
+            theme,
+          )
+        : view;
     },
   };
 }
@@ -547,8 +567,8 @@ export function registerThreeLayerToolRenderers(
   pi.registerTool(createThreeLayerEditDefinition(cwd, mode));
   pi.registerTool(createThreeLayerWriteDefinition(cwd, mode));
   return {
-    invalidate() {
-      for (const invalidate of invalidators.values()) invalidate();
+    invalidate(ids: readonly string[] = [...invalidators.keys()]) {
+      for (const id of ids) invalidators.get(id)?.();
     },
     clear() {
       invalidators.clear();

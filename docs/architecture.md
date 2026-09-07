@@ -93,6 +93,13 @@ Read previews show a count, Write previews add line numbers, and Edit uses the
 public `renderDiff` formatter for word highlights. A guarded presentation
 adapter moves recognized diff line numbers before the change marker while
 preserving ANSI sequences; unrecognized formats pass through unchanged.
+Adjacent successful Read/Bash calls share a compact count summary. The grouping
+adapter observes public finalized messages and tool completion events, and
+rehydrates metadata from `sessionManager.getBranch()` on startup/navigation.
+It deduplicates lexically normalized file paths, counts every Bash call, and
+keeps failures, images, truncation, visible text and other tools as boundaries.
+Group members use their individual tool views when expanded. Only affected tool
+rows are invalidated after completion; no message or session entry is rewritten.
 Execution functions, argument schemas, and permission behavior are
 unchanged. Other extensions' MCP tools and built-in transcript components remain
 host-owned. No new runtime dependency or private host patch is introduced.

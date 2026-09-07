@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a numbered model picker with draft effort adjustment, Pi model scope and capability checks, and cancellation through `/pituix-model`.
 - Use public self-rendered tool shells and replace pending rows with results; preserve exact Pi tool execution functions.
 - Add result branches, compact Read counts, numbered Write previews, and Update diffs with Pi's public word-level highlighting.
+- Group adjacent successful Read/Bash calls into unique-file and shell-call counts, with individual expansion and read-only reconstruction when resuming sessions.
 
 ### Fixed
 - Use configured tool expansion bindings instead of the unregistered E hint.

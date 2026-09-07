@@ -60,6 +60,9 @@ permission mode was not relaxed.
 
 - Compact transcript combines adjacent completed Read/Bash calls into an
   indented count summary. Detailed transcript (`Ctrl+O`) separates the calls.
+- A second authenticated capture read two different ranges of the same file
+  and ran two Bash commands. The compact summary was `Read 1 file, ran 2 shell
+  commands`: files are deduplicated, while shell invocations are counted.
 - Detailed Read shows a `Read(path)` heading and a result branch with the line
   count. It does not print the file body in the observed detailed transcript.
 - Bash prints output under a result branch; a deliberately failing command
@@ -105,7 +108,8 @@ colors retain Pi-TUIX's existing accessible palette.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented; spinner frames are an approximation |
 | Queued follow-up count | `input` events, `setStatus` | Observational count; Pi owns delivery |
-| Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state`, public `renderDiff` | Result branches, compact Read counts, numbered Write previews and Update diffs implemented; adjacent-call grouping remains incomplete |
+| Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state`, public `renderDiff` | Result branches, compact Read counts, numbered Write previews and Update diffs implemented |
+| Adjacent Read/Bash summaries | Finalized message/tool events, public session branch, per-row invalidation | Implemented for adjacent successful calls; paths deduplicated, expanded calls retained, resumed sessions reconstructed |
 | Tool expansion | `options.expanded`, configured `app.tools.expand` | Implemented; no invented E binding |
 | Execution, errors, cancellation | Original tool `execute` functions | Delegated unchanged |
 | Default UI restoration | Public unset/reset methods | Implemented and tested |
@@ -121,6 +125,8 @@ Pi exposes `ui_prompt_start` and `ui_prompt_end` for blocking extension prompts.
 They do not provide a replacement renderer for all host permission decisions.
 
 Tool headings retain explicit status and attention text for accessibility.
+Group summaries also retain a compact target list and explicit success status;
+errors, cancellation, images and truncated results are never hidden in a group.
 Expanded Read can reveal the file body, an intentional Pi-TUIX affordance beyond
 the observed reference count-only result. Diff layout follows the reference
 number/marker order, while word highlighting uses Pi's public formatter rather
@@ -155,6 +161,10 @@ than reproducing Claude's syntax palette exactly.
   execution and an exit-code-7 error in a disposable directory. It validates
   result branches, expansion and native restoration through the actual host;
   it is a deterministic UI test, not a successful Pi model-network request.
+- Grouping tests cover repeated files, shell invocation counts, text/tool/error
+  boundaries, pending results, ANSI/CJK widths, individual expansion and native
+  restoration. A saved interactive Pi session was reopened through `--session`
+  and retained the expected `Read 1 file, ran 2 shell commands` summary.
 - Successful Claude Read/Bash/Edit/Write calls and approval dialogs are now
   observed. Full cross-product visual parity remains incomplete; the tool
   presentation gaps above are based on these authenticated observations.

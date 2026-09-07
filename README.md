@@ -54,6 +54,8 @@ The effective thinking level appears above the prompt with Pi's configured short
 
 Each tool row keeps the action, target, state, and attention signal visible. Read defaults to a line-count result branch; Bash shows output, Edit uses an `Update` heading with a numbered diff, and Write previews numbered content. Long previews show the first and last two detail lines. Collapsed mode keeps the summary; expanded mode reveals the full output or diff, including Read contents. Errors retain their details. All views use ANSI-aware width constraints.
 
+Adjacent successful Read/Bash calls combine into a count summary, deduplicating file paths while counting each shell call. Expand tools to reveal every call. Errors, cancellation, images, and truncated results remain separate; assistant text and other tools separate groups. Grouping is reconstructed from Pi's public session branch when resuming.
+
 These commands are reversible:
 
 | Command | Purpose |
