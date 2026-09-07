@@ -6,6 +6,10 @@ import type { ImageContent } from "@earendil-works/pi-ai";
 import type { InputEvent, InputEventResult, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { getImageDimensions } from "@earendil-works/pi-tui";
 import { collectImages, type PrepareImages } from "../../session/image-attachments.ts";
+import {
+  type ImageNumberData,
+  ImageNumberObservations,
+} from "../../session/image-number-metadata.ts";
 import { DraftQueue, type QueueDraft } from "./draft-queue.ts";
 import { splitPastedPaths } from "./image-paths.ts";
 
@@ -28,6 +32,15 @@ export interface DraftImage {
 }
 
 type CapturedImage = Omit<DraftImage, "token" | "number">;
+
+function highestImageLabel(text: string): number {
+  let highest = 0;
+  for (const match of text.matchAll(/\[Image #(\d+)\]/g)) {
+    const number = Number(match[1]);
+    if (Number.isSafeInteger(number) && number > highest) highest = number;
+  }
+  return highest;
+}
 
 /** Read only an explicitly pasted single image path, outside all rendering. */
 export function readPastedImage(
@@ -89,6 +102,7 @@ function readImagePath(
 export class DraftImages {
   private readonly images = new Map<string, DraftImage>();
   private readonly queue = new DraftQueue();
+  private readonly submissions = new ImageNumberObservations();
   private nextNumber = 0;
   private nextToken = 0;
   private bytes = 0;
@@ -106,8 +120,31 @@ export class DraftImages {
       this.nextNumber = Math.max(this.nextNumber, image.number ?? 0);
   }
 
-  reserve(message: Extract<SessionEntry, { type: "message" }>["message"], pending = true): void {
+  /** Historical user labels seed a fresh editor; live text does not reserve IDs. */
+  seedHistory(entries: readonly SessionEntry[]): void {
+    this.observe(entries);
+    for (const entry of entries) {
+      if (entry.type !== "message" || entry.message.role !== "user") continue;
+      const content = entry.message.content;
+      const texts =
+        typeof content === "string"
+          ? [content]
+          : Array.isArray(content)
+            ? content.flatMap((block) =>
+                block?.type === "text" && typeof block.text === "string" ? [block.text] : [],
+              )
+            : [];
+      for (const text of texts)
+        this.nextNumber = Math.max(this.nextNumber, highestImageLabel(text));
+    }
+  }
+
+  reserve(
+    message: Extract<SessionEntry, { type: "message" }>["message"],
+    pending = true,
+  ): ImageNumberData | undefined {
     if (message.role !== "user") return;
+    const observed = this.submissions.delivered(message.content, message.timestamp, pending);
     const content =
       typeof message.content === "string"
         ? [{ type: "text" as const, text: message.content }]
@@ -120,6 +157,13 @@ export class DraftImages {
       content.filter((block) => block.type === "image"),
       pending,
     );
+    if (observed) {
+      for (const number of observed.numbers) {
+        if (number === null) this.nextNumber++;
+        else this.nextNumber = Math.max(this.nextNumber, number);
+      }
+      return observed;
+    }
     const images = collectImages([
       {
         type: "message",
@@ -134,16 +178,17 @@ export class DraftImages {
     } else this.nextNumber += images.length;
   }
 
-  paste(text: string, cwd: string): string | undefined {
+  paste(text: string, cwd: string, draft = ""): string | undefined {
     if (this.closed) return;
+    const minimumNumber = highestImageLabel(draft);
     const value = readPastedImage(text, cwd, MAX_DRAFT_BYTES - this.bytes);
-    if (value) return this.attach(value);
+    if (value) return this.attach(value, minimumNumber);
     const paths = splitPastedPaths(text);
     if (!paths) return;
     let changed = false;
     const transformed = paths.map(({ raw, path }) => {
       const image = readImagePath(path, cwd, MAX_DRAFT_BYTES - this.bytes);
-      const token = image ? this.attach(image) : undefined;
+      const token = image ? this.attach(image, minimumNumber) : undefined;
       if (!token) return this.display(raw);
       changed = true;
       return token;
@@ -151,11 +196,18 @@ export class DraftImages {
     return changed ? transformed.join(" ") : undefined;
   }
 
-  private attach(value: CapturedImage): string | undefined {
+  private attach(value: CapturedImage, minimumNumber: number): string | undefined {
     const size = Buffer.byteLength(value.image.data, "base64");
-    if (this.bytes + size > MAX_DRAFT_BYTES || this.nextToken >= 0xfffd) return;
+    const number = Math.max(this.nextNumber, minimumNumber) + 1;
+    if (
+      this.bytes + size > MAX_DRAFT_BYTES ||
+      this.nextToken >= 0xfffd ||
+      !Number.isSafeInteger(number)
+    )
+      return;
     const token = String.fromCodePoint(0xf0000 + ++this.nextToken);
-    const image = { ...value, token, number: ++this.nextNumber };
+    const image = { ...value, token, number };
+    this.nextNumber = number;
     this.images.set(token, image);
     this.bytes += size;
     if (this.prepare) {
@@ -220,6 +272,7 @@ export class DraftImages {
   }
 
   restoreQueuedDraft(text: string, draft: QueueDraft): { text: string; unmatched: boolean } {
+    this.submissions.clear();
     return this.queue.restore(text, draft);
   }
 
@@ -231,6 +284,7 @@ export class DraftImages {
     }
     const text = referenced.size ? this.display(event.text) : event.text;
     const attached: ImageContent[] = [];
+    const numbers: (number | null)[] = (event.images ?? []).map(() => null);
     // One attachment per owned identity, in first visible-reference order.
     // A typed reference can precede its chip; unused/old numbers stay text.
     if (referenced.size) {
@@ -239,10 +293,12 @@ export class DraftImages {
         const image = referenced.get(number);
         if (!image) continue;
         attached.push({ ...image.image });
+        numbers.push(number);
         referenced.delete(number);
       }
     }
     const images = [...(event.images ?? []), ...attached];
+    this.submissions.remember([{ type: "text", text }, ...images], numbers, pending);
     this.queue.observe(event, text, images, pending);
     return attached.length
       ? {
@@ -259,6 +315,7 @@ export class DraftImages {
     this.requests.clear();
     this.images.clear();
     this.queue.clear();
+    this.submissions.clear();
     this.bytes = 0;
   }
 }

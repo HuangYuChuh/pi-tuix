@@ -182,7 +182,7 @@ broadly than the observed reference.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Old runs without branch observations stay unknown |
 | Main/snapshot/preview image attachments | Public message/context entries, component composition, `hyperlink`, native URL activation | User-only numbering, image-only prompts and openable temporary raster files implemented; Read images use file/byte summaries, other tool/custom images use unnumbered links |
-| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation | Multi-path chips, literal/history label editing, captured-image links and positional submission implemented; observed queue take-back distinguishes literal labels; shared external references implemented; collapsed-paste deletion, text-only history numbering and parser edge cases still differ |
+| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation, custom entries | Multi-path chips, literal/history label editing, captured-image links, shared references and history numbering implemented; delivered image numbers survive mixed literals and resume; observed queue take-back distinguishes literal labels; collapsed-paste deletion, shared text/image counters and parser edge cases still differ |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -337,9 +337,34 @@ remain a measured difference, rather than a claim of full syntax parity.
   text only. A further Pi 0.84.4 run placed a GIF reference before its PNG/GIF
   chips and delivered GIF/PNG bytes in that first-reference order with matching
   #26/#25 branches. Default restoration and all six temporary-asset removals
-  passed; sessions contain no internal draft tokens. A separate reference resume assigned
-  #1000 after saved text-only #999; Pi currently seeds from actual image blocks.
-  That historical-numbering edge still needs investigation.
+  passed; sessions contain no internal draft tokens.
+- A fresh authenticated Claude 2.1.263 numbering probe pasted after current text
+  #41 and received image #42. Clearing that draft and discarding text #77 still
+  produced #43 next. Sending text-only user #90 did not jump the running counter;
+  the later assistant #150 did not either. A new process resuming that history
+  produced #91. Pi-TUIX now seeds from saved user labels on the selected branch
+  and from the visible draft at successful image allocation, while keeping live
+  text-only messages, discarded labels and failed reads from consuming numbers.
+  The same reference pasted 100 lines containing #300: its collapsed text chip
+  received #92 and the following image #93. Pi still uses the native separate
+  long-text counter; shared text/image references remain a documented gap.
+- Mixed literal/image labels exposed a separate display ambiguity after delivery.
+  Pi-TUIX now records the known attachment numbers through a public plain custom
+  entry, bound to the following user's timestamp and ordered content fingerprint.
+  It contains no image bytes/source paths and does not enter model context.
+  Invalid, stale, ambiguous and transformed payloads retain legacy fallback.
+  Display projection preserves a matching ancestor annotation when compaction
+  keeps its image message. Regressions cover these cases, metadata bounds,
+  selected ancestry, unchanged model context, pre-persistence rendering,
+  restart, malformed imports and ANSI widths 8-100.
+  Actual Pi 0.84.4 regular mode at 80x24 submitted literal #800 with image #801;
+  the live view and transcript retained one #801 branch, and the next paste was
+  #802. Pi 0.85.1 fullscreen at 100x40 resumed that session with the same #801
+  branch and next #802, then delivered a native follow-up with literal #900 and
+  one GIF #901. Provider inputs retained the original PNG/GIF hashes and text.
+  Both hosts restored native UI and removed their temporary assets on quit;
+  saved messages contain no internal draft tokens. Old ambiguous messages cannot
+  be retroactively disambiguated without an original annotation.
 - Resume controls tests cover branch indexing beyond the visible window,
   selection stability, search/scope combinations, unavailable Git, unreadable
   files, queue replacement, aborts and stale results. Rename tests cover native

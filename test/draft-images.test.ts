@@ -19,6 +19,7 @@ import {
 } from "@earendil-works/pi-tui";
 import { contentText } from "../extensions/session/image-attachment-view.ts";
 import { collectImages } from "../extensions/session/image-attachments.ts";
+import { IMAGE_NUMBERS_ENTRY_TYPE } from "../extensions/session/image-number-metadata.ts";
 import { DraftImages, readPastedImage } from "../extensions/shell/open-tui/draft-images.ts";
 import { OpenTuiEditor } from "../extensions/shell/open-tui/editor.ts";
 import { splitPastedPaths } from "../extensions/shell/open-tui/image-paths.ts";
@@ -71,6 +72,46 @@ const fixture = (providedImages?: DraftImages) => {
 };
 const plain = (editor: OpenTuiEditor, width = 100) =>
   editor.render(width).map(stripTerminalSequences).join("\n");
+
+test("mixed literal and owned image numbers survive submission and restart without phantom IDs", () => {
+  const h = fixture();
+  const resumed = fixture();
+  try {
+    h.editor.setText("Literal [Image #300] ");
+    h.paste();
+    const result = h.images.transform(
+      { type: "input", source: "interactive", text: h.editor.getExpandedText() },
+      false,
+    );
+    if (result.action !== "transform") assert.fail();
+    const message = {
+      role: "user" as const,
+      timestamp: 123,
+      content: [{ type: "text" as const, text: result.text }, ...(result.images ?? [])],
+    };
+    const observed = h.images.reserve(message, false);
+    assert.deepEqual(observed?.numbers, [301]);
+    const manager = SessionManager.inMemory("/fixture");
+    manager.appendCustomEntry(IMAGE_NUMBERS_ENTRY_TYPE, observed);
+    manager.appendMessage(message);
+    assert.deepEqual(
+      collectImages(manager.getBranch()).map(({ number, inline }) => [number, inline]),
+      [[301, true]],
+    );
+    assert.deepEqual(manager.buildSessionContext().messages, [message]);
+    assert.equal(result.images?.[0].data, png);
+    h.images.observe(manager.getBranch());
+    h.editor.setText("");
+    h.paste();
+    assert.equal(h.images.display(h.editor.getText()), "[Image #302]");
+    resumed.images.seedHistory(manager.getBranch());
+    resumed.paste();
+    assert.equal(resumed.images.display(resumed.editor.getText()), "[Image #302]");
+  } finally {
+    h.close();
+    resumed.close();
+  }
+});
 
 test("explicit pasted image paths preserve bytes; ordinary text and non-image files stay text", () => {
   const h = fixture();
@@ -652,6 +693,142 @@ test("incoming user media reserves numbers before persistence without advancing 
     });
     h.paste();
     assert.match(plain(h.editor), /Image #2.*Image #3/);
+  } finally {
+    h.close();
+  }
+});
+
+test("current literal labels seed successful image pastes without consuming discarded or failed drafts", () => {
+  const h = fixture();
+  try {
+    h.editor.handleInput("Note [Image #41] ");
+    h.paste(`${h.path.replaceAll(" ", "\\ ")} ${h.path.replaceAll(" ", "\\ ")}`);
+    assert.equal(h.images.display(h.editor.getText()), "Note [Image #41] [Image #42] [Image #43]");
+    const input = h.images.transform(
+      { type: "input", source: "interactive", text: h.editor.getExpandedText() },
+      false,
+    );
+    assert.equal(input.action, "transform");
+    if (input.action !== "transform") assert.fail();
+    assert.equal(input.images?.length, 2);
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getText(), "Note [Image #41] ");
+    h.editor.setText("Discard [Image #77]");
+    h.editor.setText("");
+    h.editor.insertTextAtCursor(h.path);
+    assert.equal(h.images.display(h.editor.getText()), "[Image #44]");
+    h.editor.setText("[Image #500] ");
+    h.paste(join(h.cwd, "missing.png"));
+    assert.equal(h.images.has(h.editor.getText()), false);
+    h.editor.setText("");
+    h.paste();
+    assert.equal(h.images.display(h.editor.getText()), "[Image #45]");
+    for (const width of [8, 20, 40, 80, 100])
+      assert.ok(h.editor.render(width).every((line) => visibleWidth(line) <= width));
+  } finally {
+    h.close();
+  }
+});
+
+test("restored history seeds from selected-branch user text but does not create image payloads", () => {
+  const manager = SessionManager.inMemory("/fixture");
+  const branch = manager.appendMessage({
+    role: "user",
+    content: "Literal [Image #90]",
+    timestamp: 0,
+  });
+  manager.appendMessage({ role: "user", content: "Other branch [Image #900]", timestamp: 0 });
+  manager.branch(branch);
+  manager.appendMessage({
+    role: "user",
+    content: [{ type: "text", text: "[Image #88]" }],
+    timestamp: 0,
+  });
+  manager.appendMessage({
+    role: "assistant",
+    content: [{ type: "text", text: "[Image #150]" }],
+    timestamp: 0,
+    api: "anthropic-messages",
+    provider: "anthropic",
+    model: "fixture",
+    stopReason: "stop",
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+  });
+  manager.appendMessage({
+    role: "toolResult",
+    toolCallId: "read",
+    toolName: "read",
+    content: [{ type: "text", text: "[Image #250]" }],
+    timestamp: 0,
+    isError: false,
+  });
+  manager.appendCustomMessageEntry("fixture", "[Image #350]", true);
+  for (const content of [null, [null, { type: "text", text: 42 }]])
+    manager.appendMessage({ role: "user", content, timestamp: 0 } as unknown as Parameters<
+      typeof manager.appendMessage
+    >[0]);
+  const entries = manager.getBranch();
+  const before = structuredClone(entries);
+  const h = fixture();
+  try {
+    h.images.seedHistory(entries);
+    assert.equal(h.images.has("[Image #90]"), false);
+    assert.equal(
+      h.images.transform({ type: "input", source: "interactive", text: "[Image #90]" }, false)
+        .action,
+      "continue",
+    );
+    h.paste();
+    assert.equal(h.images.display(h.editor.getText()), "[Image #91]");
+    assert.deepEqual(entries, before);
+    assert.deepEqual(manager.getBranch(), before);
+  } finally {
+    h.close();
+  }
+});
+
+test("live text-only messages leave allocation unchanged until a new runtime seeds history", () => {
+  const manager = SessionManager.inMemory("/fixture");
+  const message = { role: "user" as const, content: "Literal [Image #90]", timestamp: 0 };
+  manager.appendMessage(message);
+  const h = fixture();
+  const resumed = fixture();
+  try {
+    h.paste();
+    h.editor.setText("");
+    h.images.reserve(message, false);
+    h.images.observe(manager.getBranch());
+    h.paste();
+    assert.equal(h.images.display(h.editor.getText()), "[Image #2]");
+    resumed.images.seedHistory(manager.getBranch());
+    resumed.paste();
+    assert.equal(resumed.images.display(resumed.editor.getText()), "[Image #91]");
+  } finally {
+    h.close();
+    resumed.close();
+  }
+});
+
+test("invalid numbering text stays literal and exhausted safe IDs cannot create duplicate attachments", () => {
+  const h = fixture();
+  try {
+    h.editor.setText("[Image #0] [Image #-9] [Image #9007199254740992] ");
+    h.paste();
+    assert.ok(h.images.display(h.editor.getText()).endsWith("[Image #1]"));
+    h.editor.setText("[Image #9007199254740990] ");
+    h.paste();
+    assert.ok(h.images.display(h.editor.getText()).endsWith("[Image #9007199254740991]"));
+    h.editor.setText("");
+    h.paste();
+    assert.equal(h.editor.getText(), h.path);
+    assert.equal(h.images.has(h.editor.getText()), false);
   } finally {
     h.close();
   }

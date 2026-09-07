@@ -118,3 +118,9 @@ The editor may turn explicitly pasted local image paths into removable draft
 chips and pass their bytes through Pi's public input transformation. Pi still
 owns submission, model requests, queue delivery and persisted messages. Draft
 identities and undo remain UI state, and no provider or session store is added.
+Delivered chips may also append a display-only number annotation through Pi's
+public custom-entry API. It contains the attachment numbers, message timestamp
+and a content fingerprint, without image bytes or source paths. This keeps
+ordinary text labels from changing an actual attachment's displayed number.
+Pi owns storage and branching; the annotation stays outside model context and
+requires no migration when the extension is removed.

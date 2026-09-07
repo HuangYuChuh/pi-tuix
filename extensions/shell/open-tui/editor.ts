@@ -323,7 +323,7 @@ export class OpenTuiEditor extends CustomEditor {
     const content = this.imagePaste.slice(0, stop);
     const remainder = this.imagePaste.slice(stop + end.length);
     this.imagePaste = undefined;
-    const image = this.images?.paste(content, this.cwd);
+    const image = this.images?.paste(content, this.cwd, super.getText());
     if (image) super.insertTextAtCursor(image);
     else super.handleInput(begin + (this.images?.display(content) ?? content) + end);
     if (remainder) this.handleInput(remainder);
@@ -333,7 +333,7 @@ export class OpenTuiEditor extends CustomEditor {
 
   override insertTextAtCursor(text: string): void {
     super.insertTextAtCursor(
-      this.images?.paste(text, this.cwd) ?? this.images?.display(text) ?? text,
+      this.images?.paste(text, this.cwd, super.getText()) ?? this.images?.display(text) ?? text,
     );
   }
 

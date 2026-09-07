@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { registerModelPicker } from "../../control/model-picker.ts";
 import type { PrepareImages } from "../../session/image-attachments.ts";
+import { IMAGE_NUMBERS_ENTRY_TYPE } from "../../session/image-number-metadata.ts";
 import { registerResumePicker } from "../../session/resume-picker.ts";
 import type { SubagentActivityObserver } from "../../session/subagent-activity.ts";
 import {
@@ -57,13 +58,14 @@ export function createOpenTuiShellRuntime(
   const lifecycle = new SessionLifecycle();
   const state: FooterState = createInitialState();
   const telemetry = new TurnTelemetryTracker();
-  const liveTranscript = createLiveTranscript(pi, prepareImages);
   let draftImages = new DraftImages(prepareImages, () => requestRender?.());
   pi.on("input", (event, ctx) => draftImages.transform(event, ctx.hasPendingMessages()));
-  pi.on("message_start", (event, ctx) =>
-    draftImages.reserve(event.message, ctx.hasPendingMessages()),
-  );
+  pi.on("message_start", (event, ctx) => {
+    const numbers = draftImages.reserve(event.message, ctx.hasPendingMessages());
+    if (numbers && ctx.mode === "tui") pi.appendEntry(IMAGE_NUMBERS_ENTRY_TYPE, numbers);
+  });
   pi.on("message_end", (_event, ctx) => draftImages.observe(ctx.sessionManager.getBranch()));
+  const liveTranscript = createLiveTranscript(pi, prepareImages);
   let config: OpenTuiConfig = structuredClone(DEFAULT_CONFIG);
   const effort: EffortState = { enabled: false, level: "off", ascii: false };
   const syncEffort = (ctx: ExtensionContext) => {
@@ -285,7 +287,7 @@ export function createOpenTuiShellRuntime(
       lifecycle.start();
       draftImages.dispose();
       draftImages = new DraftImages(prepareImages, () => requestRender?.());
-      draftImages.observe(ctx.sessionManager.getBranch());
+      draftImages.seedHistory(ctx.sessionManager.getBranch());
       subagentActivity?.reset();
       subagentActivity?.setOnChange(() => requestRender?.());
       context = ctx;
