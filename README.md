@@ -101,7 +101,7 @@ These commands are reversible:
 
 | Command | Purpose |
 | --- | --- |
-| `/pituix` | Enable or restore the Pi-TUIX shell |
+| `/pituix` | Enable or restore the Pi-TUIX shell and reference theme |
 | `/pituix-default` | Restore Pi's default TUI components |
 | `/pituix-compact` | Collapse reference-style tools to summary rows |
 | `/pituix-three-layer` | Show reference-style tool previews with expansion |
@@ -119,6 +119,8 @@ These commands are reversible:
 | `/pituix-plan [show\|hide\|clear]` | Control the detected read-only plan panel |
 
 The bundled `pi-tuix-dark` theme is applied with the shell and remains available from Pi's `/settings` screen. The project includes adapted MIT-licensed code from [OldSuns/pi-open-tui](https://github.com/OldSuns/pi-open-tui); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+If colors change after native `/new`, `/resume`, or `/reload` on Pi 0.84.4, run `/pituix` to restore the reference theme without restarting or replacing the editor. Pi reapplies its saved theme after those commands; automatic recovery is not available through its public lifecycle hooks. Recovery applies a temporary theme without changing Pi's saved theme setting. `/pituix-default` restores the theme that recovery replaced, unless you select another theme afterward.
 
 ## How It Works
 

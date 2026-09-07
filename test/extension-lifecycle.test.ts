@@ -21,6 +21,7 @@ import {
 } from "@earendil-works/pi-tui";
 import piTuix from "../extensions/index.ts";
 import { DEFAULT_CONFIG, loadConfig, saveConfig } from "../extensions/shell/open-tui/config.ts";
+import { createOpenTuiShellRuntime } from "../extensions/shell/open-tui/shell.ts";
 import { COMPLETION_ENTRY_TYPE } from "../extensions/stream/completion-entry.ts";
 
 let previousAgentDir: string | undefined;
@@ -142,6 +143,17 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     { matches: () => false } as unknown as KeybindingsManager,
   );
   assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /^[-─]+$/);
+
+  // Pi reapplies its saved theme after native /new and /reload finish.
+  ui.theme = originalTheme;
+  const installedEditors = editorFactories.length;
+  editor.setText("draft survives theme recovery");
+  await commands.get("pituix")?.handler("", context);
+  assert.equal(ui.theme, referenceTheme, "explicit recovery must restore the reference theme");
+  assert.equal(editorFactories.length, installedEditors, "recovery must keep the live editor");
+  assert.equal(editor.getText(), "draft survives theme recovery");
+  await commands.get("pituix")?.handler("", context);
+  assert.equal(ui.theme, referenceTheme);
 
   await handlers.get("agent_start")?.({ type: "agent_start" }, context);
   assert.equal(workingMessages.at(-1), "Working...");
@@ -265,6 +277,87 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   );
   await commands.get("pituix-mode")?.handler("preview", context);
   assert.equal(toolRedraws, 4);
+});
+
+test("theme recovery preserves user choices and handles unavailable themes", () => {
+  const shell = createOpenTuiShellRuntime({
+    on() {},
+    registerCommand() {},
+    registerMarkdownTransformer() {},
+  } as unknown as ExtensionAPI);
+  const original = { name: "native", fg: (_token: string, text: string) => text } as Theme;
+  const reference = { ...original, name: "pi-tuix-dark" } as Theme;
+  const selected = { ...original, name: "user-selected" } as Theme;
+  let available = true;
+  let rejectChange = false;
+  const writes: Theme[] = [];
+  const ui = {
+    theme: original,
+    getTheme: () => (available ? reference : undefined),
+    setTheme: (next: Theme) => {
+      assert.equal(typeof next, "object", "theme names would change Pi's saved preference");
+      writes.push(next);
+      if (rejectChange) return { success: false, error: "unavailable" };
+      ui.theme = next;
+      return { success: true };
+    },
+    setWorkingIndicator() {},
+    setHiddenThinkingLabel() {},
+    setHeader() {},
+    setFooter() {},
+    setEditorComponent() {},
+  };
+  const ctx = { mode: "tui", hasUI: true, ui } as unknown as ExtensionContext;
+  try {
+    shell.apply(ctx);
+    assert.equal(ui.theme, reference);
+    ui.theme = selected;
+    shell.apply(ctx);
+    assert.equal(ui.theme, selected, "ordinary synchronization respects a user's theme");
+    shell.remove(ctx);
+    assert.equal(ui.theme, selected, "disable preserves a theme selected while active");
+
+    shell.apply(ctx);
+    shell.apply(ctx, true);
+    shell.remove(ctx);
+    assert.equal(ui.theme, selected, "repeated recovery must not overwrite the return theme");
+
+    shell.apply(ctx);
+    ui.theme = original;
+    shell.apply(ctx, true);
+    shell.remove(ctx);
+    assert.equal(ui.theme, original, "recovery remembers the theme it actually replaced");
+
+    available = false;
+    const beforeMissing = writes.length;
+    shell.apply(ctx);
+    shell.apply(ctx, true);
+    assert.equal(writes.length, beforeMissing);
+    assert.equal(ui.theme, original);
+    available = true;
+    shell.apply(ctx, true);
+    assert.equal(
+      ui.theme,
+      reference,
+      "an active shell can recover when the theme becomes available",
+    );
+
+    ui.theme = selected;
+    rejectChange = true;
+    shell.apply(ctx, true);
+    assert.equal(ui.theme, selected);
+    rejectChange = false;
+    ui.theme = reference;
+    shell.remove(ctx);
+    assert.equal(ui.theme, original, "a rejected change must not replace the return theme");
+
+    const beforeNonTui = writes.length;
+    shell.apply({ ...ctx, mode: "rpc" }, true);
+    shell.apply({ ...ctx, hasUI: false }, true);
+    assert.equal(writes.length, beforeNonTui);
+  } finally {
+    shell.handleSessionShutdown(ctx);
+  }
 });
 
 test("queue commands delegate steering and follow-ups to Pi", async () => {

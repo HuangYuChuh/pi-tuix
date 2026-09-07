@@ -106,7 +106,7 @@ Ctrl+R（或 Pi 配置的会话重命名快捷键）编辑所选会话名称，E
 
 | 命令 | 用途 |
 | --- | --- |
-| `/pituix` | 启用或恢复 Pi-TUIX shell |
+| `/pituix` | 启用或恢复 Pi-TUIX shell 和参考配色 |
 | `/pituix-default` | 恢复 Pi 默认 TUI 组件 |
 | `/pituix-compact` | 将参考样式的工具展示收起为摘要行 |
 | `/pituix-three-layer` | 显示参考样式的工具预览，保留展开能力 |
@@ -124,6 +124,8 @@ Ctrl+R（或 Pi 配置的会话重命名快捷键）编辑所选会话名称，E
 | `/pituix-plan [show\|hide\|clear]` | 控制自动识别出的只读计划面板 |
 
 启用 shell 时会应用内置的 `pi-tuix-dark` 主题，也可在 Pi 的 `/settings` 中切换主题。
+
+在 Pi 0.84.4 中，原生 `/new`、`/resume` 或 `/reload` 之后可能恢复成 Pi 已保存的配色。执行 `/pituix` 即可重新应用参考主题，无需重启或更换输入框。当前公开生命周期 hook 不支持在这些命令完成后自动恢复主题。此操作只临时切换主题，不修改 Pi 保存的主题设置；`/pituix-default` 会还原恢复操作之前的主题。如果之后又手动选择了其他主题，则保留该选择。
 
 ## 工作原理
 
