@@ -109,6 +109,12 @@ opening, searching, filtering and previewing remain read-only. These controls
 do not introduce a separate session format or require migration on removal.
 
 The main conversation and readers may create disposable private image files for
-attachment links. User attachments receive occurrence numbers; tool images do not. They prepare those files outside rendering and clean them up
+attachment links. User attachments receive numbers; tool images do not. They
+prepare those files outside rendering and clean them up
 on normal runtime shutdown. This is UI-owned cache data: original session files,
 message content and model inputs remain Pi-owned and are not rewritten.
+
+The editor may turn explicitly pasted local image paths into removable draft
+chips and pass their bytes through Pi's public input transformation. Pi still
+owns submission, model requests, queue delivery and persisted messages. Draft
+identities and undo remain UI state, and no provider or session store is added.

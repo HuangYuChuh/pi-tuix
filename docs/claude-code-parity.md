@@ -75,8 +75,13 @@ Pasting the same file again produced `[Image #2]`: numbers count occurrences,
 not unique file contents. A subsequent Read of that same PNG rendered `Read 1
 file` in normal mode and `Read image (311 bytes)` in detailed mode, without an
 attachment row. Pasting another user image afterwards still produced `[Image #2]`.
-Tool-read images therefore do not consume user attachment numbers. No inline
-bitmap appeared in these sampled views.
+Tool-read images therefore do not consume user attachment numbers. A later draft
+probe inserted a chip between text, moved across it with one arrow press, deleted
+it with one Backspace, and restored it with Ctrl+_. Deleting `[Image #3]` then
+pasting again produced `[Image #4]`. Submitting the two surviving chips retained
+`[Image #2][Image #4]` in the prompt and attachment branches; the model correctly
+reported identical images. Draft deletion therefore leaves numbering gaps.
+No inline bitmap appeared in these sampled views.
 The official [image workflow documentation](https://code.claude.com/docs/en/common-workflows#work-with-images)
 describes Cmd+Click on macOS or Ctrl+Click on Windows/Linux to open a numbered
 image in the default viewer. Reference click activation itself was not tested;
@@ -157,7 +162,7 @@ broadly than the observed reference.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Old runs without branch observations stay unknown |
 | Main/snapshot/preview image attachments | Public message/context entries, component composition, `hyperlink`, native URL activation | User-only numbering, image-only prompts and openable temporary raster files implemented; Read images use file/byte summaries, other tool/custom images use unnumbered links |
-| Image paste and draft chips | Native editor and public input interfaces | Still native Pi behavior; bracketed paste of a PNG path was submitted as text in the tested host |
+| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation | Single-path chips, atomic edits, captured-image links, positional submission and native follow-up delivery implemented; multi-file paste and fresh-runtime image recall remain gaps |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -237,6 +242,22 @@ remain a measured difference, rather than a claim of full syntax parity.
   assets were removed on exit. A later authenticated Claude Read sample corrected
   the initial assumption that tool and user images shared one counter; the main
   view and both readers now follow the observed user-only numbering.
+- Draft tests cover quoted/escaped paths, byte preservation, atomic movement and
+  deletion, native undo with large pasted text, split terminal paste sequences,
+  bounds at widths 0-100, wrapped vertical navigation and control-text handling.
+  Input transformations preserve existing images and delivery metadata; saved
+  labels preserve numbering gaps without duplicated prompt markers. Link tests
+  cover preparation, truncation and late completion after disposal. External
+  editor and follow-up/dequeue actions keep image identity through public APIs.
+  In actual Pi 0.85.1 fullscreen, paste/delete/undo produced a numbered chip and
+  the fixture provider received its original SHA-256 with a positional prompt.
+  Clicking a draft chip opened the matching captured PNG in macOS Preview.
+  Actual Pi 0.84.4 regular mode queued a pasted image with Alt+Enter and delivered
+  the original bytes after the active run. A later run took the queued chip back,
+  edited its readable label in a disposable external editor, then delivered the
+  same image bytes with the edited text. No private-use draft tokens appeared
+  in the saved fixture session. Native clipboard access itself was delegated,
+  rather than replacing or inspecting the user's clipboard.
 - Resume controls tests cover branch indexing beyond the visible window,
   selection stability, search/scope combinations, unavailable Git, unreadable
   files, queue replacement, aborts and stale results. Rename tests cover native

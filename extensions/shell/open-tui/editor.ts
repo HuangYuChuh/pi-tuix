@@ -8,11 +8,14 @@ import {
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import {
   CURSOR_MARKER,
+  getKeybindings,
   sliceByColumn,
   truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
 import type { CursorStyle } from "./config.ts";
+import { layoutDraftImages } from "./draft-image-layout.ts";
+import type { DraftImages } from "./draft-images.ts";
 import {
   applyFullscreenWheelScrollLines,
   DEFAULT_FULLSCREEN_WHEEL_SCROLL_LINES,
@@ -71,12 +74,22 @@ export function renderPromptRule(
 }
 
 export class OpenTuiEditor extends CustomEditor {
+  onQueueRestored?: () => void;
   private helpVisible = false;
   private ascii: boolean;
   private readonly getBorder: (s: string) => string;
   private cursorStyle: CursorStyle;
   private previewHardwareCursor = false;
   private readonly getPromptStatus: (width: number) => string;
+  private readonly images?: DraftImages;
+  private readonly cwd: string;
+  private imagePaste: string | undefined;
+  private imageWidth = 80;
+  private imagePreferredColumn: number | undefined;
+  private readonly appKeys: KeybindingsManager;
+  private externalImages = false;
+  private externalDraft: string | undefined;
+  private restoringQueuedImages = false;
 
   constructor(
     tui: TUI,
@@ -85,11 +98,16 @@ export class OpenTuiEditor extends CustomEditor {
     cursorStyle: CursorStyle = "block",
     ascii = useAsciiChrome(),
     getPromptStatus: (width: number) => string = () => "",
+    images?: DraftImages,
+    cwd = process.cwd(),
   ) {
     super(tui, editorTheme, keybindings, { paddingX: 0 });
     this.cursorStyle = cursorStyle;
     this.ascii = ascii;
     this.getPromptStatus = getPromptStatus;
+    this.images = images;
+    this.cwd = cwd;
+    this.appKeys = keybindings;
     configureCursor(tui, cursorStyle);
     // ponytail: route the frame through this.borderColor so Pi can recolor it
     // via updateEditorBorderColor() — bash mode ("! " prefix → green) and
@@ -141,6 +159,28 @@ export class OpenTuiEditor extends CustomEditor {
   }
 
   override handleInput(data: string): void {
+    if (this.images && this.handleImagePaste(data)) return;
+    if (this.appKeys.matches(data, "app.editor.external")) {
+      this.externalImages = true;
+      try {
+        super.handleInput(data);
+      } finally {
+        this.externalImages = false;
+      }
+      return;
+    }
+    if (this.appKeys.matches(data, "app.message.dequeue")) {
+      this.restoringQueuedImages = true;
+      try {
+        super.handleInput(data);
+      } finally {
+        this.restoringQueuedImages = false;
+        this.onQueueRestored?.();
+      }
+      return;
+    }
+    if (this.moveImageCursor(data)) return;
+    this.imagePreferredColumn = undefined;
     if (data === "?" && this.getText() === "") {
       this.helpVisible = !this.helpVisible;
       this.tui.requestRender();
@@ -152,22 +192,141 @@ export class OpenTuiEditor extends CustomEditor {
       return;
     }
     this.helpVisible = false;
-    super.handleInput(data);
+    super.handleInput(this.images?.display(data) ?? data);
+  }
+
+  private moveImageCursor(data: string): boolean {
+    if (!this.images?.has(super.getText()) || this.isShowingAutocomplete()) return false;
+    if (
+      this.appKeys.matches(data, "tui.editor.historyPrevious") ||
+      this.appKeys.matches(data, "tui.editor.historyNext")
+    )
+      return false;
+    const keys = getKeybindings();
+    const up = keys.matches(data, "tui.editor.cursorUp");
+    const down = keys.matches(data, "tui.editor.cursorDown");
+    if (!up && !down) return false;
+    const layout = layoutDraftImages(
+      this.getLines(),
+      this.getCursor(),
+      this.images,
+      this.imageWidth,
+      1,
+      false,
+      false,
+      this.imagePreferredColumn,
+    );
+    const target = up ? layout.up : layout.down;
+    if (!target) return false;
+    this.imagePreferredColumn ??= layout.column;
+    const lines = this.getLines();
+    const offset = (cursor: { line: number; col: number }) =>
+      lines.slice(0, cursor.line).reduce((sum, line) => sum + line.length + 1, cursor.col);
+    const destination = offset(target);
+    const action =
+      destination < offset(this.getCursor()) ? "tui.editor.cursorLeft" : "tui.editor.cursorRight";
+    const candidates = action === "tui.editor.cursorLeft" ? ["\x1b[D", "\x02"] : ["\x1b[C", "\x06"];
+    for (const key of keys.getKeys(action)) {
+      if (key.length === 1) candidates.push(key);
+      else if (/^ctrl\+[a-z]$/.test(key))
+        candidates.push(String.fromCharCode(key.charCodeAt(5) - 96));
+    }
+    const key = candidates.find((candidate) => keys.matches(candidate, action));
+    if (!key) return false;
+    for (let remaining = super.getText().length + 1; remaining > 0; remaining--) {
+      const before = offset(this.getCursor());
+      if (before === destination) break;
+      super.handleInput(key);
+      if (offset(this.getCursor()) === before) break;
+    }
+    this.tui.requestRender();
+    return true;
+  }
+
+  private handleImagePaste(data: string): boolean {
+    const begin = "\x1b[200~";
+    const end = "\x1b[201~";
+    const start = data.indexOf(begin);
+    if (this.imagePaste === undefined && start < 0) return false;
+    if (this.imagePaste === undefined) {
+      if (start > 0) super.handleInput(data.slice(0, start));
+      this.imagePaste = "";
+      data = data.slice(start + begin.length);
+    }
+    this.imagePaste += data;
+    const stop = this.imagePaste.indexOf(end);
+    if (stop < 0) return true;
+    const content = this.imagePaste.slice(0, stop);
+    const remainder = this.imagePaste.slice(stop + end.length);
+    this.imagePaste = undefined;
+    const image = this.images?.paste(content, this.cwd);
+    if (image) super.insertTextAtCursor(image);
+    else super.handleInput(begin + (this.images?.display(content) ?? content) + end);
+    if (remainder) this.handleInput(remainder);
+    this.tui.requestRender();
+    return true;
+  }
+
+  override insertTextAtCursor(text: string): void {
+    super.insertTextAtCursor(
+      this.images?.paste(text, this.cwd) ?? this.images?.display(text) ?? text,
+    );
+  }
+
+  override getExpandedText(): string {
+    const text = super.getExpandedText();
+    if (this.externalImages && this.images?.has(text)) {
+      this.externalDraft = text;
+      return this.images.display(text);
+    }
+    return text;
+  }
+
+  override setText(text: string): void {
+    if (this.restoringQueuedImages && this.images) text = this.images.restoreQueuedLabels(text);
+    if (this.externalDraft !== undefined && this.images) {
+      text = this.images.restoreLabels(text, this.externalDraft);
+      this.externalDraft = undefined;
+    }
+    super.setText(text);
+  }
+
+  restoreImagePaths(): void {
+    if (this.images?.has(super.getText()))
+      super.setText(this.images.paths(super.getExpandedText()));
+    this.imagePaste = undefined;
+    this.externalDraft = undefined;
   }
 
   render(width: number): string[] {
     if (width <= 0) return [];
-    if (width < 4) return this.renderBase(width).map((line) => truncateToWidth(line, width, ""));
-    const innerWidth = width - 2;
+    if (width < 4 && !this.images?.has(super.getText()))
+      return this.renderBase(width).map((line) => truncateToWidth(line, width, ""));
+    const innerWidth = Math.max(1, width - 2);
+    this.imageWidth = innerWidth;
     const baseLines = this.renderBase(innerWidth);
     const bottomIdx = findBottomBorderIndex(baseLines);
-    const result = [renderPromptRule(width, this.getBorder, baseLines[0], this.ascii)];
-    for (let i = 1; i < bottomIdx; i++) {
-      const line = baseLines[i] ?? "";
-      const prefix = i === 1 ? this.getBorder(this.ascii ? "> " : "❯ ") : "  ";
+    const rich = this.images?.has(super.getText())
+      ? layoutDraftImages(
+          this.getLines(),
+          this.getCursor(),
+          this.images,
+          innerWidth,
+          Math.max(1, Math.min(10, Math.floor(this.tui.terminal.rows / 3))),
+          this.focused,
+          this.cursorStyle === "block",
+        )
+      : undefined;
+    const top = rich ? (rich.above ? `↑ ${rich.above} more` : "") : baseLines[0];
+    const bottom = rich ? (rich.below ? `↓ ${rich.below} more` : "") : baseLines[bottomIdx];
+    const result = [renderPromptRule(width, this.getBorder, top, this.ascii)];
+    const body = rich?.lines ?? baseLines.slice(1, bottomIdx);
+    for (let i = 0; i < body.length; i++) {
+      const line = body[i] ?? "";
+      const prefix = i === 0 ? this.getBorder(this.ascii ? "> " : "❯ ") : "  ";
       result.push(prefix + fillLine(isEditorBorderLine(line) ? "" : line, innerWidth));
     }
-    result.push(renderPromptRule(width, this.getBorder, baseLines[bottomIdx], this.ascii));
+    result.push(renderPromptRule(width, this.getBorder, bottom, this.ascii));
     // Autocomplete belongs to Pi; keep its rows after the input rules.
     result.push(...baseLines.slice(bottomIdx + 1));
     if (this.helpVisible) {
@@ -193,6 +352,7 @@ export function installEditor(
   iconMode: IconMode = "auto",
   getPromptStatus: (width: number) => string = () => "",
   onCreate?: (tui: TUI, editor: OpenTuiEditor) => () => void,
+  images?: DraftImages,
 ) {
   let activeTui: TUI | undefined;
   let activeEditor: OpenTuiEditor | undefined;
@@ -214,6 +374,8 @@ export function installEditor(
       currentCursorStyle,
       useAsciiChrome(currentIconMode),
       getPromptStatus,
+      images,
+      ctx.cwd,
     );
     disposePresentation = onCreate?.(tui, activeEditor);
     return activeEditor;
@@ -234,6 +396,7 @@ export function installEditor(
     cleanup(): void {
       disposePresentation?.();
       disposePresentation = undefined;
+      activeEditor?.restoreImagePaths();
       ctx.ui.setEditorComponent(undefined);
       if (activeTui) {
         if (currentCursorStyle !== "block") activeTui.terminal.write(DEFAULT_CURSOR_STYLE_SEQUENCE);

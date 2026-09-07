@@ -103,6 +103,7 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
     hasUI: true,
     cwd: process.cwd(),
     ui,
+    sessionManager: { getBranch: () => [] },
     getContextUsage: () => undefined,
   } as unknown as ExtensionContext;
 
@@ -333,6 +334,7 @@ test("plan panel follows Pi-TUIX enable and default lifecycle", async () => {
     hasUI: true,
     cwd: process.cwd(),
     ui,
+    sessionManager: { getBranch: () => [] },
     getContextUsage: () => undefined,
   } as unknown as ExtensionContext;
 
@@ -421,6 +423,7 @@ test("saved disabled startup and settings use the same presentation state as com
     hasUI: true,
     cwd: agentDir,
     ui,
+    sessionManager: { getBranch: () => [] },
     getContextUsage: () => undefined,
   } as unknown as ExtensionContext;
   const entry = {

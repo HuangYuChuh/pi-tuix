@@ -371,7 +371,9 @@ export class LiveImagePresentation {
     )
       return cached.lines;
     const text = row.skill
-      ? [row.userText, ...(row.images ?? []).map(imageLabel)].filter(Boolean).join(" ")
+      ? [row.userText, ...(row.images ?? []).filter((image) => !image.inline).map(imageLabel)]
+          .filter(Boolean)
+          .join(" ")
       : contentText(row.content, row.entryId, this.imageMap);
     const content = new ReferenceUserMessage(text, theme, ascii);
     const lines = this.attached(content, row).render(width);

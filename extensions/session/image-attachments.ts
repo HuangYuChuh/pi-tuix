@@ -10,6 +10,7 @@ export interface ImageAttachment {
   entryId: string;
   key: string;
   number?: number;
+  inline?: boolean;
   mimeType: string;
   data: string;
 }
@@ -37,13 +38,28 @@ export function collectImages(entries: readonly SessionEntry[]): ImageAttachment
     if (entry.type === "message" && entry.message.role === "custom" && !entry.message.display)
       continue;
     if (!Array.isArray(content)) continue;
+    const user = entry.type === "message" && entry.message.role === "user";
+    const imageCount = content.filter((part) => part?.type === "image").length;
+    const labels = user
+      ? content.flatMap((part) =>
+          part?.type === "text" && typeof part.text === "string"
+            ? [...part.text.matchAll(/\[Image #(\d+)\]/g)].map((match) => Number(match[1]))
+            : [],
+        )
+      : [];
+    const explicit =
+      labels.length === imageCount &&
+      labels.every((number) => Number.isSafeInteger(number) && number > 0);
+    let ordinal = 0;
     content.forEach((part, index) => {
       if (part?.type !== "image") return;
+      const number = user ? (explicit ? labels[ordinal++] : ++userNumber) : undefined;
+      userNumber = Math.max(userNumber, number ?? 0);
       images.push({
         entryId: entry.id,
         key: `${entry.id}:${index}`,
-        number:
-          entry.type === "message" && entry.message.role === "user" ? ++userNumber : undefined,
+        number,
+        inline: user && explicit,
         mimeType: typeof part.mimeType === "string" ? part.mimeType : "",
         data: typeof part.data === "string" ? part.data : "",
       });

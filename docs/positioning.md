@@ -72,3 +72,7 @@ Code 2.1.263. Fidelity is tracked per surface in the
 [parity report](claude-code-parity.md). Pi-TUIX preserves its identity and Pi's
 actual controls; it does not claim complete reproduction while reference flows
 remain unverified or the public host APIs leave rendering gaps.
+
+Image draft chips are input presentation. They use the native editor's grapheme
+editing and undo, then return text/images through Pi's public input event. The
+extension does not submit requests or run a separate delivery queue.

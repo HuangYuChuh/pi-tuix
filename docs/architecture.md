@@ -196,7 +196,9 @@ preview reuses its content renderer with individual tools and message metadata;
 the main snapshot keeps its existing grouping and optional expansion.
 
 `SessionImageCache` prepares supported raster attachments outside rendering.
-Only user images receive occurrence numbers in displayed branch order. Tool/custom
+Only user images receive numbers. When user text contains one valid positional
+label per image, those labels preserve their numbers and positions, including
+deleted-draft gaps; other user images receive branch-order numbers. Tool/custom
 images do not advance that counter. Content hashes deduplicate temporary bytes
 across repeated images and concurrent main/preview preparation. Files use
 mode 0600 inside a fresh 0700 temporary directory. Base64, MIME/header dimensions
@@ -222,8 +224,40 @@ images retain their tool summary without an extra attachment branch; other tool
 images keep unnumbered links. Width/theme/link-state caches cover stable prompts.
 The same rendered document supplies native search, prompt navigation and link
 activation. Deferred persistence refreshes and asset loads cancel on unmount.
-Editor image paste and draft chips still use Pi's native behavior: bracketed
-paste of a PNG path produced text rather than image content in the tested host.
+The editor handles an explicitly pasted single image path through a bounded file
+read outside rendering. It accepts PNG/JPEG/GIF/WebP headers with positive
+reported dimensions, regular files up to 20 MiB, and a 128 MiB per-runtime draft
+budget. An unrecognized path stays as ordinary pasted text. Quoted, shell-escaped,
+relative, home and file-URL paths are supported. Native clipboard callbacks still
+own clipboard access; their public `insertTextAtCursor` call enters the same path.
+
+Each chip occupies one private-use Unicode grapheme in the native editor buffer.
+Native movement, deletion, kill/yank and undo therefore retain atomic image
+identity without replacing or inspecting the editor's undo/paste registries.
+A separate pure layout expands that grapheme to its visible numbered label,
+wraps whole chips, and derives cursor position from public `getLines`/`getCursor`.
+Vertical movement follows the expanded rows through public native key handling;
+autocomplete and explicit history bindings retain their native behavior.
+
+A public input handler replaces owned draft tokens with positional labels and
+adds the captured image bytes, preserving any existing input images. Pi performs
+submission, steering/follow-up delivery and persistence. Literal labels typed by
+a user do not create attachments. Incoming user-message events reserve numbers
+before persistence; deleted numbers are not recycled within the runtime. Draft
+links asynchronously share the runtime's private image cache, so opening them
+shows captured bytes even if the source file changes. Late preparation cancels
+on shutdown. No draft identity is saved separately in a session file.
+
+The native follow-up action reads unresolved editor content so image data reaches
+the input event. The public dequeue action restores known queued labels to chips. After it
+returns, a clear public `hasPendingMessages()` result resets the presentation
+queue count, so removed messages do not leave a stale badge.
+The native external-editor action receives readable labels; its public `setText`
+callback restores surviving known labels to their image identities. Disabling the
+extension expands remaining draft chips to readable source paths before restoring
+the host editor. This also preserves the contents of native collapsed text pastes.
+Multi-file path paste, image history reconstruction after a new runtime, and
+native commands that consume arguments before the input event need further work.
 
 The main view composes reversible presentation containers into the public
 document tree. A version-local adapter recognizes public

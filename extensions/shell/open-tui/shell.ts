@@ -10,6 +10,7 @@ import {
   type OpenTuiConfig,
   saveConfig,
 } from "./config.ts";
+import { DraftImages } from "./draft-images.ts";
 import { installEditor } from "./editor.ts";
 import { type EffortState, renderEffortLine } from "./effort.ts";
 import { installFooter } from "./footer.ts";
@@ -51,11 +52,16 @@ export function createOpenTuiShellRuntime(
   subagentActivity?: SubagentActivityObserver,
   onSettingsApplied?: (ctx: ExtensionContext) => void,
   prepareImages?: PrepareImages,
+  onQueueRestored?: (ctx: ExtensionContext) => void,
 ): OpenTuiShellRuntime {
   const lifecycle = new SessionLifecycle();
   const state: FooterState = createInitialState();
   const telemetry = new TurnTelemetryTracker();
   const liveTranscript = createLiveTranscript(pi, prepareImages);
+  let draftImages = new DraftImages(prepareImages, () => requestRender?.());
+  pi.on("input", (event) => draftImages.transform(event));
+  pi.on("message_start", (event) => draftImages.reserve(event.message));
+  pi.on("message_end", (_event, ctx) => draftImages.observe(ctx.sessionManager.getBranch()));
   let config: OpenTuiConfig = structuredClone(DEFAULT_CONFIG);
   const effort: EffortState = { enabled: false, level: "off", ascii: false };
   const syncEffort = (ctx: ExtensionContext) => {
@@ -183,8 +189,13 @@ export function createOpenTuiShellRuntime(
       config.fullscreen.wheelScrollLines,
       config.icons.mode,
       (width) => renderEffortLine(effort, ctx.ui.theme, width),
-      (tui, activeEditor) =>
-        liveTranscript.mount(tui, activeEditor, ctx, () => useAsciiChrome(config.icons.mode)),
+      (tui, activeEditor) => {
+        activeEditor.onQueueRestored = () => onQueueRestored?.(ctx);
+        return liveTranscript.mount(tui, activeEditor, ctx, () =>
+          useAsciiChrome(config.icons.mode),
+        );
+      },
+      draftImages,
     );
     active = true;
     if (state.workingSince !== undefined) startTimer();
@@ -265,6 +276,9 @@ export function createOpenTuiShellRuntime(
     remove,
     handleSessionStart(ctx) {
       lifecycle.start();
+      draftImages.dispose();
+      draftImages = new DraftImages(prepareImages, () => requestRender?.());
+      draftImages.observe(ctx.sessionManager.getBranch());
       subagentActivity?.reset();
       subagentActivity?.setOnChange(() => requestRender?.());
       context = ctx;
@@ -278,6 +292,7 @@ export function createOpenTuiShellRuntime(
       lifecycle.shutdown();
       subagentActivity?.setOnChange(undefined);
       remove(ctx);
+      draftImages.dispose();
       context = undefined;
     },
     handleAgentStart() {
