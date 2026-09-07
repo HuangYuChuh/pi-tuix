@@ -67,8 +67,8 @@ Pi-TUIX 目前尚未发布到 npm，因此暂时不能使用 `pi install npm:pi-
 | --- | --- |
 | `/pituix` | 启用或恢复 Pi-TUIX shell |
 | `/pituix-default` | 恢复 Pi 默认 TUI 组件 |
-| `/pituix-compact` | 使用原有紧凑工具展示 |
-| `/pituix-three-layer` | 使用三层工具展示 |
+| `/pituix-compact` | 将参考样式的工具展示收起为摘要行 |
+| `/pituix-three-layer` | 显示参考样式的工具预览，保留展开能力 |
 | `/pituix-mode <collapsed\|preview\|expanded>` | 设置工具详情模式，默认是 preview |
 | `/pituix-status` | 切换简洁底栏和详细统计 |
 | `/pituix-model` | 在编号列表中选择 Pi 模型，并调整思考强度 |

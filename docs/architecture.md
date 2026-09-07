@@ -88,6 +88,10 @@ availability, effective effort and persistence remain Pi-owned. The native
 `/model` command is preserved.
 
 Tool definitions keep the public `renderShell: "self"` option stable.
+Each built-in tool is registered once. `/pituix-compact` selects collapsed
+summaries and `/pituix-three-layer` selects previews in the same renderer;
+both reset Pi's expansion flag. Native rendering is selected by
+`/pituix-default`, without competing registrations for the same tool names.
 Their call and result components share a small presentation flag through the
 public `context.state`: once a result is rendered, the pending call row becomes
 empty. Pi 0.84 retains the shell container attached at tool-row creation, so

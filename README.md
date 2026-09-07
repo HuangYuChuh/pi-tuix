@@ -64,8 +64,8 @@ These commands are reversible:
 | --- | --- |
 | `/pituix` | Enable or restore the Pi-TUIX shell |
 | `/pituix-default` | Restore Pi's default TUI components |
-| `/pituix-compact` | Use the original compact tool renderer |
-| `/pituix-three-layer` | Use the three-layer tool renderer |
+| `/pituix-compact` | Collapse reference-style tools to summary rows |
+| `/pituix-three-layer` | Show reference-style tool previews with expansion |
 | `/pituix-mode <collapsed\|preview\|expanded>` | Set the tool detail display mode; preview is the default |
 | `/pituix-about` | Show the package and compatible Pi version |
 | `/pituix-status` | Toggle compact hints and detailed session statistics |

@@ -24,11 +24,7 @@ import {
   startTool,
   startTurn,
 } from "./stream/workflow-status.ts";
-import { registerCompactToolRenderers, type ToolRendererMode } from "./tools/renderers.ts";
-import {
-  registerThreeLayerToolRenderers,
-  type ToolRendererMode as ThreeLayerMode,
-} from "./tools/renderers-v2.ts";
+import { registerThreeLayerToolRenderers, type ToolRendererMode } from "./tools/renderers-v2.ts";
 import type { DisplayMode } from "./tools/three-layer-view.ts";
 import { ToolGroupRuntime } from "./tools/tool-groups.ts";
 
@@ -37,21 +33,12 @@ const PACKAGE_NAME = "Pi-TUIX";
 function applyPiTuix(
   ctx: ExtensionContext,
   toolMode: ToolRendererMode,
-  threeLayerMode: ThreeLayerMode,
   shell: ReturnType<typeof createOpenTuiShellRuntime>,
   plan: PlanRuntime,
-  useThreeLayer: boolean = true,
 ): void {
   if (ctx.mode !== "tui") return;
 
-  // 启用对应的渲染器
-  if (useThreeLayer) {
-    threeLayerMode.enabled = true;
-    toolMode.enabled = false;
-  } else {
-    toolMode.enabled = true;
-    threeLayerMode.enabled = false;
-  }
+  toolMode.enabled = true;
   ctx.ui.setTitle(PACKAGE_NAME);
   shell.apply(ctx);
   syncPlanWidget(ctx, plan);
@@ -59,9 +46,8 @@ function applyPiTuix(
 
 export default function piTuix(pi: ExtensionAPI): void {
   // 工具渲染模式配置
-  const toolMode: ToolRendererMode = { enabled: false };
   const groups = new ToolGroupRuntime();
-  const threeLayerMode: ThreeLayerMode = {
+  const toolMode: ToolRendererMode = {
     enabled: false,
     defaultMode: "preview" as DisplayMode, // collapsed | preview | expanded
     groups,
@@ -78,7 +64,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   };
   const showCompletion = (ctx: ExtensionContext) => {
     const completion = run.completion;
-    if (ctx.mode !== "tui" || (!toolMode.enabled && !threeLayerMode.enabled) || !completion) {
+    if (ctx.mode !== "tui" || !toolMode.enabled || !completion) {
       ctx.ui.setWidget("pituix-completion", undefined);
       return;
     }
@@ -90,9 +76,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   const plan = createPlanRuntime();
   registerSessionTreeCommand(pi);
 
-  // 注册两套渲染器（可切换）
-  registerCompactToolRenderers(pi, toolMode);
-  const toolRenderers = registerThreeLayerToolRenderers(pi, threeLayerMode);
+  const toolRenderers = registerThreeLayerToolRenderers(pi, toolMode);
   const hydrateGroups = (ctx: ExtensionContext) => {
     groups.reset(ctx.cwd);
     if (ctx.mode === "tui") {
@@ -109,9 +93,9 @@ export default function piTuix(pi: ExtensionAPI): void {
     shell.handleSessionStart(ctx);
     clearPlan(plan);
     plan.visible = true;
-    applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, true);
+    applyPiTuix(ctx, toolMode, shell, plan);
     workflow.requestRender = () => {
-      if (ctx.mode !== "tui" || (!toolMode.enabled && !threeLayerMode.enabled)) return;
+      if (ctx.mode !== "tui" || !toolMode.enabled) return;
       const activity = workflow.currentTool
         ? `Running ${workflow.currentTool}`
         : workflow.activity === "THINKING"
@@ -155,7 +139,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   });
   pi.on("turn_start", (event) => startTurn(workflow, event.turnIndex));
   pi.on("turn_end", (event, ctx) => {
-    if (updatePlan(plan, event.message) && (toolMode.enabled || threeLayerMode.enabled)) {
+    if (updatePlan(plan, event.message) && toolMode.enabled) {
       syncPlanWidget(ctx, plan);
     }
     refreshWorkflow(workflow);
@@ -180,7 +164,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.on("tool_execution_end", (event, ctx) => {
     run.observeTool(event.toolCallId, event.result, event.isError);
     const affected = groups.complete(event.toolCallId, event.result, event.isError);
-    if (threeLayerMode.enabled && affected.length) toolRenderers.invalidate(affected);
+    if (toolMode.enabled && affected.length) toolRenderers.invalidate(affected);
     finishTool(workflow, event.isError);
     shell.handleRefresh(ctx);
   });
@@ -188,7 +172,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     run.observeMessage(event.message);
     if (ctx.mode === "tui") {
       const affected = groups.recordMessage(event.message);
-      if (threeLayerMode.enabled && affected.length) toolRenderers.invalidate(affected);
+      if (toolMode.enabled && affected.length) toolRenderers.invalidate(affected);
     }
     shell.handleRefresh(ctx);
   });
@@ -216,7 +200,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.registerCommand("pituix", {
     description: "Show Pi-TUIX status and restore its interface",
     handler: async (_args, ctx) => {
-      applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, true);
+      applyPiTuix(ctx, toolMode, shell, plan);
       toolRenderers.invalidate();
       showCompletion(ctx);
       ctx.ui.notify(`${PACKAGE_NAME} interface enabled (three-layer mode)`, "info");
@@ -227,7 +211,6 @@ export default function piTuix(pi: ExtensionAPI): void {
     description: "Restore Pi's default TUI components",
     handler: async (_args, ctx) => {
       toolMode.enabled = false;
-      threeLayerMode.enabled = false;
       showCompletion(ctx);
       ctx.ui.setTitle("pi");
       shell.remove(ctx);
@@ -239,9 +222,11 @@ export default function piTuix(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("pituix-compact", {
-    description: "Switch to compact tool rendering (original Pi-TUIX v0.1)",
+    description: "Show collapsed reference-style tool summaries",
     handler: async (_args, ctx) => {
-      applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, false);
+      toolMode.defaultMode = "collapsed";
+      applyPiTuix(ctx, toolMode, shell, plan);
+      ctx.ui.setToolsExpanded?.(false);
       toolRenderers.invalidate();
       showCompletion(ctx);
       ctx.ui.notify(`${PACKAGE_NAME} compact mode enabled`, "info");
@@ -249,9 +234,11 @@ export default function piTuix(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("pituix-three-layer", {
-    description: "Switch to three-layer tool rendering (collapsed/preview/expanded)",
+    description: "Show reference-style tool previews with expansion",
     handler: async (_args, ctx) => {
-      applyPiTuix(ctx, toolMode, threeLayerMode, shell, plan, true);
+      toolMode.defaultMode = "preview";
+      applyPiTuix(ctx, toolMode, shell, plan);
+      ctx.ui.setToolsExpanded?.(false);
       toolRenderers.invalidate();
       showCompletion(ctx);
       ctx.ui.notify(`${PACKAGE_NAME} three-layer mode enabled`, "info");
@@ -266,7 +253,7 @@ export default function piTuix(pi: ExtensionAPI): void {
         ctx.ui.notify("Usage: /pituix-mode <collapsed|preview|expanded>", "warning");
         return;
       }
-      threeLayerMode.defaultMode = mode;
+      toolMode.defaultMode = mode;
       ctx.ui.setToolsExpanded?.(mode === "expanded");
       toolRenderers.invalidate();
       ctx.ui.notify(`Default tool mode: ${mode}`, "info");
@@ -276,7 +263,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.registerCommand("pituix-about", {
     description: "Show Pi-TUIX positioning and current compatibility",
     handler: async (_args, ctx) => {
-      ctx.ui.notify(`${PACKAGE_NAME} 0.1.0 · Pi ${VERSION} compatible`, "info");
+      ctx.ui.notify(`${PACKAGE_NAME} · Pi ${VERSION} compatible`, "info");
     },
   });
 
@@ -346,7 +333,7 @@ export default function piTuix(pi: ExtensionAPI): void {
         ctx.ui.notify("Usage: /pituix-plan [show|hide|clear]", "warning");
         return;
       }
-      if (!toolMode.enabled && !threeLayerMode.enabled) {
+      if (!toolMode.enabled) {
         ctx.ui.notify("Enable Pi-TUIX with /pituix before showing the plan panel", "warning");
         return;
       }

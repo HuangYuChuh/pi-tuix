@@ -34,6 +34,10 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   assert.ok(commands.has("pituix-settings"));
   assert.ok(commands.has("pituix-session"));
   assert.ok(!commands.has("open-tui"));
+  assert.deepEqual(
+    tools.map((tool) => tool.name),
+    ["read", "bash", "edit", "write"],
+  );
 
   const editorFactories: unknown[] = [];
   const workingMessages: (string | undefined)[] = [];
@@ -102,6 +106,35 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   const completion = widgets.get("pituix-completion") as () => { render(width: number): string[] };
   assert.equal(typeof completion, "function");
   assert.match(stripTerminalSequences(completion().render(100)[0]), /Worked for.*done/);
+  const read = tools.find((tool) => tool.name === "read");
+  const readContext = {
+    args: { path: "fixture.ts" },
+    cwd: process.cwd(),
+    state: {},
+    toolCallId: "mode-fixture",
+    invalidate() {},
+    isError: false,
+  };
+  const toolTheme = {
+    fg: (_token: string, text: string) => text,
+    bg: (_token: string, text: string) => text,
+    bold: (text: string) => text,
+  };
+  const renderRead = () =>
+    read
+      ?.renderResult?.(
+        { content: [{ type: "text", text: "first\nsecond" }], details: undefined },
+        { expanded: false, isPartial: false },
+        toolTheme as never,
+        readContext as never,
+      )
+      .render(100);
+  await commands.get("pituix-compact")?.handler("", context);
+  assert.equal(renderRead()?.length, 1);
+  assert.match(renderRead()?.[0] ?? "", /Read\(fixture.ts\) \[OK\]/);
+  await commands.get("pituix-three-layer")?.handler("", context);
+  assert.equal(renderRead()?.length, 2);
+  assert.match(renderRead()?.[1] ?? "", /Read 2 lines/);
   assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /^[-─]+$/);
 
   let toolRedraws = 0;
