@@ -248,6 +248,10 @@ remain a measured difference, rather than a claim of full syntax parity.
   New-session and reload commands preserve the live view, but retain the host's
   temporary-theme reset described below. The deterministic provider fixtures
   are excluded from the package and make no model-network requests.
+  The user's installed Pi 0.85.1 also loads the package at 80x24 and verifies
+  live user/assistant rows, Bash cancellation, native confirmation cancellation,
+  focus recovery and default restoration. The full regression suite remains
+  pinned to Pi 0.84.4; this newer-host check is an interactive smoke test.
 - Resume-picker tests cover public session scope, filtering, native input paste,
   preview navigation, two-step selection, loading failures, late callback
   cleanup, single switch delegation, and ANSI/CJK width/height bounds. Actual
