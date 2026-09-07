@@ -1080,7 +1080,7 @@ test("multiple dropped paths become ordered image chips in one native undo step"
     const second = join(h.cwd, "second.gif");
     writeFileSync(second, Buffer.from(gif, "base64"));
     h.editor.handleInput("Before ");
-    h.paste(`${h.path.replaceAll(" ", "\\ ")}\r\n${second}\t${JSON.stringify(h.path)}`);
+    h.paste(`${h.path.replaceAll(" ", "\\ ")}\r\n${second}\t${h.path.replaceAll(" ", "\\ ")}`);
     const raw = h.editor.getText();
     assert.equal(h.images.display(raw), "Before [Image #1] [Image #2] [Image #3]");
     const sent = h.images.transform({ type: "input", text: raw, source: "interactive" });
@@ -1096,7 +1096,7 @@ test("multiple dropped paths become ordered image chips in one native undo step"
     );
     h.editor.handleInput("\x1f");
     assert.equal(h.editor.getText(), "Before ");
-    h.paste(`${JSON.stringify(h.path)} ${JSON.stringify(h.path)}`);
+    h.paste(`${h.path.replaceAll(" ", "\\ ")} ${h.path.replaceAll(" ", "\\ ")}`);
     assert.equal(h.images.display(h.editor.getText()), "Before [Image #4] [Image #5]");
     h.editor.handleInput("\x7f");
     assert.equal(h.images.display(h.editor.getText()), "Before [Image #4] ");
@@ -1109,8 +1109,8 @@ test("multiple dropped paths become ordered image chips in one native undo step"
   }
 });
 
-test("file-list parsing preserves quoted paths and never expands shell expressions", () => {
-  const input = String.raw`'/tmp/one two.png' /tmp/three\ four.png "file:///tmp/five%20six.png" ~/seven.png /tmp/\$TOKEN.png '/tmp/$(command).png'`;
+test("file-list parsing accepts escaped paths but rejects individually quoted lists", () => {
+  const input = String.raw`/tmp/one\ two.png /tmp/three\ four.png file:///tmp/five%20six.png ~/seven.png /tmp/\$TOKEN.png /tmp/$(command).png`;
   const paths = splitPastedPaths(input);
   assert.deepEqual(
     paths?.map(({ path }) => path),
@@ -1123,6 +1123,8 @@ test("file-list parsing preserves quoted paths and never expands shell expressio
       "/tmp/$(command).png",
     ],
   );
+  assert.equal(splitPastedPaths("'/tmp/one two.png' '/tmp/three four.png'"), undefined);
+  assert.equal(splitPastedPaths("'/tmp/one two.png' /tmp/three\\ four.png"), undefined);
   for (const text of [
     "/tmp/one.png please",
     "Compare /tmp/one.png /tmp/two.png",
@@ -1144,11 +1146,8 @@ test("mixed file drops retain unavailable and non-image paths without losing the
     const missing = join(h.cwd, "missing.png");
     writeFileSync(note, "text file");
     writeFileSync(invalid, "not a PNG");
-    h.paste([h.path, note, invalid, missing].map((path) => JSON.stringify(path)).join(" "));
-    assert.equal(
-      h.images.display(h.editor.getText()),
-      `[Image #1] ${JSON.stringify(note)} ${JSON.stringify(invalid)} ${JSON.stringify(missing)}`,
-    );
+    h.paste([h.path.replaceAll(" ", "\\ "), note, invalid, missing].join(" "));
+    assert.equal(h.images.display(h.editor.getText()), `[Image #1]${note} ${invalid}`);
     const sent = h.images.transform({
       type: "input",
       text: h.editor.getText(),
@@ -1159,8 +1158,8 @@ test("mixed file drops retain unavailable and non-image paths without losing the
     assert.equal(sent.images?.length, 1);
     assert.equal(sent.images?.[0].data, png);
     h.editor.restoreImagePaths();
-    for (const path of [h.path, note, invalid, missing])
-      assert.ok(h.editor.getText().includes(path));
+    for (const path of [h.path, note, invalid]) assert.ok(h.editor.getText().includes(path));
+    assert.equal(h.editor.getText().includes(missing), false);
   } finally {
     h.close();
   }
@@ -1171,7 +1170,9 @@ test("ordinary prose, malformed lists and excessive file drops stay unchanged an
   try {
     for (const text of [
       `Compare ${JSON.stringify(h.path)} please`,
+      `${JSON.stringify(h.path)} ${JSON.stringify(h.path)}`,
       `${JSON.stringify(h.path)} '/unclosed.png`,
+      `${join(h.cwd, "missing-one.png")} ${join(h.cwd, "missing-two.png")}`,
       Array(65).fill(JSON.stringify(h.path)).join(" "),
     ]) {
       h.paste(text);

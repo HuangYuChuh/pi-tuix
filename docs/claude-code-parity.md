@@ -146,8 +146,8 @@ mixed with ordinary prose stayed text, as did two bare relative filenames.
 Two individually quoted paths stayed text in the clean sample. With a valid
 image plus an absolute text-file path, the image became a chip and the text path
 remained, without a separating space. With a missing PNG path, only the valid
-image survived. Pi-TUIX accepts quoted lists and retains unavailable paths with
-spaces; these are explicit parser differences, not evidence of exact parity.
+image survived. Pi-TUIX now follows these measured fallback rules while retaining
+single quoted-path support; escaped-space path lists still attach in source order.
 The official [image workflow documentation](https://code.claude.com/docs/en/common-workflows#work-with-images)
 describes Cmd+Click on macOS or Ctrl+Click on Windows/Linux to open a numbered
 image in the default viewer. Reference click activation itself was not tested;
@@ -228,7 +228,7 @@ broadly than the observed reference.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Old runs without branch observations stay unknown |
 | Main/snapshot/preview image attachments | Public message/context entries, component composition, `hyperlink`, native URL activation | User-only numbering, image-only prompts and openable temporary raster files implemented; Read images use file/byte summaries, other tool/custom images use unnumbered links |
-| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation, custom entries | Multi-path chips, literal/history label editing, captured-image links, shared references and history numbering implemented; delivered image numbers survive mixed literals and resume; observed queue take-back distinguishes literal labels; collapsed-paste deletion, shared text/image counters and parser edge cases still differ |
+| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation, custom entries | Multi-path chips, literal/history label editing, captured-image links, shared references and history numbering implemented; delivered image numbers survive mixed literals and resume; observed queue take-back distinguishes literal labels; measured quoted-list, missing-path and mixed-path fallback rules implemented; collapsed-paste deletion and shared text/image counters still differ |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |

@@ -252,12 +252,16 @@ budget. An unrecognized path stays as ordinary pasted text. Quoted, shell-escape
 relative, home and file-URL paths are supported. Native clipboard callbacks still
 own clipboard access; their public `insertTextAtCursor` call enters the same path.
 For multiple paths, a pure tokenizer accepts absolute, home and file-URL tokens
-with quoted or escaped spaces. It does not evaluate shell syntax. Limits of 64
-paths and 64 KiB of path-list text bound parsing and file operations. A path list
-containing ordinary prose stays as text. Valid images receive tokens in source
-order, separated by one space; unavailable and non-image paths retain their raw
-spelling. Remaining draft capacity bounds each read before allocation. The whole
-batch enters the native editor in one insertion, preserving a single undo step.
+with escaped spaces. Individually quoted path lists remain unchanged, matching
+the measured fallback; single quoted image paths remain supported. The tokenizer
+does not evaluate shell syntax. Limits of 64 paths and 64 KiB of path-list text
+bound parsing and file operations. A path list containing ordinary prose stays as
+text. When at least one image is accepted, valid images receive tokens in source
+order, missing paths are omitted and existing non-image paths retain their raw
+spelling. An image followed by retained text has no inserted separator, matching
+the measured reference. A list with no accepted image falls back unchanged.
+Remaining draft capacity bounds each read before allocation. The whole batch
+enters the native editor in one insertion, preserving a single undo step.
 
 Each chip occupies one private-use Unicode grapheme in the native editor buffer.
 Native movement, deletion, kill/yank and undo therefore retain atomic image
@@ -332,8 +336,8 @@ native: `setText` would otherwise clear the host's collapsed-paste registry.
 History remains Pi-owned and no display token or image data is inserted for a
 literal label. Collapsed-paste deletion, native commands consuming arguments
 before the input event, and a shared counter for long text/image paste references
-need further work. Quoted path-list acceptance and retaining unavailable paths
-are documented differences from the sampled reference parser.
+need further work. The measured quoted-list, missing-path and mixed-path fallback
+rules are covered by parser and editor regressions.
 
 The main view composes reversible presentation containers into the public
 document tree. A version-local adapter recognizes public
