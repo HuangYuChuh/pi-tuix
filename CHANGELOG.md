@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use the reference syntax palette with Pi's public highlighter for added/context diff lines; retain the documented differences in token categories.
 
 ### Fixed
+- Preserve Pi's native session/project terminal title across startup, settings changes and interface toggles; avoid replacing named sessions with static `Pi-TUIX` or `pi` tab titles.
 - Render resume previews as native modal overlays so fullscreen viewport keys reach the preview; preserve original focus, cancel pending reads, ignore late results, and parse/migrate session data only in memory.
 - Show individual historical tools, assistant model/time and completion records in resume previews; keep tool-boundary spacing compact while preserving internal output lines.
 - Use configured tool expansion bindings instead of the unregistered E hint.

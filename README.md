@@ -118,7 +118,7 @@ The stream line distinguishes thinking, response text, and tool execution by tur
 
 ## Roadmap
 
-1. **Shell (current):** header, footer, terminal title, theme, working state, and reversible editor chrome.
+1. **Shell (current):** header, footer, theme, working state, and reversible editor chrome. Pi retains its native session and project title in terminal tabs.
 2. **Tool surface (current):** three-layer Read/Bash/Edit/Write rows with collapsed, preview, and expanded modes; explicit queued/running/success/error/cancelled states; and diff summaries.
 3. **Stream surface (current):** thinking/responding/tool activity, turn progress, thinking level, context pressure, and stable repainting.
 4. **Control surface (in progress):** steer/follow-up queue commands and read-only plan review are available; approval adapters and keyboard conventions remain planned.

@@ -35,8 +35,12 @@ The prototype intentionally uses only public hooks:
 - `agent_*`, `turn_*`, `message_update`, `input`, and `tool_execution_*` events for read-only workflow and stream status;
 - `ctx.ui.setWidget()` for a detected read-only plan panel;
 - `ctx.ui.setEditorComponent()` with Pi's public `CustomEditor` for reversible editor chrome;
-- `ctx.ui.setTitle()` for terminal identity;
 - `pi.registerCommand()` for reversible toggles.
+
+Pi retains its native terminal title and activity updates. Pi-TUIX does not call
+`setTitle()` on startup, settings changes or interface toggles: a static title
+would discard the session/project identity used by terminal tabs and workspace
+integrations. The extension's product identity stays in its header.
 
 Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` delegation pattern. Pi-TUIX retains each original public tool definition and exact `execute()` function while replacing only presentation. `/pituix-default` restores existing and future tool rows using the original Pi renderers in the same session.
 

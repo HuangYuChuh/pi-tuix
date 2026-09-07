@@ -42,6 +42,7 @@ The first useful release must support this loop:
 - Header, footer, editor, and tool rows remain readable in narrow terminals.
 - Built-in tool execution behavior is unchanged; only rendering is delegated.
 - Disabling Pi-TUIX restores the default interface within the same session.
+- Interface changes preserve Pi's native terminal title so named sessions remain identifiable in terminal tabs and workspace integrations.
 - No Pi session, provider, credential, or project-file migration is required.
 
 ## Explicit non-goals

@@ -191,6 +191,7 @@ broadly than the observed reference.
 | Tool expansion | `options.expanded`, configured `app.tools.expand` | Implemented; no invented E binding |
 | Execution, errors, cancellation | Original tool `execute` functions | Delegated unchanged |
 | Default UI restoration | Public unset/reset methods | Implemented and tested |
+| Terminal tab identity | Native Pi title and activity updates | Preserved across startup, settings and interface toggles; Pi-TUIX does not overwrite session/project titles |
 | User/assistant transcript chrome | Public document/message containers and identity Markdown transformer | Implemented in regular/fullscreen modes and `/pituix-transcript`; original host containers retained |
 | Native model command, transcript navigation, resume | Native Pi commands/components | Retained; `/pituix-model` and `/pituix-resume` provide custom selection surfaces |
 | Claude permission modes and approval dialogs | Pi trust/permission semantics differ | Not emulated |
@@ -230,6 +231,21 @@ remain a measured difference, rather than a claim of full syntax parity.
 
 ## Validation
 
+- Orca acceptance on 2026-09-07 exercised Pi 0.85.1 regular mode with a disposable
+  local fixture provider: PNG/GIF batch paste, native follow-up/steering take-back,
+  editing/requeue, Esc cancellation and resubmission. One queued GIF plus a
+  current collapsed paste retained all 100 CJK text lines and delivered exactly
+  one original GIF, despite 100 same-number literal labels. Saved messages had
+  no internal draft tokens. Pi 0.84.4 fullscreen resumed that session, retained
+  attachment numbers, allocated the next image as #6 and delivered its original
+  PNG bytes. Wide and split-pane layouts remained usable. Orca's link menu opened
+  the matching PNG in macOS Preview. This run verifies UI/delivery mechanics,
+  not an additional authenticated Claude or gateway request.
+  Default/enable checks exposed static terminal titles replacing session/project
+  identity and removing Orca's Pi activity row. Removing the title override
+  retained the native title and activity row through reload, disable and enable
+  in the same Pi 0.84.4 session. Lifecycle regressions also cover settings,
+  disabled startup and subsequent native title changes.
 - TypeScript compilation against Pi 0.84.4 and Biome checks.
 - Image tests cover occurrence numbering, hidden/custom/tool messages, duplicate
   data, malformed/unsupported/oversized input, private file permissions,

@@ -123,7 +123,7 @@ Pi Coding Agent（runtime、provider、工具、会话、权限）
 
 ## 路线图
 
-1. **Shell（当前）：** header、footer、终端标题、主题、working state 与可逆的 editor chrome。
+1. **Shell（当前）：** header、footer、主题、working state 与可逆的 editor chrome。终端标签保留 Pi 原生的会话与项目标题。
 2. **工具界面（当前）：** 支持 collapsed、preview、expanded 三种模式的 Read/Bash/Edit/Write 行，明确区分 queued/running/success/error/cancelled，并提供 diff 摘要。
 3. **流式界面（当前）：** thinking/responding/tool 状态、Turn 进度、thinking level、context 压力与稳定刷新。
 4. **控制界面（进行中）：** 已提供 steer/follow-up 队列命令和只读计划审阅；审批适配与键盘约定仍在规划中。

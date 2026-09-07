@@ -87,7 +87,7 @@ stream line은 Turn별 thinking, 응답, tool 실행을 구분합니다. context
 
 ## 로드맵
 
-1. **Shell (현재):** header, footer, terminal title, theme, working state, reversible editor chrome.
+1. **Shell (현재):** header, footer, theme, working state, reversible editor chrome.
 2. **Tool surface (현재):** collapsed, preview, expanded 모드를 지원하는 Read/Bash/Edit/Write row, queued/running/success/error/cancelled 상태, 확장 가능한 출력 및 diff summary.
 3. **Stream surface (현재):** thinking/responding/tool 상태, Turn 진행, thinking level, context pressure.
 4. **Control surface (진행 중):** steer/follow-up과 읽기 전용 plan review를 제공하며 approval과 keyboard 규칙은 계획 중입니다.

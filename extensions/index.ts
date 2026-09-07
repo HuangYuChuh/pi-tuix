@@ -77,7 +77,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   const syncInterface = (ctx: ExtensionContext) => {
     if (ctx.mode !== "tui") return;
     toolMode.enabled = shell.isEnabled();
-    ctx.ui.setTitle(toolMode.enabled ? PACKAGE_NAME : "pi");
+    // Pi owns the dynamic terminal title, including session/project identity.
     if (toolMode.enabled) {
       shell.apply(ctx);
       syncPlanWidget(ctx, plan);
