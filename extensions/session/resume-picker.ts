@@ -19,7 +19,9 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import {
+  loadSessionMetadata,
   loadSessionPreview,
+  type SessionMetadata,
   SessionPreviewContent,
   type SessionPreviewSnapshot,
 } from "./session-preview.ts";
@@ -48,6 +50,29 @@ function age(date: Date, now: number): string {
   if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function compactAge(date: Date, now: number): string {
+  const elapsed = now - date.getTime();
+  if (!Number.isFinite(elapsed)) return "Unknown time";
+  const minutes = Math.max(0, Math.floor(elapsed / 60000));
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
+}
+
+export function formatSessionSize(bytes: number | undefined): string | undefined {
+  if (bytes === undefined || !Number.isSafeInteger(bytes) || bytes < 0) return;
+  if (bytes < 1024) return `${bytes}B`;
+  const units = ["KB", "MB", "GB", "TB", "PB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value.toFixed(1)}${units[unit]}`;
 }
 
 /** A read-only view of public SessionInfo records. Loading and switching live in the command. */
@@ -82,9 +107,26 @@ export class ResumePicker {
   private finished = false;
   private pageSize = 5;
   private previewCache: { path: string; width: number; lines: string[] } | undefined;
+  private readonly metadata = new Map<string, SessionMetadata>();
 
   constructor(options: ResumePicker["options"]) {
     this.options = options;
+  }
+
+  /** Read candidates outside render; the command owns asynchronous I/O. */
+  metadataCandidates(): readonly SessionInfo[] {
+    if (this.finished || this.loading) return [];
+    const count = Math.max(1, Math.min(200, Math.ceil(this.options.getRows())));
+    const start = Math.max(
+      0,
+      Math.min(this.selected - Math.floor(count / 2), this.filtered.length - count),
+    );
+    return this.filtered.slice(start, start + count);
+  }
+
+  setMetadata(path: string, metadata: SessionMetadata): void {
+    if (this.finished) return;
+    this.metadata.set(path, { byteSize: metadata.byteSize, gitBranch: metadata.gitBranch });
   }
 
   setSessions(sessions: readonly SessionInfo[]): void {
@@ -244,17 +286,30 @@ export class ResumePicker {
     const muted = (text: string) => theme.fg("muted", text);
     const clip = (line: string) => truncateToWidth(line, width, "");
     const separator = ascii ? " | " : " · ";
-    const metadata = (session: SessionInfo) =>
-      [
-        age(session.modified, (this.options.now ?? Date.now)()),
-        `${session.messageCount} message${session.messageCount === 1 ? "" : "s"}`,
+    const metadata = (session: SessionInfo, preview = false) => {
+      const details = this.metadata.get(session.path);
+      const now = (this.options.now ?? Date.now)();
+      return [
+        preview ? compactAge(session.modified, now) : age(session.modified, now),
+        ...(preview
+          ? [`${session.messageCount} message${session.messageCount === 1 ? "" : "s"}`]
+          : []),
+        ...(details?.gitBranch ? [plain(details.gitBranch).replace(/\s+/g, " ")] : []),
+        ...(!preview && formatSessionSize(details?.byteSize)
+          ? [formatSessionSize(details?.byteSize)]
+          : []),
         ...(this.all && session.cwd ? [plain(session.cwd)] : []),
       ].join(separator);
+    };
+    const count =
+      !this.searching && this.filtered.length > 1
+        ? ` (${this.selected + 1} of ${this.filtered.length})`
+        : "";
     const heading = compact
       ? [`${inset}${accent(theme.bold(this.preview ? "Session preview" : "Resume session"))}`]
       : [
           accent((ascii ? "-" : "▔").repeat(width)),
-          `${inset}${accent(theme.bold(this.preview ? "Session preview" : "Resume session"))}`,
+          `${inset}${accent(theme.bold(this.preview ? "Session preview" : `Resume session${count}`))}`,
         ];
     const selected = this.filtered[this.selected];
     if (this.preview && selected) {
@@ -283,7 +338,7 @@ export class ResumePicker {
       const lines = [
         ...this.previewCache.lines,
         muted((ascii ? "-" : "─").repeat(bodyWidth)),
-        muted(`  ${metadata(selected)}`),
+        muted(`  ${metadata(selected, true)}`),
         muted(`  Enter to resume${separator}Esc to return`),
       ];
       const top = rows >= 3 ? [accent((ascii ? "-" : "▔").repeat(width))] : [];
@@ -382,6 +437,10 @@ export function registerResumePicker(
     session: SessionInfo,
     signal: AbortSignal,
   ) => Promise<SessionPreviewSnapshot> = loadSessionPreview,
+  readMetadata: (
+    session: SessionInfo,
+    signal: AbortSignal,
+  ) => Promise<SessionMetadata> = loadSessionMetadata,
 ): void {
   pi.registerCommand("pituix-resume", {
     description: "Search, preview and resume Pi sessions",
@@ -393,11 +452,47 @@ export function registerResumePicker(
       let path: string | undefined;
       let closed = false;
       let previewLoad: AbortController | undefined;
+      const metadataLoad = new AbortController();
       try {
         path = await ctx.ui.custom<string | undefined>(
           (tui, theme, keys, done) => {
             let current: SessionInfo[] = [];
             let all: SessionInfo[] | undefined;
+            const requested = new Set<string>();
+            const previewMetadata = new Set<string>();
+            const pending: SessionInfo[] = [];
+            let reading = 0;
+            const loadMetadata = () => {
+              for (const session of view.metadataCandidates()) {
+                if (requested.has(session.path)) continue;
+                requested.add(session.path);
+                pending.push(session);
+              }
+              const pump = () => {
+                if (closed) return;
+                while (reading < 2 && pending.length) {
+                  const session = pending.shift();
+                  if (!session) break;
+                  reading++;
+                  void readMetadata(session, metadataLoad.signal)
+                    .then((metadata) => {
+                      if (!closed && !previewMetadata.has(session.path))
+                        view.setMetadata(session.path, metadata);
+                    })
+                    .catch(() => {
+                      /* A missing/unreadable file keeps its catalogue row usable. */
+                    })
+                    .finally(() => {
+                      reading--;
+                      if (!closed) {
+                        tui.requestRender();
+                        pump();
+                      }
+                    });
+                }
+              };
+              pump();
+            };
             const load = async (allProjects: boolean) => {
               try {
                 if (allProjects) {
@@ -406,7 +501,10 @@ export function registerResumePicker(
                     ...(await Promise.all([catalog.listAll(), catalog.listAll(sessionDir)])).flat(),
                   ];
                 } else current = await catalog.list(ctx.cwd, sessionDir);
-                if (!closed) view.setSessions(allProjects ? (all ?? []) : current);
+                if (!closed) {
+                  view.setSessions(allProjects ? (all ?? []) : current);
+                  loadMetadata();
+                }
               } catch (error) {
                 if (!closed) view.setError(error);
               }
@@ -439,6 +537,8 @@ export function registerResumePicker(
                       session.path,
                       new SessionPreviewContent(snapshot, theme, tui, hooks.ascii()),
                     );
+                    previewMetadata.add(session.path);
+                    view.setMetadata(session.path, snapshot);
                     tui.requestRender();
                   })
                   .catch((error) => {
@@ -460,6 +560,7 @@ export function registerResumePicker(
               invalidate: () => view.invalidate(),
               handleInput: (data) => {
                 view.handleInput(data);
+                loadMetadata();
                 tui.requestRender();
               },
             };
@@ -474,6 +575,7 @@ export function registerResumePicker(
       } finally {
         closed = true;
         previewLoad?.abort();
+        metadataLoad.abort();
         hooks.onClose();
       }
       if (!path || path === currentPath) return;

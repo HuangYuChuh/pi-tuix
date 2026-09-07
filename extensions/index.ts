@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { VERSION } from "@earendil-works/pi-coding-agent";
 import { clearPlan, createPlanRuntime, syncPlanWidget, updatePlan } from "./control/plan.ts";
+import { readGitBranch } from "./session/git-branch.ts";
 import { registerSessionTreeCommand } from "./session/session-tree.ts";
 import { createSubagentActivityObserver } from "./session/subagent-activity.ts";
 import { registerTranscriptCommand } from "./session/transcript-view.ts";
@@ -47,6 +48,8 @@ export default function piTuix(pi: ExtensionAPI): void {
   const workflow = createWorkflowRuntime();
   const run = new RunPresentation();
   const completions = registerCompletionEntries(pi, () => toolMode.enabled, shell.useAscii);
+  let completionRead: AbortController | undefined;
+  let completionBranch: string | undefined;
   let runTimer: ReturnType<typeof setInterval> | undefined;
   const stopRunTimer = () => {
     if (runTimer) clearInterval(runTimer);
@@ -86,6 +89,8 @@ export default function piTuix(pi: ExtensionAPI): void {
   };
 
   pi.on("session_start", (_event, ctx) => {
+    completionRead?.abort();
+    completionRead = undefined;
     stopRunTimer();
     run.reset();
     ctx.ui.setWidget("pituix-completion", undefined);
@@ -109,6 +114,9 @@ export default function piTuix(pi: ExtensionAPI): void {
     shell.handleRefresh(ctx, true);
   });
   pi.on("agent_start", (_event, ctx) => {
+    completionRead?.abort();
+    completionRead = undefined;
+    completionBranch = undefined;
     run.begin();
     stopRunTimer();
     if (ctx.mode === "tui") {
@@ -118,17 +126,30 @@ export default function piTuix(pi: ExtensionAPI): void {
     beginAgentRun(workflow);
     shell.handleAgentStart();
   });
-  pi.on("agent_end", (event) => {
+  pi.on("agent_end", async (event, ctx) => {
     stopRunTimer();
     run.end(event.messages ?? []);
     finishAgentRun(workflow);
     shell.handleAgentEnd();
+    if (ctx.mode === "tui" && toolMode.enabled) {
+      const request = new AbortController();
+      completionRead?.abort();
+      completionRead = request;
+      const gitBranch = await readGitBranch(ctx.cwd, request.signal);
+      if (request.signal.aborted || completionRead !== request) return;
+      completionRead = undefined;
+      completionBranch = gitBranch;
+    }
   });
   pi.on("agent_settled", (event, ctx) => {
     stopRunTimer();
     const completion = run.settle();
     if (completion && ctx.mode === "tui" && toolMode.enabled) {
-      pi.appendEntry<CompletionEntryData>(COMPLETION_ENTRY_TYPE, { version: 1, ...completion });
+      pi.appendEntry<CompletionEntryData>(COMPLETION_ENTRY_TYPE, {
+        version: 1,
+        ...completion,
+        ...(completionBranch ? { gitBranch: completionBranch } : {}),
+      });
     }
     settleAgent(workflow);
     shell.handleAgentSettled(event, ctx);
@@ -178,12 +199,16 @@ export default function piTuix(pi: ExtensionAPI): void {
     shell.handleRefresh(ctx);
   });
   pi.on("session_tree", (_event, ctx) => {
+    completionRead?.abort();
+    completionRead = undefined;
     run.reset();
     hydrateGroups(ctx);
     toolRenderers.invalidate();
     shell.handleRefresh(ctx);
   });
   pi.on("session_shutdown", (_event, ctx) => {
+    completionRead?.abort();
+    completionRead = undefined;
     stopRunTimer();
     run.reset();
     toolRenderers.clear();

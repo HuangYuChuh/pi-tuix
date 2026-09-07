@@ -249,7 +249,19 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   await commands.get("pituix")?.handler("", context);
   assert.equal(loadConfig().enabled, true);
   assert.ok(renderCompletion(), "historical completion restores when re-enabled");
+  await handlers.get("agent_start")?.({}, context);
+  const pendingCompletion = handlers.get("agent_end")?.(
+    { messages: [{ role: "assistant", stopReason: "stop" }] },
+    context,
+  );
   await handlers.get("session_shutdown")?.({ type: "session_shutdown" }, context);
+  await pendingCompletion;
+  await handlers.get("agent_settled")?.({}, context);
+  assert.equal(
+    entries.length,
+    2,
+    "shutdown aborts Git observation before it can append into a replacement session",
+  );
   await commands.get("pituix-mode")?.handler("preview", context);
   assert.equal(toolRedraws, 4);
 });

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Show selected session index, file size and recorded Git branch in resume rows, with short relative time/message count/branch in preview footers; load metadata asynchronously with bounded concurrency and cancellation.
+- Record optional Git branch observations in existing display-only completion entries; preserve unknown historical values and follow saved parent links through compaction without reading today's checkout into old sessions.
 - Persist a single enabled preference across settings and enable/default commands, including startup/reload; synchronize shell, tools, plan, queue and completion visibility.
 - Restore historical completion rows after disabled startup without retaining host spacing or rebuilding sessions; apply configured icons to tools, working feedback and saved conversation views.
 - Suppress performance notifications while disabled and validate preference types without mutating defaults.

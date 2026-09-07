@@ -41,6 +41,12 @@ const entry: CustomEntry = {
 
 test("completion metadata rejects malformed imports and unsupported schema versions", () => {
   assert.deepEqual(readCompletionEntry(data), data);
+  assert.deepEqual(readCompletionEntry({ ...data, gitBranch: "feat/历史" }), {
+    ...data,
+    gitBranch: "feat/历史",
+  });
+  for (const gitBranch of [null, 1, "", "\x1b[31mbranch", "main\nnext", "x".repeat(1025)])
+    assert.deepEqual(readCompletionEntry({ ...data, gitBranch }), data);
   for (const invalid of [
     undefined,
     null,

@@ -50,6 +50,10 @@ is included in Pi-TUIX. The reference mascot is replaced with an original ASCII
   result before a second Enter resumes, and Space previews the conversation.
   Escape returns from preview to the list, clears active search, or cancels the
   picker. The observed picker also exposes project/branch filters and rename.
+  The measured 2,169-byte reference file displays `2.1KB`, confirming 1024-based
+  size units. The list heading includes selected index/total. Preview footers
+  use shorter relative time (`2h ago`), message count and the recorded branch,
+  while list rows use longer relative time, branch and file size.
 - A model request failed with an expired-login message. A completion-duration
   line was still rendered for that failed attempt. This is not evidence of a
   successful model turn or of model-driven Read/Edit/Write rendering.
@@ -126,7 +130,7 @@ broadly than the observed reference.
 | Effort above the prompt | Custom editor, `thinking_level_select`, `model_select` | Implemented; displays Pi's effective level and actual cycle binding |
 | Searchable settings page | `ctx.ui.custom`, public `Input` | Reference frame, filtering, focus navigation and value alignment implemented for Pi-TUIX settings |
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
-| Searchable resume picker | Public session catalogue, parser/context helpers, modal UI and `ctx.switchSession` | Read-only rich preview includes individual tools, diffs, recorded model/time and completion rows; branch/file-size metadata and rendered binary media remain gaps |
+| Searchable resume picker | Public session catalogue, parser/context helpers, modal UI and `ctx.switchSession` | Rich preview includes tools, diffs, model/time and completion rows; list sizes and recorded Git branches implemented. Branch filtering, rename and rendered binary media remain gaps; old runs without branch observations stay unknown |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -172,6 +176,14 @@ remain a measured difference, rather than a claim of full syntax parity.
 ## Validation
 
 - TypeScript compilation against Pi 0.84.4 and Biome checks.
+- Session metadata tests cover measured byte formatting, ANSI/CJK bounds, unknown
+  historical branches, compaction and abandoned paths, bounded concurrent reads,
+  cancellation and late-read ordering. Disposable Git tests cover unborn and
+  nested repositories, detached HEAD and aborted reads without checkout changes.
+  Actual Pi 0.85.1 at 100x40 records two completed runs on different Git branches,
+  then displays each saved branch after checkout changes. Pi 0.84.4 at 80x24
+  displays the same list/preview metadata. Both saved files retain identical
+  bytes and modification times across metadata and preview reads.
 - Public `discoverAndLoadExtensions` loading test with an isolated agent directory.
 - Editor/header/footer tests at zero, tiny, narrow, normal, and wide sizes;
   ANSI styling, Chinese input, Unicode and ASCII prompt fallbacks, and cursor

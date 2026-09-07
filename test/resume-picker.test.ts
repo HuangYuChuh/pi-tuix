@@ -14,8 +14,15 @@ import {
   TuiMainScreen,
   visibleWidth,
 } from "@earendil-works/pi-tui";
-import { ResumePicker, registerResumePicker } from "../extensions/session/resume-picker.ts";
-import type { SessionPreviewSnapshot } from "../extensions/session/session-preview.ts";
+import {
+  formatSessionSize,
+  ResumePicker,
+  registerResumePicker,
+} from "../extensions/session/resume-picker.ts";
+import type {
+  SessionMetadata,
+  SessionPreviewSnapshot,
+} from "../extensions/session/session-preview.ts";
 
 const now = new Date("2026-09-07T04:00:00Z").getTime();
 function session(index: number, overrides: Partial<SessionInfo> = {}): SessionInfo {
@@ -62,7 +69,7 @@ test("resume search filters conversation text, preserves native paste editing an
   const { view, selected } = setup();
   view.setSessions([session(1), session(2, { allMessagesText: "The hidden needle 中文" })]);
   assert.match(text(view), /❯ Session 1 \[current\]/);
-  assert.match(text(view), /1 minute ago · 2 messages/);
+  assert.match(text(view), /1 minute ago/);
   view.handleInput("\x1b[200~needle 中文\x1b[201~");
   assert.doesNotMatch(text(view), /Session 1/);
   assert.match(text(view), /Session 2/);
@@ -156,6 +163,7 @@ function harness(
     customFailure?: boolean;
     resumeFailure?: boolean;
     readPreview?: (session: SessionInfo, signal: AbortSignal) => Promise<SessionPreviewSnapshot>;
+    readMetadata?: (session: SessionInfo, signal: AbortSignal) => Promise<SessionMetadata>;
   } = {},
 ) {
   let handler: ((args: string, ctx: ExtensionCommandContext) => Promise<void>) | undefined;
@@ -203,6 +211,7 @@ function harness(
         ? options.readPreview(session, signal)
         : { entries: [], cwd: session.cwd, model: "Recorded model", effort: "off" };
     },
+    options.readMetadata ?? (async () => ({})),
   );
   const ctx = {
     hasUI: true,
@@ -273,6 +282,108 @@ function harness(
     },
   };
 }
+
+test("resume list and preview display recorded metadata in reference order without fabricating unknown values", () => {
+  assert.equal(
+    formatSessionSize(2169),
+    "2.1KB",
+    "measured reference file has 2169 bytes and displays 2.1KB",
+  );
+  assert.equal(formatSessionSize(0), "0B");
+  assert.equal(formatSessionSize(1024 * 1024), "1.0MB");
+  for (const value of [undefined, -1, NaN, Infinity, 1.5])
+    assert.equal(formatSessionSize(value), undefined);
+  for (const ascii of [false, true]) {
+    const { view } = setup(40, ascii);
+    view.setMetadata(sessions[0].path, { gitBranch: "feat/历史", byteSize: 2169 });
+    const before = text(view);
+    assert.match(before, /Resume session \(1 of 3\)/);
+    assert.match(
+      before,
+      ascii ? /1 minute ago \| feat\/历史 \| 2.1KB/ : /1 minute ago · feat\/历史 · 2.1KB/,
+    );
+    assert.doesNotMatch(before, /2 messages/);
+    assert.equal(before.match(/feat\/历史/g)?.length, 1, "unknown sessions get no invented branch");
+    view.handleInput(" ");
+    assert.match(
+      text(view),
+      ascii ? /1m ago \| 2 messages \| feat\/历史/ : /1m ago · 2 messages · feat\/历史/,
+    );
+    assert.doesNotMatch(text(view), /2.1KB/);
+    view.setMetadata(sessions[0].path, {
+      gitBranch: "\x1b]0;title\x07很长的分支".repeat(20),
+      byteSize: 2169,
+    });
+    for (const width of [0, 1, 4, 12, 40, 80, 100]) {
+      const lines = view.render(width);
+      assert.ok(lines.every((line) => visibleWidth(line) <= width));
+      assert.ok(lines.every((line) => !line.includes("\x1b]0;")));
+    }
+  }
+});
+
+test("metadata I/O stays bounded, never blocks navigation, and aborts without late redraws", async () => {
+  const requests: {
+    session: SessionInfo;
+    signal: AbortSignal;
+    resolve: (value: SessionMetadata) => void;
+  }[] = [];
+  const h = harness({
+    list: async () => Array.from({ length: 500 }, (_, index) => session(index + 1)),
+    readMetadata: (session, signal) =>
+      new Promise((resolve) => requests.push({ session, signal, resolve })),
+  });
+  const run = h.run();
+  await tick();
+  assert.equal(requests.length, 2, "only two metadata reads run at once");
+  const page = h.views[0];
+  page.handleInput("\x1b[B");
+  requests[0].resolve({ gitBranch: "first", byteSize: 1024 });
+  await tick();
+  assert.equal(requests.length, 3);
+  const output = page.render(100).map(stripTerminalSequences).join("\n");
+  assert.match(output, /❯ Session 2/);
+  assert.match(output, /first · 1.0KB/);
+  page.handleInput("\x1b");
+  await run;
+  assert.ok(requests.every((request) => request.signal.aborted));
+  const renders = h.renders;
+  requests[1].resolve({ gitBranch: "late", byteSize: 9000 });
+  requests[2].resolve({ gitBranch: "late", byteSize: 9000 });
+  await tick();
+  assert.equal(requests.length, 3, "queued files are not read after closing");
+  assert.equal(h.renders, renders);
+  assert.doesNotMatch(page.render(100).map(stripTerminalSequences).join("\n"), /late/);
+});
+
+test("a later preview snapshot wins over an older list metadata read", async () => {
+  const requests: ((value: SessionMetadata) => void)[] = [];
+  const h = harness({
+    readMetadata: () => new Promise((resolve) => requests.push(resolve)),
+    readPreview: async (session) => ({
+      entries: [],
+      cwd: session.cwd,
+      model: "model",
+      effort: "off",
+      byteSize: 4096,
+      gitBranch: "new-observation",
+    }),
+  });
+  const run = h.run();
+  await tick();
+  const page = h.views[0];
+  page.handleInput(" ");
+  await tick();
+  requests[0]({ byteSize: 1024, gitBranch: "old-observation" });
+  await tick();
+  assert.match(page.render(100).map(stripTerminalSequences).join("\n"), /new-observation/);
+  page.handleInput("\x1b");
+  assert.match(page.render(100).map(stripTerminalSequences).join("\n"), /new-observation · 4.0KB/);
+  page.handleInput("\x1b");
+  await run;
+  for (const resolve of requests.slice(1)) resolve({});
+  await tick();
+});
 
 test("resume command delegates the selected path once after closing the UI and loads all scopes on demand", async () => {
   const h = harness();

@@ -12,6 +12,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, type TUI, visibleWidth } from "@earendil-works/pi-tui";
 import {
+  loadSessionMetadata,
   loadSessionPreview,
   parseSessionPreview,
   SessionPreviewContent,
@@ -142,6 +143,8 @@ test("saved preview renders recorded tools separately, diffs, metadata, media la
   assert.match(output, /Update\(sample.ts\)[\s\S]*one = 3/);
   assert.match(output, /\d+:\d{2} [AP]M recorded-model\n⏺.*Recorded response/);
   assert.match(output, /Worked for 2s/);
+  assert.equal(snapshot.byteSize, Buffer.byteLength(f.json(), "utf8"));
+  assert.equal(snapshot.gitBranch, undefined, "old sessions have no inferred checkout branch");
   assert.doesNotMatch(output, /ENOENT|must-never-be-read.*ERROR/);
   content.setExpanded(true);
   assert.match(render(), /const two = 2/);
@@ -199,6 +202,10 @@ test("preview reads and migrates legacy data only in memory; cancellation and er
     assert.ok(snapshot.entries[0].id);
     assert.equal(await readFile(f.session.path, "utf8"), legacy);
     assert.equal((await stat(f.session.path)).mtimeMs, before.mtimeMs);
+    assert.deepEqual(await loadSessionMetadata(f.session, new AbortController().signal), {
+      byteSize: Buffer.byteLength(legacy),
+      gitBranch: undefined,
+    });
     assert.deepEqual(await readdir(directory), ["legacy.jsonl"]);
     const cancel = new AbortController();
     cancel.abort();
@@ -211,6 +218,31 @@ test("preview reads and migrates legacy data only in memory; cancellation and er
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("recorded Git metadata follows public parent links, survives compaction and never reads today's checkout", () => {
+  const f = fixture();
+  const completion = (gitBranch?: string) =>
+    f.manager.appendCustomEntry(COMPLETION_ENTRY_TYPE, {
+      version: 1,
+      durationMs: 10,
+      finishedAt: 10,
+      outcome: "done",
+      failedTools: 0,
+      ...(gitBranch ? { gitBranch } : {}),
+    });
+  const selected = completion("feat/recorded");
+  completion("abandoned-git-branch");
+  f.manager.branch(selected);
+  const kept = f.manager.appendMessage({ role: "user", content: "Kept message", timestamp: 0 });
+  f.manager.appendCompaction("Summary", kept, 10000);
+  assert.equal(parseSessionPreview(f.json(), f.session).gitBranch, "feat/recorded");
+  completion();
+  assert.equal(
+    parseSessionPreview(f.json(), f.session).gitBranch,
+    undefined,
+    "an unavailable later observation does not reuse an older branch",
+  );
 });
 
 test("preview rejects invalid identity, future formats and cyclic ancestry before traversal", () => {

@@ -6,6 +6,8 @@ export const COMPLETION_ENTRY_TYPE = "pi-tuix-run-completion";
 
 export interface CompletionEntryData extends RunCompletion {
   version: 1;
+  /** Observed when this run ended, never inferred from today's checkout. */
+  gitBranch?: string;
 }
 
 /** Ignore unknown versions and malformed imported UI metadata. */
@@ -31,6 +33,12 @@ export function readCompletionEntry(value: unknown): CompletionEntryData | undef
     finishedAt: data.finishedAt,
     outcome: data.outcome as RunCompletion["outcome"],
     failedTools: data.failedTools,
+    ...(typeof data.gitBranch === "string" &&
+    data.gitBranch.length > 0 &&
+    data.gitBranch.length <= 1024 &&
+    !/\p{Cc}/u.test(data.gitBranch)
+      ? { gitBranch: data.gitBranch }
+      : {}),
   };
 }
 

@@ -99,3 +99,7 @@ Run completion history is presentation metadata delegated to Pi's public custom
 entry API. Pi-TUIX supplies a versioned payload and renderer; Pi retains session
 storage, ordering, branching and model-context construction. Disabling or removing
 the renderer requires no migration and does not delete or rewrite messages.
+The same payload may record the Git branch observed at run end for session-picker
+display. Old runs without that observation remain unknown; opening a picker never
+backfills history from the current checkout. File sizes are read from the selected
+session data without creating a second session catalogue or persistence layer.

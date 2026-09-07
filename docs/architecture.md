@@ -52,6 +52,11 @@ than estimated. Automatic continuations retain the start time until Pi emits
 `pi-tuix-run-completion` custom entry through `pi.appendEntry`; duplicate
 settlement events do not append again. `registerEntryRenderer` displays its
 elapsed time, end time, outcome and failed-tool count in the native document.
+An optional `gitBranch` records a bounded, read-only Git observation at agent end.
+The completion entry itself is still appended synchronously on settlement, with
+no extra model message. Missing Git and unavailable branch data are omitted;
+unborn branches and detached HEAD are supported. Lifecycle changes abort pending
+observations, so a result cannot attach to a replacement session.
 These records are UI metadata, excluded by Pi's model-context builder. Pi owns
 storage, ordering, branching, compaction and restoration; Pi-TUIX neither writes
 session files nor modifies messages. Existing histories without these records
@@ -125,8 +130,16 @@ and `buildSessionContext` helpers. It verifies the selected header identity and
 rejects future formats or invalid ancestry before traversal. It never opens a
 persisting SessionManager to preview a file. The active saved branch and
 compaction projection remain Pi-owned. No file is rewritten or migrated on disk.
-It shows message counts and modification times rather than guessing unavailable
-branch or file-size metadata. The custom view closes before
+List rows show relative time, recorded Git branch when available, and file size
+in 1024-based units; preview footers show short relative time, message count and
+recorded branch. The latest completion on the saved parent chain supplies the
+branch even when compaction hides that older UI entry from the transcript.
+Abandoned paths cannot supply it, and current Git state never fills missing
+historical data. Metadata is read only for a bounded window near the visible
+selection with at most two concurrent file reads. Closing aborts those reads and
+discards queued work; late results cannot overwrite a newer preview snapshot.
+Only small metadata fields are cached, not the preview's full parsed history.
+The custom view closes before
 `ctx.switchSession(path)` replaces the runtime; late load callbacks are ignored,
 and no captured session-bound object is used after a successful replacement.
 Pi 0.84 reapplies its saved theme after `session_start` during replacement.
