@@ -41,6 +41,48 @@ The prototype intentionally uses only public hooks:
 Read, Bash, Edit, and Write rendering uses Pi's documented `registerTool()` delegation pattern. Pi-TUIX retains each original public tool definition and exact `execute()` function while replacing only presentation. `/pituix-default` restores existing and future tool rows using the original Pi renderers in the same session.
 
 Workflow status shows the current phase, active tool, completed and failed tool counts, and queued follow-up messages. It resets for each agent run and never changes Pi's queue, tool inputs, or execution behavior.
+Active calls are keyed by public tool-call ID, including simultaneous calls of
+the same tool. The working line reports the active count until one call remains.
+Duplicate completions and late events after settlement cannot alter that count.
+
+Run presentation observes assistant usage and stop reasons. A one-second UI timer
+updates elapsed working feedback; unavailable token counts are omitted rather
+than estimated. Automatic continuations retain the start time until Pi emits
+`agent_settled`. Each newly settled TUI run appends one versioned
+`pi-tuix-run-completion` custom entry through `pi.appendEntry`; duplicate
+settlement events do not append again. `registerEntryRenderer` displays its
+elapsed time, end time, outcome and failed-tool count in the native document.
+An optional `gitBranch` records a bounded, read-only Git observation at agent end.
+The completion entry itself is still appended synchronously on settlement, with
+no extra model message. Missing Git and unavailable branch data are omitted;
+unborn branches and detached HEAD are supported. Lifecycle changes abort pending
+observations, so a result cannot attach to a replacement session.
+These records are UI metadata, excluded by Pi's model-context builder. Pi owns
+storage, ordering, branching, compaction and restoration; Pi-TUIX never directly
+writes session files or modifies messages. Existing histories without these records
+are not backfilled. No records are added in the default UI or non-TUI modes.
+Cancellation has a separate interruption prompt, including Pi's error-form
+AbortError case. Imported records with invalid fields or unknown versions are
+ignored. The snapshot reader uses the same parser and formatter.
+
+Pi can replay custom entries before `session_start`, so presentation reads the
+saved enabled preference at registration. Valid completion renderers always
+return an owned row, preserving host mounting even when startup is disabled.
+A zero-height `setWidget` factory supplies the public TUI reference. After host
+composition, a public `Container` wraps only entry containers containing our
+row; it hides both the row and host spacing while disabled, retaining the source
+as a child for native invalidation. Cleanup unwraps only these owned containers
+and preserves host additions, removal and reordering. No session rebuild or
+private host fields are used. Without the extension, Pi ignores these
+unregistered custom entries and keeps the ordinary conversation.
+
+Settings and enable/default commands share one persisted `enabled` preference.
+After the settings page closes, the lifecycle controller synchronizes the shell,
+tool renderers, plan, queue and completion visibility. Disabled runs retain
+observational state for a later mode switch but add no completion metadata or
+telemetry notifications. Icon selection is read by pending/result tools, working
+feedback, history and preview renderers. Preference parsing validates primitive
+types and known choices without sharing mutable defaults.
 
 Stream status maps public assistant events to explicit `THINKING`, `RESPONDING`, and `TOOL` labels, includes the one-based turn number, and shows the active thinking level and context pressure. The plan adapter reads assistant text after a turn, recognizes a `Plan:` or localized plan heading with numbered or checkbox steps, and renders those steps through `setWidget()`. It is deliberately observational: it does not inject plan instructions, disable tools, or infer completion from tool execution.
 
@@ -77,6 +119,120 @@ thinking levels. Arrow-key adjustments remain draft UI state until confirmation;
 then `pi.setModel` and `pi.setThinkingLevel` apply them. Authentication, model
 availability, effective effort and persistence remain Pi-owned. The native
 `/model` command is preserved.
+
+`/pituix-resume` lists sessions through the public `SessionManager.list` and
+loads `listAll` only when the user chooses all projects. The current custom
+session directory is included through the public overload. The component
+filters public `SessionInfo` text and opens a selected conversation on demand.
+The command reads that file asynchronously with an AbortSignal, then uses public
+`parseSessionEntries`, in-memory `migrateSessionEntries`, `buildContextEntries`
+and `buildSessionContext` helpers. It verifies the selected header identity and
+rejects future formats or invalid ancestry before traversal. It never opens a
+persisting SessionManager to preview a file. The active saved branch and
+compaction projection remain Pi-owned. No file is rewritten or migrated on disk.
+List rows show relative time, recorded Git branch when available, and file size
+in 1024-based units; preview footers show short relative time, message count and
+recorded branch. The latest completion on the saved parent chain supplies the
+branch even when compaction hides that older UI entry from the transcript.
+Abandoned paths cannot supply it, and current Git state never fills missing
+historical data. Metadata normally loads for a bounded window near the visible
+selection. Ctrl+B filters by the current Git branch, observed once on opening;
+while active it reads metadata across the selected catalogue scope. Missing
+observations are excluded, and unavailable Git/loading/empty states are distinct.
+At most two file reads run at once. Changing search/scope/filter discards queued
+rows that are no longer needed. Closing aborts reads and discards queued work;
+late results cannot overwrite a newer preview snapshot or post-rename size.
+Only small metadata fields are cached, not the preview's full parsed history.
+The normal list keeps up to three entries and a stable 20-row frame shared with
+search and rename; short terminals use a compact layout. The configured public
+`app.session.rename` binding opens a draft using the public Input component.
+Esc cancels; Enter confirms one write. The current session delegates through
+`pi.setSessionName`, preserving host state/events. Other selections validate the
+file identity/format before `SessionManager.open().appendSessionInfo()`; Pi owns
+the name entry and any legacy migration, just as in its native selector.
+Opening the picker or a preview never invokes that persistence path. Cancelled
+validation does not write, errors retain the draft for retry, and saving refreshes
+the public catalogue without switching sessions. Names remain usable after
+disabling or removing Pi-TUIX.
+The custom view closes before
+`ctx.switchSession(path)` replaces the runtime; late load callbacks are ignored,
+and no captured session-bound object is used after a successful replacement.
+Pi 0.84 reapplies its saved theme after `session_start` during replacement.
+The picker reapplies the reference Theme instance through the fresh public
+`withSession` context, without changing Pi's saved theme preference. Native
+session/reload commands can still reset an extension-applied temporary theme;
+their post-rebind sequence is not intercepted by Pi-TUIX. The public extension
+context exposes no post-theme-rebind event or saved automatic-theme preference.
+Switching by theme name would persist a different Pi setting, so the adapter
+continues using a temporary Theme instance rather than silently replacing that
+preference.
+The preview shares the pure startup header and snapshot transcript components.
+It shows individual tool results (without live Read/Bash grouping), diffs,
+completion records and recorded assistant time/model above text responses.
+Binary attachments have type labels. Header, conversation and recovery hints
+scroll inside the reference separator. Arrows, paging, Home/End, wheel input and
+Pi's tool-expansion binding stay scoped to a public modal overlay; a fullscreen
+host otherwise consumes viewport keys before non-overlay editor input. The
+bottom-anchored overlay leaves two context rows when space permits. Closing
+restores native focus before any session replacement. Cancelling or selecting
+another preview aborts the pending read; request identity also rejects late
+results from readers that ignore cancellation. A failed read can be retried by
+reopening the preview. Rendering does no file I/O or tool execution. Native
+`/resume` and `/tree` are untouched.
+
+`/pituix-transcript` reads and clones the current public session branch before
+opening a full-width custom overlay. Its snapshot components preserve raw user
+text and prefix rendered assistant Markdown, so heading/list/fence parsing is
+unaffected. Recorded tool calls/results are paired by ID and displayed through
+public `ToolExecutionComponent` instances and the existing Pi-TUIX renderers.
+No executor is invoked or newly registered. Missing calls, failed/aborted
+responses, visible custom messages and compaction summaries remain explicit.
+Binary attachments receive type labels; foreign tool renderers are not copied.
+Rendering performs no I/O. The reader owns only scroll/expansion state, returns
+to the same editor, and remains a separate view of the current branch. The resume
+preview reuses its content renderer with individual tools and message metadata;
+the main snapshot keeps its existing grouping and optional expansion.
+
+The main view composes reversible presentation containers into the public
+document tree. A version-local adapter recognizes public
+`Container.children`, `UserMessageComponent` and `AssistantMessageComponent`
+instances. It traverses only plain concatenating containers. Opaque components,
+including tools, media and notifications, retain their native render methods.
+An identity `registerMarkdownTransformer` callback observes source/context while
+the public Markdown component renders; it returns source unchanged. Raw user
+text receives prompt chrome. Assistant Markdown is prefixed after rendering,
+preserving the host's Markdown parsing, highlighting and transformer chain.
+Unknown layouts or missing callbacks fall back to native rendering. Package
+imports go through Pi's extension loader so component identities share the host
+UI runtime. The adapter wraps the document's direct children through public
+`Container.children`. It retains the original document, header and chat
+containers, so Pi continues adding and removing messages through the same
+references. Each presentation container also keeps its source as a public
+child, preserving mounted-component discovery and native invalidation. Teardown
+unwraps only this mount's components and preserves later additions and ordering.
+No private fields, methods or prototypes are patched.
+
+Both renderer modes consume that same document. Fullscreen paging, wheel input,
+prompt navigation, search, selection and copying therefore stay in Pi's native
+viewport. Standard OSC 133 prompt zones are retained around the restyled user
+rows. Search closes at its matched location, and native settings can switch
+between regular and fullscreen mode without a persistent overlay blocking the
+transition. Regular mode retains terminal scrollback. The editor, dock, queue,
+status, foreign widgets and dialogs use their original host composition and
+focus handling. A public `TuiAltScreen.scrollToBottom` capability resumes
+following for a new run. The adapter owns no second viewport or focus observer,
+and performs no provider, session-file or shell I/O.
+
+Static message rows are cached by public source/rendered-line identity, width,
+theme and icon mode. Invalidation propagates to the original components and
+clears presentation caches. Observed Markdown padding is reused to avoid
+alternating render widths when the host output padding differs from one cell.
+Streamed text, width and theme changes still refresh the affected display.
+Large-history measurements cover this presentation layer rather than total
+terminal latency. Real-terminal multi-line/image selection needs broader
+coverage. User chrome observes source at this extension's position in the
+transformer chain, so later user-text transformers are not reflected in that
+raw-text view.
 
 Tool definitions keep the public `renderShell: "self"` option stable.
 Each built-in tool is registered once. `/pituix-compact` selects collapsed
@@ -115,7 +271,3 @@ rows are invalidated after completion; no message or session entry is rewritten.
 Execution functions, argument schemas, and permission behavior are
 unchanged. Other extensions' MCP tools and built-in transcript components remain
 host-owned. No new runtime dependency or private host patch is introduced.
-
-RunPresentation observes public message and tool events, keeping elapsed time across retries and tracking concurrent tools by call ID. On agent_settled the extension appends one versioned pi-tuix-run-completion custom entry through Pi. The entry renderer reads validated metadata and hides it in default mode. Pi owns storage, ordering, branching and model context; these display-only entries do not become model messages. Timers clear on shutdown and duplicate settlement cannot append twice.
-
-Live presentation wraps public Container children and observes Markdown transformer callbacks without changing their source. It retains original component identities and child order, falls back on unknown layouts, and restores native composition on removal. The native viewport owns scrolling, search, selection and prompt navigation in both terminal modes. Width/theme/content caches cover stable rows. The transcript snapshot clones the public selected branch and shares pure message components, public ToolExecutionComponent rendering and completion metadata without executing tools or writing files.

@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { registerModelPicker } from "../../control/model-picker.ts";
+import { registerResumePicker } from "../../session/resume-picker.ts";
 import type { SubagentActivityObserver } from "../../session/subagent-activity.ts";
 import {
   DEFAULT_CONFIG,
@@ -31,6 +32,9 @@ function isTuiContext(ctx: ExtensionContext): boolean {
 }
 
 export interface OpenTuiShellRuntime {
+  isEnabled(): boolean;
+  useAscii(): boolean;
+  setEnabled(enabled: boolean): void;
   apply(ctx: ExtensionContext): void;
   remove(ctx: ExtensionContext): void;
   handleSessionStart(ctx: ExtensionContext): void;
@@ -44,6 +48,7 @@ export interface OpenTuiShellRuntime {
 export function createOpenTuiShellRuntime(
   pi: ExtensionAPI,
   subagentActivity?: SubagentActivityObserver,
+  onSettingsApplied?: (ctx: ExtensionContext) => void,
 ): OpenTuiShellRuntime {
   const lifecycle = new SessionLifecycle();
   const state: FooterState = createInitialState();
@@ -69,6 +74,11 @@ export function createOpenTuiShellRuntime(
   const stopTimer = () => {
     if (timer) clearInterval(timer);
     timer = undefined;
+  };
+  const startTimer = () => {
+    stopTimer();
+    timer = setInterval(() => requestRender?.(), 250);
+    timer.unref?.();
   };
   const refresh = (ctx: ExtensionContext, project = false) => {
     if (!lifecycle.isCurrent() || !ctx.hasUI) return;
@@ -123,14 +133,7 @@ export function createOpenTuiShellRuntime(
     requestRender = undefined;
     active = false;
   };
-  const apply = (ctx: ExtensionContext) => {
-    if (!isTuiContext(ctx) || active) return;
-    syncEffort(ctx);
-    const referenceTheme = ctx.ui.getTheme?.("pi-tuix-dark");
-    if (referenceTheme) {
-      previousTheme = ctx.ui.theme;
-      ctx.ui.setTheme(referenceTheme);
-    }
+  const applyIndicator = (ctx: ExtensionContext) => {
     ctx.ui.setWorkingIndicator({
       frames: (useAsciiChrome(config.icons.mode)
         ? [".", "*", "+", "*"]
@@ -138,6 +141,21 @@ export function createOpenTuiShellRuntime(
       ).map((frame) => ctx.ui.theme.fg("accent", frame)),
       intervalMs: 120,
     });
+  };
+  const apply = (ctx: ExtensionContext) => {
+    if (!isTuiContext(ctx)) return;
+    syncEffort(ctx);
+    if (active) {
+      applyIndicator(ctx);
+      requestRender?.();
+      return;
+    }
+    const referenceTheme = ctx.ui.getTheme?.("pi-tuix-dark");
+    if (referenceTheme) {
+      previousTheme = ctx.ui.theme;
+      ctx.ui.setTheme(referenceTheme);
+    }
+    applyIndicator(ctx);
     ctx.ui.setHiddenThinkingLabel("Thinking (expand to view)");
     disposeHeader = installHeader(pi, ctx);
     disposeFooter = installFooter(
@@ -167,6 +185,7 @@ export function createOpenTuiShellRuntime(
         liveTranscript.mount(tui, activeEditor, ctx, () => useAsciiChrome(config.icons.mode)),
     );
     active = true;
+    if (state.workingSince !== undefined) startTimer();
   };
 
   pi.registerCommand("pituix-status", {
@@ -197,6 +216,18 @@ export function createOpenTuiShellRuntime(
     onOpen: onPanelOpened,
     onClose: onPanelClosed,
   });
+  registerResumePicker(pi, {
+    ascii: () => useAsciiChrome(config.icons.mode),
+    onOpen: onPanelOpened,
+    onClose: onPanelClosed,
+    onResume: (replacement) => {
+      // Pi 0.84 reapplies its saved theme after session_start. The public
+      // post-switch callback is bound to the fresh session, after that reset.
+      if (!config.enabled) return;
+      const referenceTheme = replacement.ui.getTheme("pi-tuix-dark");
+      if (referenceTheme) replacement.ui.setTheme(referenceTheme);
+    },
+  });
   registerSettingsCommand(pi, {
     getConfig: () => config,
     onOverlayOpened: onPanelOpened,
@@ -214,12 +245,19 @@ export function createOpenTuiShellRuntime(
     onOverlayClosed: () => {
       onPanelClosed();
       if (!context) return;
-      if (config.enabled) apply(context);
+      if (onSettingsApplied) onSettingsApplied(context);
+      else if (config.enabled) apply(context);
       else remove(context);
     },
   });
 
   return {
+    isEnabled: () => config.enabled,
+    useAscii: () => useAsciiChrome(config.icons.mode),
+    setEnabled(enabled) {
+      config = { ...config, enabled };
+      saveConfig(config);
+    },
     apply,
     remove,
     handleSessionStart(ctx) {
@@ -241,12 +279,12 @@ export function createOpenTuiShellRuntime(
     },
     handleAgentStart() {
       if (!lifecycle.isCurrent()) return;
-      liveTranscript.followLatest();
       state.workingSince = Date.now();
       state.lastDoneIn = undefined;
-      stopTimer();
-      timer = setInterval(() => requestRender?.(), 250);
-      timer.unref?.();
+      if (active) {
+        liveTranscript.followLatest();
+        startTimer();
+      }
     },
     handleAgentEnd() {
       if (!lifecycle.isCurrent()) return;
@@ -259,7 +297,7 @@ export function createOpenTuiShellRuntime(
     },
     handleAgentSettled(event, ctx) {
       const result = telemetry.handle(event as never);
-      if (result && config.telemetry.enabled && isTuiContext(ctx)) {
+      if (result && active && config.telemetry.enabled && isTuiContext(ctx)) {
         const message = formatTurnTelemetry(
           result,
           ctx.ui.theme,

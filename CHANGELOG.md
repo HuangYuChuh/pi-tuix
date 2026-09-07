@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Show selected session index, file size and recorded Git branch in resume rows, with short relative time/message count/branch in preview footers; load metadata asynchronously with bounded concurrency and cancellation.
+- Record optional Git branch observations in existing display-only completion entries; preserve unknown historical values and follow saved parent links through compaction without reading today's checkout into old sessions.
+- Persist a single enabled preference across settings and enable/default commands, including startup/reload; synchronize shell, tools, plan, queue and completion visibility.
+- Restore historical completion rows after disabled startup without retaining host spacing or rebuilding sessions; apply configured icons to tools, working feedback and saved conversation views.
+- Suppress performance notifications while disabled and validate preference types without mutating defaults.
 - Align startup, prompt rules, and compact footer with observed Claude Code 2.1.263 terminal layout; retain Pi-TUIX identity and Pi runtime ownership.
 - Apply the reference dark palette reversibly and expose detailed statistics through `/pituix-status`.
 - Add empty-input shortcut help and live working/thinking/responding labels.
@@ -16,16 +21,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use public self-rendered tool shells and replace pending rows with results; preserve exact Pi tool execution functions.
 - Add result branches, compact Read counts, numbered Write previews, and Update diffs with Pi's public word-level highlighting.
 - Group adjacent successful Read/Bash calls into unique-file and shell-call counts, with individual expansion and read-only reconstruction when resuming sessions.
+- Add elapsed working feedback, reported output-token counts, and persisted display-only settled-run completion/interruption lines; retain duration through automatic retries.
+- Match observed user-message background/text and successful tool-marker colors through the public theme.
+- Add a searchable resume picker with public Pi session metadata, read-only tool/diff previews, project scope switching, and host-delegated session restoration through `/pituix-resume`.
 - Match observed Edit row and changed-token backgrounds, gutter colors and right margin; preserve source characters, theme fallback, no-color mode and distinct 256-color fills.
 - Use the reference syntax palette with Pi's public highlighter for added/context diff lines; retain the documented differences in token categories.
 
 ### Fixed
+- Render resume previews as native modal overlays so fullscreen viewport keys reach the preview; preserve original focus, cancel pending reads, ignore late results, and parse/migrate session data only in memory.
+- Show individual historical tools, assistant model/time and completion records in resume previews; keep tool-boundary spacing compact while preserving internal output lines.
 - Use configured tool expansion bindings instead of the unregistered E hint.
 - Guard tiny editor widths against host wide-character wrapping recursion.
 - Hide duplicate footer hints during settings and restore them on close or failure; remove the unsupported wheel-speed control from settings.
 - Restore existing tool rows as well as new rows with `/pituix-default`; retain a stable public shell adapter and invalidate rows through their public callbacks.
 - Finish native running-renderer cleanup after a presentation-mode switch, and refresh collapsed/preview changes even when Pi's expansion flag stays unchanged.
-- Register each built-in tool once so compact summaries and previews share the same renderer.
+- Keep completion rows across requests, resume and reload using Pi's public custom-entry renderer; hide/restore them with the interface and include them in the snapshot reader without adding model-context messages.
+- Recognize Pi's error-form AbortError response as an interruption instead of reporting a failed completion.
+- Register each built-in tool once so `/pituix-compact` keeps reference-style summaries and `/pituix-three-layer` restores previews instead of routing to native rows.
+- Reapply the temporary reference theme through Pi's fresh `withSession` context after `/pituix-resume` switches sessions.
+- Track concurrent tool activity by call ID so one completed tool cannot clear another running tool; ignore duplicate and late completion events.
 
 ### Validation
 - Add shell, public extension loader, theme restoration, and shared tool-row regression tests.
@@ -38,7 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 First stable release of Pi-TUIX, published to npm with the `latest` dist-tag.
 
 ### Added
-- Add elapsed working feedback, concurrent-tool tracking and Pi-owned display-only completion/interruption history.
 - Engineering infrastructure
   - Biome for code formatting and linting
   - GitHub Actions CI workflow (typecheck, lint, test, pack:check)

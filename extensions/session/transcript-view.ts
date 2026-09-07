@@ -12,6 +12,7 @@ import {
   getKeybindings,
   Key,
   matchesKey,
+  stripTerminalSequences,
   Text,
   type TUI,
   truncateToWidth,
@@ -50,6 +51,7 @@ export class TranscriptContent implements Component {
   private readonly tui: TUI;
   private readonly cwd: string;
   private readonly ascii: boolean;
+  private readonly options: { groupTools?: boolean; showMessageMetadata?: boolean };
   private components: Component[] = [];
   private expanded = false;
   private cache: { width: number; lines: string[] } | undefined;
@@ -60,12 +62,14 @@ export class TranscriptContent implements Component {
     tui: TUI,
     cwd: string,
     ascii = false,
+    options: TranscriptContent["options"] = {},
   ) {
     this.entries = structuredClone(entries);
     this.theme = theme;
     this.tui = tui;
     this.cwd = cwd;
     this.ascii = ascii;
+    this.options = options;
     this.rebuild();
   }
 
@@ -85,7 +89,12 @@ export class TranscriptContent implements Component {
     const groups = new ToolGroupRuntime();
     groups.reset(this.cwd);
     for (const entry of this.entries) groups.recordEntry(entry);
-    const mode: ToolRendererMode = { enabled: true, defaultMode: "preview", groups };
+    const mode: ToolRendererMode = {
+      enabled: true,
+      ascii: () => this.ascii,
+      defaultMode: "preview",
+      ...(this.options.groupTools === false ? {} : { groups }),
+    };
     const definitions = new Map<
       string,
       NonNullable<ConstructorParameters<typeof ToolExecutionComponent>[4]>
@@ -130,10 +139,25 @@ export class TranscriptContent implements Component {
           new ReferenceUserMessage(contentText(message.content), this.theme, this.ascii),
         );
       } else if (message.role === "assistant") {
+        let metadata: string | undefined;
+        if (this.options.showMessageMetadata) {
+          const model = messageText(message.model || "");
+          const time =
+            typeof message.timestamp === "number" &&
+            Number.isFinite(new Date(message.timestamp).getTime())
+              ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" })
+                  .format(message.timestamp)
+                  .replace(/\s/g, " ")
+              : "";
+          metadata = [time, model].filter(Boolean).join(" ");
+        }
         for (const block of message.content) {
-          if (block.type === "text" && block.text.trim())
-            this.components.push(new ReferenceAssistantText(block.text, this.theme, this.ascii));
-          else if (block.type === "thinking" && block.thinking.trim())
+          if (block.type === "text" && block.text.trim()) {
+            this.components.push(
+              new ReferenceAssistantText(block.text, this.theme, this.ascii, false, metadata),
+            );
+            metadata = undefined;
+          } else if (block.type === "thinking" && block.thinking.trim())
             this.components.push(
               this.expanded
                 ? new ReferenceAssistantText(block.thinking, this.theme, this.ascii, true)
@@ -228,6 +252,9 @@ export class TranscriptContent implements Component {
       const rendered = [...component.render(Math.max(4, width))];
       // ToolExecutionComponent supplies its own leading spacer.
       while (rendered.length && !rendered[0].trim()) rendered.shift();
+      if (component instanceof ToolExecutionComponent)
+        while (rendered.length && !stripTerminalSequences(rendered.at(-1) ?? "").trim())
+          rendered.pop();
       if (!rendered.length) continue;
       if (lines.length) lines.push("");
       lines.push(...rendered.map((line) => truncateToWidth(line, width, "")));
@@ -313,7 +340,7 @@ export class TranscriptView implements Component {
   }
 }
 
-export function registerTranscriptCommand(pi: ExtensionAPI): void {
+export function registerTranscriptCommand(pi: ExtensionAPI, ascii = useAsciiChrome): void {
   pi.registerCommand("pituix-transcript", {
     description: "Read the current conversation with reference message and tool layout",
     handler: async (_args, ctx: ExtensionCommandContext) => {
@@ -321,7 +348,7 @@ export function registerTranscriptCommand(pi: ExtensionAPI): void {
       const entries = ctx.sessionManager.getBranch();
       await ctx.ui.custom<void>(
         (tui, theme, keys, done) => {
-          const content = new TranscriptContent(entries, theme, tui, ctx.cwd, useAsciiChrome());
+          const content = new TranscriptContent(entries, theme, tui, ctx.cwd, ascii());
           const view = new TranscriptView(
             content,
             theme,

@@ -1,16 +1,10 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { VERSION } from "@earendil-works/pi-coding-agent";
-import {
-  clearPlan,
-  createPlanRuntime,
-  type PlanRuntime,
-  syncPlanWidget,
-  updatePlan,
-} from "./control/plan.ts";
+import { clearPlan, createPlanRuntime, syncPlanWidget, updatePlan } from "./control/plan.ts";
+import { readGitBranch } from "./session/git-branch.ts";
 import { registerSessionTreeCommand } from "./session/session-tree.ts";
 import { createSubagentActivityObserver } from "./session/subagent-activity.ts";
 import { registerTranscriptCommand } from "./session/transcript-view.ts";
-import { useAsciiChrome } from "./shell/open-tui/icons.ts";
 import { createOpenTuiShellRuntime } from "./shell/open-tui/shell.ts";
 import {
   COMPLETION_ENTRY_TYPE,
@@ -37,36 +31,25 @@ import { ToolGroupRuntime } from "./tools/tool-groups.ts";
 
 const PACKAGE_NAME = "Pi-TUIX";
 
-function applyPiTuix(
-  ctx: ExtensionContext,
-  toolMode: ToolRendererMode,
-  shell: ReturnType<typeof createOpenTuiShellRuntime>,
-  plan: PlanRuntime,
-): void {
-  if (ctx.mode !== "tui") return;
-
-  toolMode.enabled = true;
-  ctx.ui.setTitle(PACKAGE_NAME);
-  shell.apply(ctx);
-  syncPlanWidget(ctx, plan);
-}
-
 export default function piTuix(pi: ExtensionAPI): void {
+  const subagentActivity = createSubagentActivityObserver(pi);
+  const shell = createOpenTuiShellRuntime(pi, subagentActivity, (ctx) => syncInterface(ctx));
   // 工具渲染模式配置
   const groups = new ToolGroupRuntime();
   const toolMode: ToolRendererMode = {
     // Pi replays persisted UI entries before session_start on resume/reload.
     // Initial rendering must match the interface installed by that event.
-    enabled: true,
+    enabled: shell.isEnabled(),
+    ascii: shell.useAscii,
     defaultMode: "preview" as DisplayMode, // collapsed | preview | expanded
     groups,
   };
 
-  const subagentActivity = createSubagentActivityObserver(pi);
-  const shell = createOpenTuiShellRuntime(pi, subagentActivity);
   const workflow = createWorkflowRuntime();
   const run = new RunPresentation();
-  registerCompletionEntries(pi, () => toolMode.enabled, useAsciiChrome);
+  const completions = registerCompletionEntries(pi, () => toolMode.enabled, shell.useAscii);
+  let completionRead: AbortController | undefined;
+  let completionBranch: string | undefined;
   let runTimer: ReturnType<typeof setInterval> | undefined;
   const stopRunTimer = () => {
     if (runTimer) clearInterval(runTimer);
@@ -74,9 +57,30 @@ export default function piTuix(pi: ExtensionAPI): void {
   };
   const plan = createPlanRuntime();
   registerSessionTreeCommand(pi);
-  registerTranscriptCommand(pi);
+  registerTranscriptCommand(pi, shell.useAscii);
 
   const toolRenderers = registerThreeLayerToolRenderers(pi, toolMode);
+  const syncInterface = (ctx: ExtensionContext) => {
+    if (ctx.mode !== "tui") return;
+    toolMode.enabled = shell.isEnabled();
+    ctx.ui.setTitle(toolMode.enabled ? PACKAGE_NAME : "pi");
+    if (toolMode.enabled) {
+      shell.apply(ctx);
+      syncPlanWidget(ctx, plan);
+      refreshWorkflow(workflow);
+    } else {
+      shell.remove(ctx);
+      ctx.ui.setStatus?.("pituix-queue", undefined);
+      ctx.ui.setWidget("pituix-plan", undefined);
+    }
+    toolRenderers.invalidate();
+    completions.refresh();
+  };
+  const enableInterface = (ctx: ExtensionContext) => {
+    if (ctx.mode !== "tui") return;
+    shell.setEnabled(true);
+    syncInterface(ctx);
+  };
   const hydrateGroups = (ctx: ExtensionContext) => {
     groups.reset(ctx.cwd);
     if (ctx.mode === "tui") {
@@ -85,6 +89,8 @@ export default function piTuix(pi: ExtensionAPI): void {
   };
 
   pi.on("session_start", (_event, ctx) => {
+    completionRead?.abort();
+    completionRead = undefined;
     stopRunTimer();
     run.reset();
     ctx.ui.setWidget("pituix-completion", undefined);
@@ -93,20 +99,24 @@ export default function piTuix(pi: ExtensionAPI): void {
     shell.handleSessionStart(ctx);
     clearPlan(plan);
     plan.visible = true;
-    applyPiTuix(ctx, toolMode, shell, plan);
+    completions.attach(ctx);
     workflow.requestRender = () => {
       if (ctx.mode !== "tui" || !toolMode.enabled) return;
       ctx.ui.setWorkingMessage?.(
-        run.workingMessage(`${workflowWorkingLabel(workflow)}...`, Date.now(), useAsciiChrome()),
+        run.workingMessage(`${workflowWorkingLabel(workflow)}...`, Date.now(), shell.useAscii()),
       );
       ctx.ui.setStatus?.(
         "pituix-queue",
         workflow.queuedMessages > 0 ? `${workflow.queuedMessages} follow-up queued` : undefined,
       );
     };
+    syncInterface(ctx);
     shell.handleRefresh(ctx, true);
   });
   pi.on("agent_start", (_event, ctx) => {
+    completionRead?.abort();
+    completionRead = undefined;
+    completionBranch = undefined;
     run.begin();
     stopRunTimer();
     if (ctx.mode === "tui") {
@@ -116,17 +126,30 @@ export default function piTuix(pi: ExtensionAPI): void {
     beginAgentRun(workflow);
     shell.handleAgentStart();
   });
-  pi.on("agent_end", (event) => {
+  pi.on("agent_end", async (event, ctx) => {
     stopRunTimer();
     run.end(event.messages ?? []);
     finishAgentRun(workflow);
     shell.handleAgentEnd();
+    if (ctx.mode === "tui" && toolMode.enabled) {
+      const request = new AbortController();
+      completionRead?.abort();
+      completionRead = request;
+      const gitBranch = await readGitBranch(ctx.cwd, request.signal);
+      if (request.signal.aborted || completionRead !== request) return;
+      completionRead = undefined;
+      completionBranch = gitBranch;
+    }
   });
   pi.on("agent_settled", (event, ctx) => {
     stopRunTimer();
     const completion = run.settle();
     if (completion && ctx.mode === "tui" && toolMode.enabled) {
-      pi.appendEntry<CompletionEntryData>(COMPLETION_ENTRY_TYPE, { version: 1, ...completion });
+      pi.appendEntry<CompletionEntryData>(COMPLETION_ENTRY_TYPE, {
+        version: 1,
+        ...completion,
+        ...(completionBranch ? { gitBranch: completionBranch } : {}),
+      });
     }
     settleAgent(workflow);
     shell.handleAgentSettled(event, ctx);
@@ -176,37 +199,38 @@ export default function piTuix(pi: ExtensionAPI): void {
     shell.handleRefresh(ctx);
   });
   pi.on("session_tree", (_event, ctx) => {
+    completionRead?.abort();
+    completionRead = undefined;
     run.reset();
     hydrateGroups(ctx);
     toolRenderers.invalidate();
     shell.handleRefresh(ctx);
   });
   pi.on("session_shutdown", (_event, ctx) => {
+    completionRead?.abort();
+    completionRead = undefined;
     stopRunTimer();
     run.reset();
     toolRenderers.clear();
     groups.reset(ctx.cwd);
     shell.handleSessionShutdown(ctx);
+    completions.detach(ctx);
   });
 
   pi.registerCommand("pituix", {
     description: "Show Pi-TUIX status and restore its interface",
     handler: async (_args, ctx) => {
-      applyPiTuix(ctx, toolMode, shell, plan);
-      toolRenderers.invalidate();
-      ctx.ui.notify(`${PACKAGE_NAME} interface enabled (three-layer mode)`, "info");
+      enableInterface(ctx);
+      ctx.ui.notify(`${PACKAGE_NAME} interface enabled (${toolMode.defaultMode} tools)`, "info");
     },
   });
 
   pi.registerCommand("pituix-default", {
     description: "Restore Pi's default TUI components",
     handler: async (_args, ctx) => {
-      toolMode.enabled = false;
-      ctx.ui.setTitle("pi");
-      shell.remove(ctx);
-      toolRenderers.invalidate();
-      ctx.ui.setStatus?.("pituix-queue", undefined);
-      ctx.ui.setWidget("pituix-plan", undefined);
+      if (ctx.mode !== "tui") return;
+      shell.setEnabled(false);
+      syncInterface(ctx);
       ctx.ui.notify("Pi default interface restored", "info");
     },
   });
@@ -215,9 +239,8 @@ export default function piTuix(pi: ExtensionAPI): void {
     description: "Show collapsed reference-style tool summaries",
     handler: async (_args, ctx) => {
       toolMode.defaultMode = "collapsed";
-      applyPiTuix(ctx, toolMode, shell, plan);
+      enableInterface(ctx);
       ctx.ui.setToolsExpanded?.(false);
-      toolRenderers.invalidate();
       ctx.ui.notify(`${PACKAGE_NAME} compact mode enabled`, "info");
     },
   });
@@ -226,9 +249,8 @@ export default function piTuix(pi: ExtensionAPI): void {
     description: "Show reference-style tool previews with expansion",
     handler: async (_args, ctx) => {
       toolMode.defaultMode = "preview";
-      applyPiTuix(ctx, toolMode, shell, plan);
+      enableInterface(ctx);
       ctx.ui.setToolsExpanded?.(false);
-      toolRenderers.invalidate();
       ctx.ui.notify(`${PACKAGE_NAME} three-layer mode enabled`, "info");
     },
   });

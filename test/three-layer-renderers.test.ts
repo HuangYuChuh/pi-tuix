@@ -399,6 +399,59 @@ test("every reference tool retains the official executor and schema", () => {
   }
 });
 
+test("configured ASCII mode updates pending and finished tools without changing execution", () => {
+  let ascii = false;
+  const mode: ToolRendererMode = { enabled: true, defaultMode: "preview", ascii: () => ascii };
+  const cwd = process.cwd();
+  const fixtures = [
+    { definition: createThreeLayerReadDefinition(cwd, mode), args: { path: "sample.ts" } },
+    { definition: createThreeLayerBashDefinition(cwd, mode), args: { command: "echo result" } },
+    {
+      definition: createThreeLayerEditDefinition(cwd, mode),
+      args: { path: "sample.ts", edits: [] },
+    },
+    {
+      definition: createThreeLayerWriteDefinition(cwd, mode),
+      args: { path: "sample.ts", content: "result" },
+    },
+  ];
+  const tui = { requestRender() {} } as ConstructorParameters<typeof ToolExecutionComponent>[5];
+  for (const { definition, args } of fixtures) {
+    ascii = false;
+    const component = new ToolExecutionComponent(
+      definition.name,
+      "icons",
+      args,
+      {},
+      definition,
+      tui,
+      cwd,
+    );
+    const lines = () => component.render(100).map(stripTerminalSequences).join("\n");
+    assert.match(lines(), /⏺/);
+    ascii = true;
+    component.invalidate();
+    assert.match(lines(), /\* .*\[QUEUED\]/);
+    component.updateResult({
+      ...result(
+        "result",
+        definition.name === "edit"
+          ? { diff: "-1 old\n+1 new", patch: "", firstChangedLine: 1 }
+          : undefined,
+      ),
+      isError: false,
+    });
+    assert.match(lines(), /\* .*\[OK\]/);
+    assert.match(lines(), / {2}L {2}/);
+    ascii = false;
+    component.invalidate();
+    assert.match(lines(), /⏺ .*\[OK\]/);
+    assert.match(lines(), / {2}⎿ {2}/);
+    for (const width of [0, 1, 4, 12, 40, 80, 100])
+      assert.ok(component.render(width).every((line) => visibleWidth(line) <= width));
+  }
+});
+
 test("live host tool components restore native frames and results after mode changes", () => {
   const cwd = process.cwd();
   const mode: ToolRendererMode = { enabled: true, defaultMode: "preview" };

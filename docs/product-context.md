@@ -90,7 +90,20 @@ provider, permission, transcript, or session ownership to Pi-TUIX. Successful
 reference tool workflows have now been observed through a separately configured
 Claude Code gateway. The model picker reads Pi's scoped/available models and
 delegates selection to Pi; it does not maintain a separate model catalogue.
+Live message presentation composes reversible wrappers through Pi's public
+component tree in both terminal modes. Pi still owns the original transcript
+containers, sessions, input, queue delivery and native scrolling/search state.
+Pi-TUIX owns the message styling and its disposable layout caches.
 
-Run-completion and interruption records improve scanning across past turns. Pi-TUIX owns their display payload and renderer, while Pi owns session storage and excludes these plain custom entries from model context.
-
-The live message view and read-only transcript snapshot share presentation components. Pi retains document ownership, native viewport input and session state. Reversible public wrappers and disposable layout caches introduce no second runtime.
+Run completion history is presentation metadata delegated to Pi's public custom
+entry API. Pi-TUIX supplies a versioned payload and renderer; Pi retains session
+storage, ordering, branching and model-context construction. Disabling or removing
+the renderer requires no migration and does not delete or rewrite messages.
+The same payload may record the Git branch observed at run end for session-picker
+display. Old runs without that observation remain unknown; opening a picker never
+backfills history from the current checkout. File sizes are read from the selected
+session data without creating a second session catalogue or persistence layer.
+The picker also exposes Pi's existing session naming through public APIs after
+explicit confirmation. Pi owns the native name entry and any legacy migration;
+opening, searching, filtering and previewing remain read-only. These controls
+do not introduce a separate session format or require migration on removal.
