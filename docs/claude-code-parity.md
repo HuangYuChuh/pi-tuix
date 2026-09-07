@@ -181,6 +181,15 @@ remain a measured difference, rather than a claim of full syntax parity.
   Chinese input, ASCII fallback, 1-40 terminal rows, footer restoration, and
   cleanup when the custom view fails. Unsupported wheel-speed UI is removed;
   its stored preference remains for compatibility and has no host effect.
+- The enabled preference is shared by settings, enable/default commands and
+  startup, including history replay before `session_start`. Regression tests
+  cover disabled startup, switching during a run, queue clearing, restoring
+  historical completions without blank host rows, malformed preference types
+  and configured ASCII pending/result tool rendering. Actual Pi 0.85.1
+  fullscreen at 100x40 verifies disabling through settings, reloading while
+  disabled, restoring saved completion/interruption lines and switching all
+  message/tool/completion symbols from ASCII to Unicode. Pi 0.84.4 regular mode
+  at 80x24 verifies disabled startup and restoration of the same saved history.
 - Model picker tests cover host scope, capability clamping, draft effort,
   cancellation, selection failures, exact public setter delegation, ANSI/CJK
   rendering and selected-row visibility in short terminals. An interactive Pi

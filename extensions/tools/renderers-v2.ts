@@ -33,6 +33,7 @@ export interface ToolRendererMode {
   defaultMode: DisplayMode; // collapsed | preview | expanded
   observe?: (toolCallId: string, invalidate: () => void) => void;
   groups?: ToolGroupRuntime;
+  ascii?: () => boolean;
 }
 
 type ReadDefinition = ReturnType<typeof createReadToolDefinition>;
@@ -156,8 +157,13 @@ interface SharedPresentationState {
 
 class PendingToolView extends ThreeLayerToolView {
   private readonly shared: SharedPresentationState;
-  constructor(summary: ToolSummary, theme: Theme, shared: SharedPresentationState) {
-    super("collapsed", summary, [], theme);
+  constructor(
+    summary: ToolSummary,
+    theme: Theme,
+    shared: SharedPresentationState,
+    ascii?: () => boolean,
+  ) {
+    super("collapsed", summary, [], theme, ascii);
     this.shared = shared;
   }
   override render(width: number): string[] {
@@ -201,6 +207,7 @@ export function createThreeLayerReadDefinition(
         summary,
         theme,
         context.state as unknown as SharedPresentationState,
+        mode.ascii,
       );
     },
 
@@ -255,7 +262,7 @@ export function createThreeLayerReadDefinition(
       // 准备详情行
       const detailLines = formatLines(splitLines(output), theme);
 
-      const view = new ThreeLayerToolView(displayMode, summary, detailLines, theme);
+      const view = new ThreeLayerToolView(displayMode, summary, detailLines, theme, mode.ascii);
       return mode.groups
         ? new GroupedToolView(
             context.toolCallId,
@@ -301,6 +308,7 @@ export function createThreeLayerBashDefinition(
         summary,
         theme,
         context.state as unknown as SharedPresentationState,
+        mode.ascii,
       );
     },
 
@@ -342,7 +350,7 @@ export function createThreeLayerBashDefinition(
       const displayMode: DisplayMode = options.expanded ? "expanded" : mode.defaultMode;
       const detailLines = formatLines(splitLines(output), theme);
 
-      const view = new ThreeLayerToolView(displayMode, summary, detailLines, theme);
+      const view = new ThreeLayerToolView(displayMode, summary, detailLines, theme, mode.ascii);
       return mode.groups
         ? new GroupedToolView(
             context.toolCallId,
@@ -388,6 +396,7 @@ export function createThreeLayerEditDefinition(
         summary,
         theme,
         context.state as unknown as SharedPresentationState,
+        mode.ascii,
       );
     },
 
@@ -441,7 +450,7 @@ export function createThreeLayerEditDefinition(
           ? formatLines(splitLines(output), theme)
           : [];
 
-      return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
+      return new ThreeLayerToolView(displayMode, summary, detailLines, theme, mode.ascii);
     },
   };
 }
@@ -479,6 +488,7 @@ export function createThreeLayerWriteDefinition(
         summary,
         theme,
         context.state as unknown as SharedPresentationState,
+        mode.ascii,
       );
     },
 
@@ -525,7 +535,7 @@ export function createThreeLayerWriteDefinition(
       const displayMode: DisplayMode = options.expanded ? "expanded" : mode.defaultMode;
       const detailLines = context.isError ? formatLines(splitLines(output), theme) : contentLines;
 
-      return new ThreeLayerToolView(displayMode, summary, detailLines, theme);
+      return new ThreeLayerToolView(displayMode, summary, detailLines, theme, mode.ascii);
     },
   };
 }

@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test, { afterEach, beforeEach } from "node:test";
 import type {
   CustomEntry,
   EntryRenderer,
@@ -10,13 +13,28 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import {
+  type Component,
   type EditorComponent,
   type EditorTheme,
   stripTerminalSequences,
   type TUI,
 } from "@earendil-works/pi-tui";
 import piTuix from "../extensions/index.ts";
+import { DEFAULT_CONFIG, loadConfig, saveConfig } from "../extensions/shell/open-tui/config.ts";
 import { COMPLETION_ENTRY_TYPE } from "../extensions/stream/completion-entry.ts";
+
+let previousAgentDir: string | undefined;
+let agentDir: string;
+beforeEach(() => {
+  previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  agentDir = mkdtempSync(join(tmpdir(), "pituix-lifecycle-"));
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+});
+afterEach(() => {
+  if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+  else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+  rmSync(agentDir, { recursive: true, force: true });
+});
 
 test("Pi-TUIX installs and reverses its editor component in the active session", async () => {
   // biome-ignore lint/suspicious/noExplicitAny: Test mock types
@@ -214,7 +232,8 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   await commands.get("pituix-mode")?.handler("preview", context);
   assert.equal(toolRedraws, 2);
   await commands.get("pituix-default")?.handler("", context);
-  assert.equal(renderCompletion(), undefined);
+  assert.deepEqual(renderCompletion()?.render(100), []);
+  assert.equal(loadConfig().enabled, false);
   assert.equal(toolRedraws, 3);
   assert.equal(editorFactories.at(-1), undefined);
   assert.equal(ui.theme, originalTheme);
@@ -228,6 +247,7 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   await handlers.get("agent_settled")?.({}, context);
   assert.equal(entries.length, 2, "default UI does not create Pi-TUIX entries");
   await commands.get("pituix")?.handler("", context);
+  assert.equal(loadConfig().enabled, true);
   assert.ok(renderCompletion(), "historical completion restores when re-enabled");
   await handlers.get("session_shutdown")?.({ type: "session_shutdown" }, context);
   await commands.get("pituix-mode")?.handler("preview", context);
@@ -323,4 +343,110 @@ test("plan panel follows Pi-TUIX enable and default lifecycle", async () => {
   assert.equal(widgets.at(-1), undefined);
   await commands.get("pituix-plan")?.handler("show", context);
   assert.equal(widgets.at(-1), undefined);
+});
+
+test("saved disabled startup and settings use the same presentation state as commands", async () => {
+  saveConfig({ ...structuredClone(DEFAULT_CONFIG), enabled: false, icons: { mode: "ascii" } });
+  // biome-ignore lint/suspicious/noExplicitAny: Public lifecycle/command callbacks have different signatures.
+  const handlers = new Map<string, (...args: any[]) => any>();
+  // biome-ignore lint/suspicious/noExplicitAny: Test command context.
+  const commands = new Map<string, { handler: (...args: any[]) => Promise<void> }>();
+  const renderers = new Map<string, EntryRenderer>();
+  const notifications: string[] = [];
+  const editors: unknown[] = [];
+  const statuses = new Map<string, string | undefined>();
+  const indicators: unknown[] = [];
+  const records: unknown[] = [];
+  const pi = {
+    on: (name: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) =>
+      handlers.set(name, handler),
+    registerCommand: (name: string, command: { handler: () => Promise<void> }) =>
+      commands.set(name, command),
+    registerMarkdownTransformer() {},
+    registerEntryRenderer: (name: string, renderer: EntryRenderer) => renderers.set(name, renderer),
+    registerTool() {},
+    appendEntry: (_name: string, record: unknown) => records.push(record),
+  } as unknown as ExtensionAPI;
+  piTuix(pi);
+  const theme = {
+    name: "native",
+    fg: (_color: string, text: string) => text,
+    bold: (text: string) => text,
+    inverse: (text: string) => text,
+  } as Theme;
+  let title = "";
+  let keys: string[] = [];
+  let settingsText = "";
+  const ui = {
+    theme,
+    setTitle: (value: string) => {
+      title = value;
+    },
+    setWorkingIndicator: (value?: unknown) => indicators.push(value),
+    setWorkingMessage() {},
+    setHiddenThinkingLabel() {},
+    setHeader() {},
+    setFooter() {},
+    setWidget() {},
+    setEditorComponent: (factory: unknown) => editors.push(factory),
+    setStatus: (key: string, value?: string) => statuses.set(key, value),
+    notify: (text: string) => notifications.push(text),
+    custom: async (
+      factory: (tui: TUI, theme: Theme, kb: unknown, done: () => void) => Component,
+    ) => {
+      const page = factory(
+        { terminal: { rows: 40 }, requestRender() {} } as unknown as TUI,
+        theme,
+        {},
+        () => {},
+      );
+      settingsText = page.render(100).map(stripTerminalSequences).join("\n");
+      for (const key of keys) page.handleInput?.(key);
+    },
+  };
+  const ctx = {
+    mode: "tui",
+    hasUI: true,
+    cwd: agentDir,
+    ui,
+    getContextUsage: () => undefined,
+  } as unknown as ExtensionContext;
+  const entry = {
+    data: { version: 1, durationMs: 1000, finishedAt: 1000, outcome: "done", failedTools: 0 },
+  } as CustomEntry;
+  const completion = () =>
+    renderers.get(COMPLETION_ENTRY_TYPE)?.(entry, { expanded: false }, theme)?.render(100);
+  assert.deepEqual(completion(), [], "saved state applies before session_start replays history");
+  await handlers.get("session_start")?.({}, ctx);
+  assert.equal(title, "pi");
+  assert.equal(editors.length, 0);
+  await commands.get("pituix-settings")?.handler("", ctx);
+  assert.match(settingsText, /Enabled\s+Off/);
+  keys = ["\r", "\r", "\x1b"];
+  await commands.get("pituix-settings")?.handler("", ctx);
+  assert.equal(title, "Pi-TUIX");
+  assert.equal(typeof editors.at(-1), "function");
+  assert.equal(loadConfig().enabled, true);
+  assert.match(completion()?.[0] ?? "", /^\* Worked/);
+  assert.deepEqual(indicators.at(-1), { frames: [".", "*", "+", "*"], intervalMs: 120 });
+  await handlers.get("agent_start")?.({}, ctx);
+  await handlers.get("input")?.({ streamingBehavior: "followUp" }, ctx);
+  assert.equal(statuses.get("pituix-queue"), "1 follow-up queued");
+  await commands.get("pituix-settings")?.handler("", ctx);
+  assert.equal(title, "pi");
+  assert.equal(loadConfig().enabled, false);
+  assert.equal(editors.at(-1), undefined);
+  assert.equal(statuses.get("pituix-queue"), undefined);
+  await handlers.get("agent_end")?.({ messages: [{ role: "assistant", stopReason: "stop" }] }, ctx);
+  await handlers.get("agent_settled")?.({}, ctx);
+  assert.deepEqual(records, []);
+  assert.deepEqual(completion(), []);
+  await commands.get("pituix")?.handler("", ctx);
+  assert.equal(loadConfig().enabled, true);
+  assert.match(completion()?.[0] ?? "", /^\* Worked/);
+  assert.match(notifications.at(-1) ?? "", /preview tools/);
+  keys = [];
+  await commands.get("pituix-settings")?.handler("", ctx);
+  assert.match(settingsText, /Enabled\s+On/);
+  await handlers.get("session_shutdown")?.({}, ctx);
 });

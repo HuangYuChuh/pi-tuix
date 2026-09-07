@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Persist a single enabled preference across settings and enable/default commands, including startup/reload; synchronize shell, tools, plan, queue and completion visibility.
+- Restore historical completion rows after disabled startup without retaining host spacing or rebuilding sessions; apply configured icons to tools, working feedback and saved conversation views.
+- Suppress performance notifications while disabled and validate preference types without mutating defaults.
 - Align startup, prompt rules, and compact footer with observed Claude Code 2.1.263 terminal layout; retain Pi-TUIX identity and Pi runtime ownership.
 - Apply the reference dark palette reversibly and expose detailed statistics through `/pituix-status`.
 - Add empty-input shortcut help and live working/thinking/responding labels.

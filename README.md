@@ -48,7 +48,7 @@ See [Using the development version](docs/development.md) for local installation 
 
 The development shell follows observed Claude Code 2.1.263 terminal layout: compact startup information, horizontal prompt rules, contextual shortcut help, and a one-line footer. `/pituix-status` reveals detailed Git/runtime/context/cost statistics. This is a partial visual adaptation; see the [reference observations and remaining gaps](docs/claude-code-parity.md).
 
-The editor extends Pi's public `CustomEditor`, preserving submission, history, autocomplete, paste handling, and registered application shortcuts. Press `?` on an empty draft for help. `/pituix-default` restores native components and the previous theme in the active session.
+The editor extends Pi's public `CustomEditor`, preserving submission, history, autocomplete, paste handling, and registered application shortcuts. Press `?` on an empty draft for help. `/pituix-default` restores native components and the previous theme in the active session. It also saves the disabled preference; `/pituix` saves the enabled preference. The settings switch uses this same state, including after restart or reload. The enabled state applies when the settings page closes, and disabled runs do not add Pi-TUIX completion records or telemetry notifications. Icon selection also applies to tools, working feedback, completion history and session previews.
 
 The effective thinking level appears above the prompt with Pi's configured shortcut. `/pituix-settings` opens searchable preference tabs: type to filter, press Enter to select a result, then Enter or Space to change it. Tab switches categories; Escape clears the query, leaves search, then closes the page.
 

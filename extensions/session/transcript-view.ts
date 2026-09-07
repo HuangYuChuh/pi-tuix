@@ -91,6 +91,7 @@ export class TranscriptContent implements Component {
     for (const entry of this.entries) groups.recordEntry(entry);
     const mode: ToolRendererMode = {
       enabled: true,
+      ascii: () => this.ascii,
       defaultMode: "preview",
       ...(this.options.groupTools === false ? {} : { groups }),
     };
@@ -339,7 +340,7 @@ export class TranscriptView implements Component {
   }
 }
 
-export function registerTranscriptCommand(pi: ExtensionAPI): void {
+export function registerTranscriptCommand(pi: ExtensionAPI, ascii = useAsciiChrome): void {
   pi.registerCommand("pituix-transcript", {
     description: "Read the current conversation with reference message and tool layout",
     handler: async (_args, ctx: ExtensionCommandContext) => {
@@ -347,7 +348,7 @@ export function registerTranscriptCommand(pi: ExtensionAPI): void {
       const entries = ctx.sessionManager.getBranch();
       await ctx.ui.custom<void>(
         (tui, theme, keys, done) => {
-          const content = new TranscriptContent(entries, theme, tui, ctx.cwd, useAsciiChrome());
+          const content = new TranscriptContent(entries, theme, tui, ctx.cwd, ascii());
           const view = new TranscriptView(
             content,
             theme,

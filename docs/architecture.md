@@ -60,12 +60,24 @@ Cancellation has a separate interruption prompt, including Pi's error-form
 AbortError case. Imported records with invalid fields or unknown versions are
 ignored. The snapshot reader uses the same parser and formatter.
 
-Pi can replay custom entries before `session_start`, so renderer registration
-starts in the enabled state used by startup. Mode changes invalidate the public
-component tree when installing/removing the live document composition. This
-lets the host rebuild its custom-entry wrappers with or without their spacing;
-`/pituix-default` hides the rows and `/pituix` restores them. Without the extension,
-Pi ignores these unregistered custom entries and keeps the ordinary conversation.
+Pi can replay custom entries before `session_start`, so presentation reads the
+saved enabled preference at registration. Valid completion renderers always
+return an owned row, preserving host mounting even when startup is disabled.
+A zero-height `setWidget` factory supplies the public TUI reference. After host
+composition, a public `Container` wraps only entry containers containing our
+row; it hides both the row and host spacing while disabled, retaining the source
+as a child for native invalidation. Cleanup unwraps only these owned containers
+and preserves host additions, removal and reordering. No session rebuild or
+private host fields are used. Without the extension, Pi ignores these
+unregistered custom entries and keeps the ordinary conversation.
+
+Settings and enable/default commands share one persisted `enabled` preference.
+After the settings page closes, the lifecycle controller synchronizes the shell,
+tool renderers, plan, queue and completion visibility. Disabled runs retain
+observational state for a later mode switch but add no completion metadata or
+telemetry notifications. Icon selection is read by pending/result tools, working
+feedback, history and preview renderers. Preference parsing validates primitive
+types and known choices without sharing mutable defaults.
 
 Stream status maps public assistant events to explicit `THINKING`, `RESPONDING`, and `TOOL` labels, includes the one-based turn number, and shows the active thinking level and context pressure. The plan adapter reads assistant text after a turn, recognizes a `Plan:` or localized plan heading with numbered or checkbox steps, and renders those steps through `setWidget()`. It is deliberately observational: it does not inject plan instructions, disable tools, or infer completion from tool execution.
 
