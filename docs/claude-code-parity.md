@@ -87,6 +87,10 @@ the complete `[Image #2]` label, but submitting the recalled prompt created no
 image attachment branches; the authenticated model reported no images attached.
 The saved user entry contained text only. Historical label editing therefore
 does not prove that image bytes will be attached again.
+A manually typed `[Image #999]`, with no corresponding attachment, had the same
+editing behavior: Right crossed it, Backspace removed it, Ctrl+_ restored it,
+and Alt+B moved to its beginning. Literal numbered labels are therefore atomic
+text spans independently of attachment data.
 
 Pasting two absolute image paths separated by spaces or newlines produced two
 chips separated by one space. Backslash-escaped spaces in a filename worked;
@@ -178,7 +182,7 @@ broadly than the observed reference.
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
 | Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Old runs without branch observations stay unknown |
 | Main/snapshot/preview image attachments | Public message/context entries, component composition, `hyperlink`, native URL activation | User-only numbering, image-only prompts and openable temporary raster files implemented; Read images use file/byte summaries, other tool/custom images use unnumbered links |
-| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation | Multi-path chips, atomic edits, captured-image links, positional submission and native follow-up delivery implemented; atomic historical text labels and parser edge cases still differ |
+| Image paste and draft chips | Public editor text/cursor/undo, clipboard callback, input transformation | Multi-path chips, literal/history label editing, captured-image links and positional submission implemented; collapsed-paste deletion, queue-label ambiguity and parser edge cases still differ |
 | Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
 | Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
 | Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
@@ -284,6 +288,20 @@ remain a measured difference, rather than a claim of full syntax parity.
   draft tokens leaked into the saved session. A fresh Pi runtime recalled the
   historical text labels; the Claude reference probe above corrected the earlier
   assumption that restart recall should automatically reattach images.
+- Literal-label tests cover whole-span arrow/word movement, deletion and native
+  undo, fresh history browsing/draft restoration, remapped arrows, Unicode,
+  narrow layouts and unchanged text submission. Actual Pi 0.85.1 at 100x40
+  recalled `[Image #18] [Image #19]`, crossed/deleted/restored the first label
+  and submitted only the original text. Actual Pi 0.84.4 at 80x24 deleted and
+  restored a manually typed `[Image #999]`; the provider again received text
+  without new images. `/pituix-default` restored native character deletion in
+  the active fullscreen session, and both runtime caches were removed on quit.
+  Literal-label deletion retains native behavior when collapsed paste data is
+  present, because public `setText` would clear that registry. Another verified
+  gap is queue take-back: its current number-based restoration can mistake a
+  literal label for an owned image with the same number. Submission before
+  take-back correctly leaves that literal as text; restoration must use the
+  observed input identity instead of the number alone.
 - Resume controls tests cover branch indexing beyond the visible window,
   selection stability, search/scope combinations, unavailable Git, unreadable
   files, queue replacement, aborts and stale results. Rename tests cover native

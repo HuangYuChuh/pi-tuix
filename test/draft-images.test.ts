@@ -570,3 +570,154 @@ test("ordinary prose, malformed lists and excessive file drops stay unchanged an
     h.close();
   }
 });
+
+test("literal image labels move and delete atomically while submission remains text only", () => {
+  const h = fixture();
+  try {
+    const text = "Before [Image #999] After";
+    h.editor.handleInput(text);
+    h.editor.handleInput("\x01");
+    for (let index = 0; index < 7; index++) h.editor.handleInput("\x1b[C");
+    assert.equal(h.editor.getCursor().col, 7);
+    h.editor.handleInput("\x1b[C");
+    assert.equal(h.editor.getCursor().col, 19);
+    h.editor.handleInput("\x7f");
+    assert.equal(h.editor.getText(), "Before  After");
+    assert.deepEqual(h.editor.getCursor(), { line: 0, col: 7 });
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getText(), text);
+    assert.equal(h.editor.getCursor().col, 19);
+    h.editor.handleInput("\x1b[D");
+    assert.equal(h.editor.getCursor().col, 7);
+    h.editor.handleInput("\x1b[3~");
+    assert.equal(h.editor.getText(), "Before  After");
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getText(), text);
+    assert.equal(h.editor.getCursor().col, 7);
+    assert.equal(h.images.has(text), false);
+    assert.deepEqual(h.images.transform({ type: "input", text, source: "interactive" }), {
+      action: "continue",
+    });
+    let submitted = "";
+    h.editor.onSubmit = (value) => {
+      submitted = value;
+    };
+    h.editor.handleInput("\r");
+    assert.equal(submitted, text);
+    h.paste();
+    assert.equal(h.images.display(h.editor.getText()), "[Image #1]");
+  } finally {
+    h.close();
+  }
+});
+
+test("fresh history labels retain native browsing, draft restoration and one-step edit undo", () => {
+  const h = fixture();
+  try {
+    const history = "Before [Image #2][Image #4] After";
+    h.editor.addToHistory("Older prompt");
+    h.editor.addToHistory(history);
+    h.editor.setText("Current draft");
+    h.editor.handleInput("\x01");
+    h.editor.handleInput("\x1b[A");
+    assert.equal(h.editor.getText(), history);
+    h.editor.handleInput("\x1b[A");
+    assert.equal(h.editor.getText(), "Older prompt");
+    h.editor.handleInput("\x1b[B");
+    assert.equal(h.editor.getText(), history);
+    h.editor.handleInput("\x1b[B");
+    assert.equal(h.editor.getText(), "Current draft");
+    h.editor.handleInput("\x01");
+    h.editor.handleInput("\x1b[A");
+    h.editor.handleInput("\x05");
+    for (let index = 0; index < 6; index++) h.editor.handleInput("\x1b[D");
+    h.editor.handleInput("\x7f");
+    assert.equal(h.editor.getText(), "Before [Image #2] After");
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getText(), history);
+    assert.equal(h.images.has(h.editor.getText()), false);
+  } finally {
+    h.close();
+  }
+});
+
+test("literal label layout keeps Unicode, narrow widths and vertical cursor positions intact", () => {
+  const h = fixture();
+  try {
+    const text = "中文🙂 12345678[Image #12]suffix";
+    h.editor.setText(text);
+    for (const width of [1, 2, 3, 4, 8, 14, 22, 40, 100]) {
+      const lines = h.editor.render(width);
+      assert.ok(lines.every((line) => visibleWidth(line) <= width));
+      assert.doesNotMatch(lines.join(""), /[\u{f0000}-\u{ffffd}]/u);
+    }
+    h.editor.setText("12345678[Image #12]suffix");
+    h.editor.render(22);
+    const end = h.editor.getCursor();
+    h.editor.handleInput("\x1b[A");
+    const up = h.editor.getCursor();
+    assert.ok(up.col <= 8 || up.col >= 19);
+    h.editor.handleInput("\x1b[B");
+    assert.deepEqual(h.editor.getCursor(), end);
+    assert.equal(h.editor.getText(), "12345678[Image #12]suffix");
+  } finally {
+    h.close();
+  }
+});
+
+test("literal label edits retain real image identities and native collapsed-paste undo", () => {
+  const h = fixture();
+  try {
+    h.paste();
+    const image = h.editor.getText();
+    h.editor.handleInput(" [Image #1]");
+    h.editor.handleInput("\x7f");
+    assert.equal(h.editor.getText(), `${image} `);
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getText(), `${image} [Image #1]`);
+    const transformed = h.images.transform({
+      type: "input",
+      text: h.editor.getText(),
+      source: "interactive",
+    });
+    assert.equal(transformed.action, "transform");
+    if (transformed.action !== "transform") assert.fail();
+    assert.equal(transformed.images?.length, 1);
+    assert.equal(transformed.images?.[0].data, png);
+    const large = "pasted line\n".repeat(20);
+    h.paste(large);
+    h.editor.handleInput(" [Image #999]");
+    const expanded = h.editor.getExpandedText();
+    h.editor.handleInput("\x7f");
+    assert.ok(h.editor.getExpandedText().includes(large));
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getExpandedText(), expanded);
+  } finally {
+    h.close();
+  }
+});
+
+test("word movement and remapped arrows cannot strand the cursor inside a literal label", () => {
+  const h = fixture();
+  const bindings = keys.getUserBindings();
+  try {
+    h.editor.setText("中文\nBefore [Image #12]");
+    h.editor.handleInput("\x1bb");
+    assert.deepEqual(h.editor.getCursor(), { line: 1, col: 7 });
+    h.editor.handleInput("\x1bf");
+    assert.deepEqual(h.editor.getCursor(), { line: 1, col: 18 });
+    keys.setUserBindings({ "tui.editor.cursorLeft": "h", "tui.editor.cursorRight": "l" });
+    h.editor.handleInput("h");
+    assert.deepEqual(h.editor.getCursor(), { line: 1, col: 7 });
+    h.editor.handleInput("l");
+    assert.deepEqual(h.editor.getCursor(), { line: 1, col: 18 });
+    h.editor.handleInput("\x7f");
+    assert.equal(h.editor.getText(), "中文\nBefore ");
+    assert.deepEqual(h.editor.getCursor(), { line: 1, col: 7 });
+    h.editor.handleInput("\x1f");
+    assert.equal(h.editor.getText(), "中文\nBefore [Image #12]");
+  } finally {
+    keys.setUserBindings(bindings);
+    h.close();
+  }
+});

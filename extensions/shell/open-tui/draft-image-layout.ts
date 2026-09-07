@@ -1,5 +1,6 @@
 import { CURSOR_MARKER, hyperlink, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { DraftImages } from "./draft-images.ts";
+import { segmentImageLabels } from "./image-labels.ts";
 
 interface Cell {
   text: string;
@@ -19,7 +20,6 @@ export interface DraftImageLayout {
   up?: { line: number; col: number };
   down?: { line: number; col: number };
 }
-const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 /** Layout uses public editor text/cursor data; it never reads the host's state. */
 export function layoutDraftImages(
@@ -40,7 +40,7 @@ export function layoutDraftImages(
   for (let line = 0; line < source.length; line++) {
     let row: Row = { line, cells: [] };
     let columns = 0;
-    const cells = [...segmenter.segment(source[line])].map(({ segment, index }) => {
+    const cells = segmentImageLabels(source[line]).map(({ segment, index }) => {
       const code = segment.codePointAt(0) ?? 0;
       const label = code < 32 || (code >= 127 && code < 160) ? "?" : images.display(segment);
       const url = images.get(segment)?.url;

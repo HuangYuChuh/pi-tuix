@@ -21,6 +21,7 @@ import {
   DEFAULT_FULLSCREEN_WHEEL_SCROLL_LINES,
 } from "./fullscreen-scroll.ts";
 import { type IconMode, useAsciiChrome } from "./icons.ts";
+import { hasImageLabels, imageLabelAt } from "./image-labels.ts";
 import { findBottomBorderIndex, isEditorBorderLine, stripAnsi } from "./utils.ts";
 
 function fillLine(content: string, width: number): string {
@@ -179,7 +180,7 @@ export class OpenTuiEditor extends CustomEditor {
       }
       return;
     }
-    if (this.moveImageCursor(data)) return;
+    if (this.handleTextImageLabel(data) || this.moveImageCursor(data)) return;
     this.imagePreferredColumn = undefined;
     if (data === "?" && this.getText() === "") {
       this.helpVisible = !this.helpVisible;
@@ -192,11 +193,58 @@ export class OpenTuiEditor extends CustomEditor {
       return;
     }
     this.helpVisible = false;
+    const beforeText = super.getText();
+    const beforeCursor = this.getCursor();
     super.handleInput(this.images?.display(data) ?? data);
+    const cursor = this.getCursor();
+    if (
+      this.images &&
+      beforeText === super.getText() &&
+      (cursor.line !== beforeCursor.line || cursor.col !== beforeCursor.col)
+    ) {
+      const backwards =
+        cursor.line < beforeCursor.line ||
+        (cursor.line === beforeCursor.line && cursor.col < beforeCursor.col);
+      const label = imageLabelAt(this.getLines()[cursor.line] ?? "", cursor.col, backwards);
+      if (label && cursor.col > label.start && cursor.col < label.end)
+        this.moveToCursor({ line: cursor.line, col: backwards ? label.start : label.end });
+    }
+  }
+
+  private hasRichDraft(): boolean {
+    const text = super.getText();
+    return Boolean(this.images && (this.images.has(text) || hasImageLabels(text)));
+  }
+
+  private handleTextImageLabel(data: string): boolean {
+    if (!this.images || this.isShowingAutocomplete()) return false;
+    const keys = getKeybindings();
+    const left = keys.matches(data, "tui.editor.cursorLeft");
+    const right = keys.matches(data, "tui.editor.cursorRight");
+    const backspace = keys.matches(data, "tui.editor.deleteCharBackward");
+    const forwardDelete = keys.matches(data, "tui.editor.deleteCharForward");
+    if (!left && !right && !backspace && !forwardDelete) return false;
+    const cursor = this.getCursor();
+    const lines = this.getLines();
+    const label = imageLabelAt(lines[cursor.line] ?? "", cursor.col, left || backspace);
+    if (!label) return false;
+    this.imagePreferredColumn = undefined;
+    if (left || right)
+      return this.moveToCursor({ line: cursor.line, col: left ? label.start : label.end });
+
+    // Public setText provides one native undo snapshot. It also clears native
+    // collapsed-paste data, so retain native deletion when that data is present.
+    if (super.getExpandedText() !== super.getText()) return false;
+    const line = lines[cursor.line];
+    lines[cursor.line] = line.slice(0, label.start) + line.slice(label.end);
+    super.setText(lines.join("\n"));
+    this.moveToCursor({ line: cursor.line, col: label.start });
+    this.tui.requestRender();
+    return true;
   }
 
   private moveImageCursor(data: string): boolean {
-    if (!this.images?.has(super.getText()) || this.isShowingAutocomplete()) return false;
+    if (!this.images || !this.hasRichDraft() || this.isShowingAutocomplete()) return false;
     if (
       this.appKeys.matches(data, "tui.editor.historyPrevious") ||
       this.appKeys.matches(data, "tui.editor.historyNext")
@@ -219,10 +267,16 @@ export class OpenTuiEditor extends CustomEditor {
     const target = up ? layout.up : layout.down;
     if (!target) return false;
     this.imagePreferredColumn ??= layout.column;
+    return this.moveToCursor(target);
+  }
+
+  private moveToCursor(target: { line: number; col: number }): boolean {
+    const keys = getKeybindings();
     const lines = this.getLines();
     const offset = (cursor: { line: number; col: number }) =>
       lines.slice(0, cursor.line).reduce((sum, line) => sum + line.length + 1, cursor.col);
     const destination = offset(target);
+    if (destination === offset(this.getCursor())) return true;
     const action =
       destination < offset(this.getCursor()) ? "tui.editor.cursorLeft" : "tui.editor.cursorRight";
     const candidates = action === "tui.editor.cursorLeft" ? ["\x1b[D", "\x02"] : ["\x1b[C", "\x06"];
@@ -300,23 +354,24 @@ export class OpenTuiEditor extends CustomEditor {
 
   render(width: number): string[] {
     if (width <= 0) return [];
-    if (width < 4 && !this.images?.has(super.getText()))
+    if (width < 4 && !this.hasRichDraft())
       return this.renderBase(width).map((line) => truncateToWidth(line, width, ""));
     const innerWidth = Math.max(1, width - 2);
     this.imageWidth = innerWidth;
     const baseLines = this.renderBase(innerWidth);
     const bottomIdx = findBottomBorderIndex(baseLines);
-    const rich = this.images?.has(super.getText())
-      ? layoutDraftImages(
-          this.getLines(),
-          this.getCursor(),
-          this.images,
-          innerWidth,
-          Math.max(1, Math.min(10, Math.floor(this.tui.terminal.rows / 3))),
-          this.focused,
-          this.cursorStyle === "block",
-        )
-      : undefined;
+    const rich =
+      this.images && this.hasRichDraft()
+        ? layoutDraftImages(
+            this.getLines(),
+            this.getCursor(),
+            this.images,
+            innerWidth,
+            Math.max(1, Math.min(10, Math.floor(this.tui.terminal.rows / 3))),
+            this.focused,
+            this.cursorStyle === "block",
+          )
+        : undefined;
     const top = rich ? (rich.above ? `↑ ${rich.above} more` : "") : baseLines[0];
     const bottom = rich ? (rich.below ? `↓ ${rich.below} more` : "") : baseLines[bottomIdx];
     const result = [renderPromptRule(width, this.getBorder, top, this.ascii)];

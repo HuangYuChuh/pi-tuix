@@ -264,11 +264,17 @@ callback restores surviving known labels to their image identities. Disabling th
 extension expands remaining draft chips to readable source paths before restoring
 the host editor. This also preserves the contents of native collapsed text pastes.
 After a new runtime, Pi recalls historical labels as text without automatically
-reattaching image bytes. The sampled Claude history recall also submits text only,
-although it moves across those labels atomically. That atomic history-label
-behavior and native commands consuming arguments before the input event need
-further work. Quoted path-list acceptance and retaining unavailable paths are
-documented differences from the sampled reference parser.
+reattaching image bytes. The sampled Claude history recall also submits text only.
+Literal `[Image #N]` spans now share whole-span layout and arrow/word navigation
+without entering the attachment registry. A span deletion uses public `setText`
+to create one native undo snapshot, then restores the cursor through native key
+handling. When expanded text differs from the editor buffer, deletion stays
+native: `setText` would otherwise clear the host's collapsed-paste registry.
+History remains Pi-owned and no display token or image data is inserted for a
+literal label. Collapsed-paste deletion, native commands consuming arguments
+before the input event, and queue restoration of literal/owned label collisions
+need further work. Quoted path-list acceptance and retaining unavailable paths
+are documented differences from the sampled reference parser.
 
 The main view composes reversible presentation containers into the public
 document tree. A version-local adapter recognizes public
