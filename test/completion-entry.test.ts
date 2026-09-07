@@ -5,10 +5,18 @@ import {
   type CustomEntry,
   type EntryRenderer,
   type ExtensionAPI,
+  type ExtensionContext,
   type SessionEntry,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import {
+  type Component,
+  Container,
+  Spacer,
+  Text,
+  type TUI,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 import {
   COMPLETION_ENTRY_TYPE,
   readCompletionEntry,
@@ -33,6 +41,12 @@ const entry: CustomEntry = {
 
 test("completion metadata rejects malformed imports and unsupported schema versions", () => {
   assert.deepEqual(readCompletionEntry(data), data);
+  assert.deepEqual(readCompletionEntry({ ...data, gitBranch: "feat/历史" }), {
+    ...data,
+    gitBranch: "feat/历史",
+  });
+  for (const gitBranch of [null, 1, "", "\x1b[31mbranch", "main\nnext", "x".repeat(1025)])
+    assert.deepEqual(readCompletionEntry({ ...data, gitBranch }), data);
   for (const invalid of [
     undefined,
     null,
@@ -92,8 +106,80 @@ test("entry rendering is reversible, width-bounded, ASCII-aware and ignores unkn
   assert.match(component.render(100)[0], /^\* Worked for 2s/);
   enabled = false;
   assert.deepEqual(component.render(100), []);
-  assert.equal(renderer(entry, { expanded: false }, theme), undefined);
+  assert.deepEqual(renderer(entry, { expanded: false }, theme)?.render(100), []);
   enabled = true;
   assert.ok(renderer(entry, { expanded: true }, theme));
   assert.equal(renderer({ ...entry, data: { version: 9 } }, { expanded: false }, theme), undefined);
+});
+
+test("disabled startup hides host entry spacing and restores history without a session rebuild", async () => {
+  let enabled = false;
+  let renderer: EntryRenderer | undefined;
+  const runtime = registerCompletionEntries(
+    {
+      registerEntryRenderer: (_name, value) => {
+        renderer = value as EntryRenderer;
+      },
+    } as ExtensionAPI,
+    () => enabled,
+    () => true,
+  );
+  const theme = { fg: (_color: string, value: string) => value } as Theme;
+  const history = new Container();
+  const before = new Text("Before", 0, 0);
+  const after = new Text("After", 0, 0);
+  const hostEntry = () => {
+    const component = renderer?.(entry, { expanded: false }, theme);
+    assert.ok(component, "a disabled renderer must still keep its host entry mounted");
+    const host = new Container();
+    host.addChild(new Spacer(1));
+    host.addChild(component);
+    return host;
+  };
+  const saved = hostEntry();
+  history.children = [before, saved, after];
+  const root = new Container();
+  root.addChild(history);
+  const tui = Object.assign(root, { requestRender() {} }) as unknown as TUI;
+  let widget: (Component & { dispose?: () => void }) | undefined;
+  const ctx = {
+    mode: "tui",
+    ui: {
+      setWidget(_key: string, factory: ((ui: TUI) => Component) | undefined) {
+        widget?.dispose?.();
+        widget = factory?.(tui);
+      },
+    },
+  } as unknown as ExtensionContext;
+  runtime.attach(ctx);
+  await Promise.resolve();
+  assert.deepEqual(widget?.render(100), []);
+  assert.deepEqual(
+    history.render(100).map((line) => line.trimEnd()),
+    ["Before", "After"],
+  );
+  enabled = true;
+  runtime.refresh();
+  await Promise.resolve();
+  const showing = history.render(100);
+  assert.equal(showing.length, 4);
+  assert.equal(showing[1].trim(), "");
+  assert.match(showing[2], /^\* Worked/);
+  const wrapper = history.children[1];
+  assert.ok(wrapper instanceof Container);
+  assert.equal(wrapper.children[0], saved, "host source identity stays mounted");
+  history.addChild(hostEntry());
+  await Promise.resolve();
+  assert.equal(history.render(100).length, 6, "entries appended later are also composed");
+  enabled = false;
+  runtime.refresh();
+  await Promise.resolve();
+  assert.deepEqual(
+    history.render(100).map((line) => line.trimEnd()),
+    ["Before", "After"],
+  );
+  history.children.reverse();
+  runtime.detach(ctx);
+  assert.equal(history.children[2], saved, "cleanup preserves later host reordering");
+  assert.equal(root.children[0], history);
 });

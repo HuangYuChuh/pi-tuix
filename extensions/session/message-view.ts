@@ -60,11 +60,13 @@ export class ReferenceAssistantText implements Component {
   private readonly theme: Theme;
   private readonly ascii: boolean;
   private readonly thinking: boolean;
+  private readonly metadata: string | undefined;
 
-  constructor(text: string, theme: Theme, ascii = false, thinking = false) {
+  constructor(text: string, theme: Theme, ascii = false, thinking = false, metadata?: string) {
     this.theme = theme;
     this.ascii = ascii;
     this.thinking = thinking;
+    this.metadata = metadata ? messageText(metadata) : undefined;
     this.markdown = new Markdown(
       messageText(text),
       0,
@@ -79,7 +81,7 @@ export class ReferenceAssistantText implements Component {
     const inset = width >= 4 ? 2 : 0;
     // Pi's Markdown wrapper needs room for a wide glyph even in one-cell views.
     const lines = this.markdown.render(Math.max(4, width - inset));
-    return lines.map((line, index) => {
+    const rendered = lines.map((line, index) => {
       const marker = this.thinking ? (this.ascii ? "~" : "∴") : this.ascii ? "*" : "⏺";
       const prefix = inset
         ? index === 0
@@ -88,6 +90,13 @@ export class ReferenceAssistantText implements Component {
         : "";
       return truncateToWidth(prefix + line, width, "");
     });
+    if (!this.metadata) return rendered;
+    const metadataWidth = Math.max(0, width - 2);
+    const label = truncateToWidth(this.metadata, metadataWidth, "");
+    return [
+      this.theme.fg("dim", " ".repeat(Math.max(0, metadataWidth - visibleWidth(label))) + label),
+      ...rendered,
+    ];
   }
 
   invalidate(): void {

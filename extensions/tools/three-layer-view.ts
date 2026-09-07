@@ -33,12 +33,20 @@ export class ThreeLayerToolView implements Component {
   private summary: ToolSummary;
   private details: ToolDetailLine[];
   private theme: Theme;
+  private readonly ascii: () => boolean;
 
-  constructor(mode: DisplayMode, summary: ToolSummary, details: ToolDetailLine[], theme: Theme) {
+  constructor(
+    mode: DisplayMode,
+    summary: ToolSummary,
+    details: ToolDetailLine[],
+    theme: Theme,
+    ascii: () => boolean = useAsciiChrome,
+  ) {
     this.mode = mode;
     this.summary = summary;
     this.details = details;
     this.theme = theme;
+    this.ascii = ascii;
   }
 
   setMode(mode: DisplayMode): void {
@@ -57,7 +65,7 @@ export class ThreeLayerToolView implements Component {
       return lines;
     }
 
-    const branch = useAsciiChrome() ? "  L  " : "  ⎿  ";
+    const branch = this.ascii() ? "  L  " : "  ⎿  ";
     const detailLine = (line: ToolDetailLine, first = false) => {
       const prefix = first ? branch : "     ";
       const content =
@@ -133,7 +141,7 @@ export class ThreeLayerToolView implements Component {
     if (fixedWidth < width) {
       const targetWidth = Math.max(1, width - fixedWidth);
       const truncatedTarget = truncateToWidth(target, targetWidth);
-      return `${this.statusStyle(this.summary.status, useAsciiChrome() ? "*" : "⏺")} ${action}(${truncatedTarget}) ${suffix}`;
+      return `${this.statusStyle(this.summary.status, this.ascii() ? "*" : "⏺")} ${action}(${truncatedTarget}) ${suffix}`;
     }
 
     // 宽度不够：全部截断

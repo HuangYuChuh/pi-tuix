@@ -45,6 +45,21 @@ is included in Pi-TUIX. The reference mascot is replaced with an original ASCII
   Pi-TUIX uses this frame and interaction with its own preference categories.
 - Shell mode: a leading `!`, an indented result branch, running text replaced by
   output, and an interruption hint during execution.
+- `/resume`: a top separator, search frame, selected session title and muted
+  relative time/branch/file-size row. Typing focuses search, Enter selects a
+  result before a second Enter resumes, and Space previews the conversation.
+  Escape returns from preview to the list, clears active search, or cancels the
+  picker. The observed picker also exposes project/branch filters and rename.
+  The measured 2,169-byte reference file displays `2.1KB`, confirming 1024-based
+  size units. The list heading includes selected index/total. Preview footers
+  use shorter relative time (`2h ago`), message count and the recorded branch,
+  while list rows use longer relative time, branch and file size.
+  Ctrl+B toggles the current-branch filter and appends the branch to the project
+  label. Ctrl+R replaces the rows with `Rename session:`, the existing name or
+  an empty placeholder, and Enter/Esc hints. Cancelling leaves the name unchanged;
+  saving and reopening prefills the new name. At 100x40, the separator stays on
+  row 21, rename label/input/hint on rows 28/30/31. The list displays three rows
+  with an edge arrow when more entries exist; its hints start on row 37.
 - A model request failed with an expired-login message. A completion-duration
   line was still rendered for that failed attempt. This is not evidence of a
   successful model turn or of model-driven Read/Edit/Write rendering.
@@ -80,7 +95,12 @@ permission mode was not relaxed.
   reliable for every request.
 - Interrupting a direct `!sleep 30` command removed its running row and restored
   the command draft in shell mode. This is evidence for direct shell-mode
-  cancellation; it is not a model-tool cancellation capture.
+  cancellation.
+- A later model-driven, read-only Python arithmetic command was approved once
+  and interrupted while running. Claude replaced the working animation with
+  an `Interrupted` branch asking what to do next, without a normal completion
+  clock. A standalone model-driven `sleep 30` had been rejected by Claude's
+  Bash tool, so the arithmetic command provided the actual cancellation capture.
 
 Observed dark-theme colors:
 
@@ -116,23 +136,35 @@ broadly than the observed reference.
 | Effort above the prompt | Custom editor, `thinking_level_select`, `model_select` | Implemented; displays Pi's effective level and actual cycle binding |
 | Searchable settings page | `ctx.ui.custom`, public `Input` | Reference frame, filtering, focus navigation and value alignment implemented for Pi-TUIX settings |
 | Numbered model picker and draft effort | `ctx.scopedModels`, model registry, public capability helpers, `pi.setModel`, `pi.setThinkingLevel` | Implemented in `/pituix-model`; cancellation leaves host state unchanged |
-| Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented; spinner frames are an approximation |
-| Queued follow-up count | `input` events, `setStatus` | Observational count; Pi owns delivery |
+| Searchable resume picker | Public session catalogue, parser/context helpers, name APIs, modal UI and `ctx.switchSession` | Rich preview, sizes, recorded Git branches, branch filter and rename implemented. Binary media remains labelled; old runs without branch observations stay unknown |
+| Working/thinking/responding/tool phase | `setWorkingIndicator`, `setWorkingMessage`, lifecycle events | Implemented with elapsed time and reported output tokens; spinner frames/words are an approximation |
+| Completion and interruption feedback | `agent_end`, `agent_settled`, `appendEntry`, `registerEntryRenderer` | One display-only completion per settled run survives resume/reload; cancellation stays distinct; old runs without timing records are not backfilled |
+| Queued follow-up count | `input` events, `setStatus`, public dock components | Count and native pending-message rows remain visible; actual delivery verified, Pi-owned |
 | Read/Bash/Edit/Write rows | Official tool definitions, `renderShell`, `renderCall`, `renderResult`, shared `context.state`, public `renderDiff`/`highlightCode` | Result branches, compact Read counts, numbered Write previews and numbered Update diffs with row/word backgrounds implemented |
 | Adjacent Read/Bash summaries | Finalized message/tool events, public session branch, per-row invalidation | Implemented for adjacent successful calls; paths deduplicated, expanded calls retained, resumed sessions reconstructed |
 | Tool expansion | `options.expanded`, configured `app.tools.expand` | Implemented; no invented E binding |
 | Execution, errors, cancellation | Original tool `execute` functions | Delegated unchanged |
 | Default UI restoration | Public unset/reset methods | Implemented and tested |
-| Built-in user/assistant transcript chrome | No general replacement hook in the declared extension contract | Host-owned; not pixel-identical |
-| Native model command, transcript navigation, resume | Native Pi commands/components | Retained; `/pituix-model` provides the custom model surface |
+| User/assistant transcript chrome | Public document/message containers and identity Markdown transformer | Implemented in regular/fullscreen modes and `/pituix-transcript`; original host containers retained |
+| Native model command, transcript navigation, resume | Native Pi commands/components | Retained; `/pituix-model` and `/pituix-resume` provide custom selection surfaces |
 | Claude permission modes and approval dialogs | Pi trust/permission semantics differ | Not emulated |
 | Claude-specific settings tabs and preferences | Extension-specific settings available | Pi-TUIX categories retained; Claude account/runtime controls are not emulated |
 | MCP group summaries and cross-session agents | No universal renderer hook for other extensions | Not reproduced |
 | Claude checkpoint/rewind behavior | Pi owns sessions, branches, tool execution | Not reproduced |
-| Fullscreen layout and wheel behavior | Pi owns its terminal layout | Use host `--tui-mode fullscreen`; no private-field patch |
+| Fullscreen layout and wheel behavior | Public container composition, native viewport and semantic prompt zones | Native page/wheel/prompt navigation, search and selection share the decorated document; regular/fullscreen switching verified |
 
 Pi exposes `ui_prompt_start` and `ui_prompt_end` for blocking extension prompts.
 They do not provide a replacement renderer for all host permission decisions.
+The main view uses reversible public document-child wrappers, retaining Pi's
+original chat, header, editor and dock containers. Native confirmations,
+selectors and input retain their focus behavior. Pi's fullscreen viewport and
+regular renderer consume the same decorated document, so search closes at its
+matched location and native mode switching is available. Standard OSC 133 zones
+retain semantic prompt navigation. Unrecognized shapes render natively. No
+persistent main-view overlay, separate scroll position or focus observer remains.
+Later user Markdown transformers are not reflected in raw user chrome;
+assistant rendering preserves the host chain. Multi-line/image selection across
+real terminal emulators remains less thoroughly verified than the text fixture.
 
 Tool headings retain explicit status and attention text for accessibility.
 Group summaries also retain a compact target list and explicit success status;
@@ -150,6 +182,29 @@ remain a measured difference, rather than a claim of full syntax parity.
 ## Validation
 
 - TypeScript compilation against Pi 0.84.4 and Biome checks.
+- Resume controls tests cover branch indexing beyond the visible window,
+  selection stability, search/scope combinations, unavailable Git, unreadable
+  files, queue replacement, aborts and stale results. Rename tests cover native
+  paste/cursor handling, configured bindings, cancel/blank/unchanged drafts,
+  exactly-once confirmation, error retry, active-session delegation and stale
+  file sizes. Filesystem tests verify one native name entry with unchanged
+  existing bytes/model context, reject missing/replaced/future files, and check
+  Pi-owned legacy migration only after confirmation. ANSI/CJK and fixed-frame
+  tests cover tiny through normal sizes.
+  Actual Pi 0.85.1 at 100x40 and Pi 0.84.4 at 80x24 exercise branch filtering,
+  prefilled rename, cancellation and saving. The 100-column list and rename
+  frames now retain the observed row positions. Cancelling leaves all fixture
+  bytes and mtimes unchanged; saved and live renames append only native name
+  records. Resuming from preview and `/pituix-default` still work, with the new
+  name visible in Pi's native interface.
+- Session metadata tests cover measured byte formatting, ANSI/CJK bounds, unknown
+  historical branches, compaction and abandoned paths, bounded concurrent reads,
+  cancellation and late-read ordering. Disposable Git tests cover unborn and
+  nested repositories, detached HEAD and aborted reads without checkout changes.
+  Actual Pi 0.85.1 at 100x40 records two completed runs on different Git branches,
+  then displays each saved branch after checkout changes. Pi 0.84.4 at 80x24
+  displays the same list/preview metadata. Both saved files retain identical
+  bytes and modification times across metadata and preview reads.
 - Public `discoverAndLoadExtensions` loading test with an isolated agent directory.
 - Editor/header/footer tests at zero, tiny, narrow, normal, and wide sizes;
   ANSI styling, Chinese input, Unicode and ASCII prompt fallbacks, and cursor
@@ -159,6 +214,15 @@ remain a measured difference, rather than a claim of full syntax parity.
   Chinese input, ASCII fallback, 1-40 terminal rows, footer restoration, and
   cleanup when the custom view fails. Unsupported wheel-speed UI is removed;
   its stored preference remains for compatibility and has no host effect.
+- The enabled preference is shared by settings, enable/default commands and
+  startup, including history replay before `session_start`. Regression tests
+  cover disabled startup, switching during a run, queue clearing, restoring
+  historical completions without blank host rows, malformed preference types
+  and configured ASCII pending/result tool rendering. Actual Pi 0.85.1
+  fullscreen at 100x40 verifies disabling through settings, reloading while
+  disabled, restoring saved completion/interruption lines and switching all
+  message/tool/completion symbols from ASCII to Unicode. Pi 0.84.4 regular mode
+  at 80x24 verifies disabled startup and restoration of the same saved history.
 - Model picker tests cover host scope, capability clamping, draft effort,
   cancellation, selection failures, exact public setter delegation, ANSI/CJK
   rendering and selected-row visibility in short terminals. An interactive Pi
@@ -180,6 +244,26 @@ remain a measured difference, rather than a claim of full syntax parity.
   boundaries, pending results, ANSI/CJK widths, individual expansion and native
   restoration. A saved interactive Pi session was reopened through `--session`
   and retained the expected `Read 1 file, ran 2 shell commands` summary.
+- Run-presentation tests cover elapsed time, reported usage without duplicate
+  counting, retry duration, settlement, failures, cancellation and ASCII/width
+  handling. Actual Pi sessions verified working elapsed time, completion,
+  default-UI cleanup and interruption of the arithmetic tool. Pi can also render
+  its own aborted-operation error message; that host transcript row remains.
+- Completion-entry tests cover schema validation, unknown imports, default-UI
+  hiding/restoration, startup replay before `session_start`, and duplicate
+  settlement. Pi's public context builder confirms these entries add no model
+  messages. Snapshot tests preserve their order without mutating source entries.
+  Actual 0.85.1 fullscreen sessions at 80x24 preserve two completed runs through
+  `/new`, `/pituix-resume` and `/reload`; default/restore toggles hide and reveal
+  both records. Pi 0.84.4 regular mode at 100x32 reopens the same session, cancels
+  a real arithmetic Bash call, then preserves the interruption through reload
+  and the snapshot reader. The saved file contains exactly three completion
+  records with outcomes `done`, `done`, `cancelled`. Starting Pi with the package
+  disabled ignores those records and retains the conversation. Fixtures make
+  no model-network requests.
+- Concurrent-tool state tests cover repeated tool names, out-of-order completion,
+  duplicated/late events and cancellation cleanup; lifecycle wiring verifies
+  that the working message retains the remaining active tool.
 - Diff tests cover changed-token offsets, RGB operands containing SGR-like
   values, explicit `+/-` gutters, background reset after truncation, CJK/emoji,
   256-color fallback, no-color mode, unknown formats and theme restoration.
@@ -192,6 +276,63 @@ remain a measured difference, rather than a claim of full syntax parity.
 - Successful Claude Read/Bash/Edit/Write calls and approval dialogs are now
   observed. Full cross-product visual parity remains incomplete; the tool
   presentation gaps above are based on these authenticated observations.
+- The conversation snapshot tests cover raw prompts, Markdown structure,
+  message/tool order, result expansion, orphan results, media labels, hidden
+  custom messages, errors, cancellation, compaction summaries, ANSI/CJK bounds
+  and scroll/close behavior. The reader clones public branch data and invokes
+  no tool execution or session mutation. Actual Pi 100x40 and 80x24 sessions
+  check grouped/expanded recorded tools, page navigation, editor return and
+  `/pituix-default`. Resume previews reuse the snapshot content renderer.
+  At 100 columns, the sampled plain assistant line matches all cell text,
+  foreground, background and inverse values in the reference. The sampled
+  two-line user message matches text and background; one automatically wrapped
+  whitespace cell retains a different foreground. Complex Markdown and media
+  are not claimed to match fully.
+- Live-view tests use public `TuiMainScreen` and `TuiAltScreen` instances to
+  exercise both native renderers. They cover streamed/cache updates, original
+  chat-container additions/removals, dock preservation, reversible wrapper
+  cleanup, native focus, page/prompt/wheel navigation and stream following.
+  Native search returns to its matched location. Simulated SGR drag events
+  copy the exact displayed `Line 31` text through the public clipboard callback.
+  ANSI/CJK bounds, theme/icon changes, semantic-zone order and Markdown padding
+  from zero to three cells are covered.
+  Actual Pi 0.84.4 regular-mode runs at 100x40 verify Read/Bash/Edit/Write,
+  partial output, error handling, follow-up display/delivery, tool expansion
+  and default restoration. The installed Pi 0.85.1 at 80x24 verifies fullscreen
+  search retention, native mode switching in both directions, regular-mode
+  confirmation cancellation and restoration. That host also resumes a saved
+  fixture, starts a new session, reloads the extension and cancels an arithmetic
+  tool with the cached presentation active. Temporary-theme reset
+  after native session/reload commands remains a gap. Deterministic provider
+  fixtures make no model-network requests and are excluded from the package.
+- A disposable 800-message, 5,600-line benchmark measured static presentation
+  redraws before/after caching on the same machine: median about 201.6 ms versus
+  0.24 ms over eight warmed renders. Initial rendering was about 234 ms after
+  caching. These measure only the message presentation layer, excluding the
+  native renderer, terminal I/O and emulator; they are not whole-UI frame times.
+- Resume-picker tests cover public session scope, filtering, native input paste,
+  preview navigation, two-step selection, loading failures, late callback
+  cleanup, single switch delegation, and ANSI/CJK width/height bounds. Actual
+  Claude `/resume` list, search and preview screens were captured in the
+  disposable reference project without switching or sending a model request.
+  Further reference captures verify individual Read/Bash rows, full Edit diffs,
+  right-aligned assistant clock/model labels, Home/End navigation, scroll arrows
+  and recovery hints at the end of the preview. Pi now uses the same structure
+  with its own header and recorded values. Native TuiMainScreen/TuiAltScreen
+  tests send input through the terminal callback, proving modal paging, End,
+  Home and wheel navigation reach the preview and closing restores editor input.
+  Tests cover on-demand loading, aborts, stale completion order, retryable errors,
+  expansion, narrow layouts and unchanged legacy-file bytes/mtime after in-memory
+  migration. Pi's public context projection is checked against branch/compaction
+  fixtures. Actual Pi 0.85.1 at 100x40 and Pi 0.84.4 at 80x24 verify tool/diff
+  previews, paging, expansion, completion/interruption rows and native restoration.
+  Both previewed session files retain their exact bytes and modification times.
+  Enter from the preview successfully resumes through Pi after the overlay closes.
+  The local-path installed package was tested by searching, previewing and
+  actually switching to a saved fixture session. The resumed tool grouping,
+  reference palette and default-UI restoration were verified. A public
+  `withSession` callback reapplies the temporary theme after Pi 0.84's saved-theme
+  reset; native session/reload commands retain that host behavior.
 
 ## Reproduce locally
 
@@ -216,7 +357,3 @@ not a complete reproduction.
 Public references: [Claude interactive mode](https://code.claude.com/docs/en/interactive-mode),
 [Claude installation](https://code.claude.com/docs/en/setup), and the extension
 contracts/examples shipped with the supported Pi package.
-
-This split adds elapsed working feedback, reported token counts and saved completion/interruption rows. Tests cover duplicate settlement, retry duration, concurrent tool IDs, cancellation, disabled rendering and unchanged model context. The original reference and host observations remain available in the integration branch; whole-product parity is still incomplete.
-
-This split adds the live message layout in both native terminal modes and the current-branch transcript reader. Tests cover ANSI/CJK width limits, Markdown rendering, original component identity, cancellation, snapshot tools, completion rows, native search/prompt navigation and default restoration. Saved-session catalogue controls are deferred to the next split.

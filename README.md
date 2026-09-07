@@ -48,7 +48,7 @@ See [Using the development version](docs/development.md) for local installation 
 
 The development shell follows observed Claude Code 2.1.263 terminal layout: compact startup information, horizontal prompt rules, contextual shortcut help, and a one-line footer. `/pituix-status` reveals detailed Git/runtime/context/cost statistics. This is a partial visual adaptation; see the [reference observations and remaining gaps](docs/claude-code-parity.md).
 
-The editor extends Pi's public `CustomEditor`, preserving submission, history, autocomplete, paste handling, and registered application shortcuts. Press `?` on an empty draft for help. `/pituix-default` restores native components and the previous theme in the active session.
+The editor extends Pi's public `CustomEditor`, preserving submission, history, autocomplete, paste handling, and registered application shortcuts. Press `?` on an empty draft for help. `/pituix-default` restores native components and the previous theme in the active session. It also saves the disabled preference; `/pituix` saves the enabled preference. The settings switch uses this same state, including after restart or reload. The enabled state applies when the settings page closes, and disabled runs do not add Pi-TUIX completion records or telemetry notifications. Icon selection also applies to tools, working feedback, completion history and session previews.
 
 The effective thinking level appears above the prompt with Pi's configured shortcut. `/pituix-settings` opens searchable preference tabs: type to filter, press Enter to select a result, then Enter or Space to change it. Tab switches categories; Escape clears the query, leaves search, then closes the page.
 
@@ -57,6 +57,18 @@ Each tool row keeps the action, target, state, and attention signal visible. Rea
 Adjacent successful Read/Bash calls combine into a count summary, deduplicating file paths while counting each shell call. Expand tools to reveal every call. Errors, cancellation, images, and truncated results remain separate; assistant text and other tools separate groups. Grouping is reconstructed from Pi's public session branch when resuming.
 
 In the reference dark theme, Edit diffs use numbered `+/-` gutters, full-row backgrounds and stronger changed-word backgrounds. Added/context lines use Pi's syntax highlighter. Other themes retain Pi's diff styling; 256-color and no-color terminals have explicit fallbacks.
+
+The working line shows elapsed time and reported output tokens when available. After Pi settles, a completion line shows duration and clock time, or an interruption prompt after cancellation. Pi saves one display-only entry per settled run, so these rows survive later requests and session resume/reload. They stay outside model context, hide with `/pituix-default`, and reappear with `/pituix`. Removing the package leaves ordinary Pi sessions usable; older runs without timing records are not backfilled.
+
+`/pituix-resume` searches saved Pi sessions. Type to filter, press Enter to select a result, then Enter again to resume. Space opens a read-only conversation preview with individual tool results, diffs, recorded model/time and completion rows. Use arrows, PgUp/PgDn, Home/End or the wheel to scroll and Ctrl+O to expand details. Esc returns to the list; Ctrl+A switches project scope. Pi performs the actual session switch. The preview uses Pi's active-branch/compaction projection and labels binary attachments; it never executes recorded tools or rewrites session files. Native `/resume` and `/tree` remain available.
+
+Session rows show file size and the Git branch recorded when a run ended. Preview footers show message count and that same recorded branch. Ctrl+B filters the list to the current Git branch; older sessions without a recorded branch are excluded. Metadata loads asynchronously near the visible selection, or across the selected project scope while branch filtering, with at most two concurrent reads. Closing stops queued work.
+
+Ctrl+R (or Pi's configured session rename binding) edits the selected session's name. Enter saves through Pi's public session API; Esc cancels the draft. Saving a name refreshes the list without resuming the session. The active session uses Pi's live setter, and other sessions use Pi's native name entries. Confirmed renaming of legacy files may invoke Pi's normal format migration; search, filtering and previews remain read-only.
+
+The main conversation uses reference-style user and assistant rows in both regular and fullscreen terminal modes, while retaining Pi's editor, streaming output, tools, notifications, widgets and queue. Fullscreen scrolling, prompt navigation, search and mouse selection use Pi's native viewport over the same styled document; closing search retains the matched location. Regular mode uses terminal scrollback. Pi's settings can switch between modes during a session. `/pituix-default` restores the native interface in that session.
+
+`/pituix-transcript` also opens a read-only snapshot of the current conversation and recorded tool results. Use Page Up/Down or Home/End to scroll, the configured tool-expansion key to reveal details and thinking, and Esc to return to the same editor. It does not rerun tools or change session data. Snapshot media is labelled; other extensions' tools use a generic public Pi view.
 
 These commands are reversible:
 
@@ -70,6 +82,9 @@ These commands are reversible:
 | `/pituix-about` | Show the package and compatible Pi version |
 | `/pituix-status` | Toggle compact hints and detailed session statistics |
 | `/pituix-model` | Choose a Pi model and thinking level in the numbered picker |
+| `/pituix-resume` | Search, filter, rename, preview and resume saved Pi sessions |
+| `/pituix-session` | Navigate entries in the current Pi session tree |
+| `/pituix-transcript` | Read a scrollable snapshot with message and tool detail |
 | `/pituix-settings` | Open shell, footer, icon, and telemetry settings |
 | `/pituix-steer <message>` | Interrupt the current run with an immediate correction |
 | `/pituix-followup <message>` | Queue work to start after the current run |
@@ -140,7 +155,3 @@ UI changes should be checked at narrow and normal terminal widths, including idl
 ## License
 
 Pi-TUIX is released under the [MIT License](LICENSE).
-
-The working line shows elapsed time and reported output tokens. Pi stores one display-only completion or interruption record per settled run through its public custom-entry API. Historical records remain outside model context, and default mode hides their rendering.
-
-Live conversations now share reversible reference message styling in regular and fullscreen modes. Pi retains its document, editor, scrolling, search and prompt navigation. `/pituix-transcript` opens a read-only current-branch snapshot with Markdown, tools, diffs and completion rows; Esc returns to the editor.
