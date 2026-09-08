@@ -218,6 +218,22 @@ Expected:
 Record the terminal name/version, Pi version, renderer mode, dimensions and a
 plain-text or screenshot capture for the issue evidence.
 
+### Scenario 12: Runtime Theme Synchronization
+
+**Test:** Enable Pi-TUIX, switch the Pi theme from `/settings` while the shell is
+active, and return to the conversation without restarting Pi. Repeat after
+`/new`, `/resume`, or `/reload` if those commands are part of the target Pi
+version's workflow.
+
+Expected:
+- Header, footer, editor chrome and live transcript use the newly selected theme.
+- The editor draft and focus remain intact while the custom components are rebound.
+- `/pituix-default` stops synchronization and restores native components.
+- No theme preference is silently rewritten by the synchronization fallback.
+
+Record the original and selected theme names, Pi version, renderer mode, terminal
+dimensions and any visible delay before the new colors appear.
+
 ## Verification Checklist
 
 After testing, verify:
@@ -233,6 +249,8 @@ After testing, verify:
 - [ ] Markdown treatment agrees across live, transcript and resume preview
 - [ ] Markdown remains bounded at 24, 40, 80 and 100 columns
 - [ ] `/pituix-default` restores native Markdown rendering
+- [ ] Runtime theme changes rebind Pi-TUIX components while enabled
+- [ ] Theme synchronization stops after `/pituix-default` and session shutdown
 
 ## Debugging
 
