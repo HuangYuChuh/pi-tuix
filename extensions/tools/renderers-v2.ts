@@ -25,7 +25,7 @@ import {
   type ToolSummary,
   truncatePath,
 } from "./three-layer-view.ts";
-import type { ToolGroupRuntime } from "./tool-groups.ts";
+import { GroupedToolView, type ToolGroupRuntime } from "./tool-groups.ts";
 
 export interface ToolRendererMode {
   enabled: boolean;
@@ -102,6 +102,23 @@ function formatLines(lines: string[], theme: Theme): string[] {
   return lines.map((line) => theme.fg("toolOutput", line));
 }
 
+interface SharedPresentationState {
+  pituixHasResult?: boolean;
+}
+
+class PendingToolView extends ThreeLayerToolView {
+  private readonly shared: SharedPresentationState;
+
+  constructor(summary: ToolSummary, theme: Theme, shared: SharedPresentationState) {
+    super("collapsed", summary, [], theme);
+    this.shared = shared;
+  }
+
+  override render(width: number): string[] {
+    return this.shared.pituixHasResult ? [] : super.render(width);
+  }
+}
+
 function formatDiff(diff: string, theme: Theme): string[] {
   return splitLines(diff).map((line) => {
     if (line.startsWith("+") && !line.startsWith("+++")) return theme.fg("success", line);
@@ -120,6 +137,7 @@ export function createThreeLayerReadDefinition(
   return {
     ...original,
     renderCall(args: ReadToolInput, theme, context) {
+      mode.observe?.(context.toolCallId, context.invalidate);
       if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
       }
@@ -137,18 +155,20 @@ export function createThreeLayerReadDefinition(
         attention: false,
       };
 
-      return new ThreeLayerToolView("collapsed", summary, [], theme, {
-        maxPreviewLines: mode.config.maxPreviewLines,
-        highlightErrors: mode.config.highlightErrors,
-        autoExpand: mode.config.autoExpand,
-      });
+      return new PendingToolView(
+        summary,
+        theme,
+        context.state as unknown as SharedPresentationState,
+      );
     },
 
     renderResult(result, options, theme, context) {
+      mode.observe?.(context.toolCallId, context.invalidate);
       if (!mode.enabled && original.renderResult) {
         return original.renderResult(result, options, theme, contextForOriginal(context));
       }
 
+      (context.state as unknown as SharedPresentationState).pituixHasResult = true;
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const details = result.details as ReadToolDetails | undefined;
@@ -183,11 +203,20 @@ export function createThreeLayerReadDefinition(
       // 准备详情行
       const detailLines = formatLines(splitLines(output), theme);
 
-      return new ThreeLayerToolView(displayMode, summary, detailLines, theme, {
+      const view = new ThreeLayerToolView(displayMode, summary, detailLines, theme, {
         maxPreviewLines: mode.config.maxPreviewLines,
         highlightErrors: mode.config.highlightErrors,
         autoExpand: mode.config.autoExpand,
       });
+      return mode.groups
+        ? new GroupedToolView(
+            context.toolCallId,
+            view,
+            mode.groups,
+            displayMode === "expanded",
+            theme,
+          )
+        : view;
     },
   };
 }
@@ -202,6 +231,7 @@ export function createThreeLayerBashDefinition(
   return {
     ...original,
     renderCall(args: BashToolInput, theme, context) {
+      mode.observe?.(context.toolCallId, context.invalidate);
       if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
       }
@@ -215,18 +245,20 @@ export function createThreeLayerBashDefinition(
         attention: false,
       };
 
-      return new ThreeLayerToolView("collapsed", summary, [], theme, {
-        maxPreviewLines: mode.config.maxPreviewLines,
-        highlightErrors: mode.config.highlightErrors,
-        autoExpand: mode.config.autoExpand,
-      });
+      return new PendingToolView(
+        summary,
+        theme,
+        context.state as unknown as SharedPresentationState,
+      );
     },
 
     renderResult(result, options, theme, context) {
+      mode.observe?.(context.toolCallId, context.invalidate);
       if (!mode.enabled && original.renderResult) {
         return original.renderResult(result, options, theme, contextForOriginal(context));
       }
 
+      (context.state as unknown as SharedPresentationState).pituixHasResult = true;
       const output = textOutput(result);
       const state = resultState(options, context, output);
       const details = result.details as BashToolDetails | undefined;
@@ -248,11 +280,20 @@ export function createThreeLayerBashDefinition(
       const displayMode: DisplayMode = options.expanded ? "expanded" : mode.config.defaultMode;
       const detailLines = formatLines(splitLines(output), theme);
 
-      return new ThreeLayerToolView(displayMode, summary, detailLines, theme, {
+      const view = new ThreeLayerToolView(displayMode, summary, detailLines, theme, {
         maxPreviewLines: mode.config.maxPreviewLines,
         highlightErrors: mode.config.highlightErrors,
         autoExpand: mode.config.autoExpand,
       });
+      return mode.groups
+        ? new GroupedToolView(
+            context.toolCallId,
+            view,
+            mode.groups,
+            displayMode === "expanded",
+            theme,
+          )
+        : view;
     },
   };
 }
@@ -267,6 +308,7 @@ export function createThreeLayerEditDefinition(
   return {
     ...original,
     renderCall(args: EditToolInput, theme, context) {
+      mode.observe?.(context.toolCallId, context.invalidate);
       if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
       }
@@ -340,6 +382,7 @@ export function createThreeLayerWriteDefinition(
   return {
     ...original,
     renderCall(args: WriteToolInput, theme, context) {
+      mode.observe?.(context.toolCallId, context.invalidate);
       if (!mode.enabled && original.renderCall) {
         return original.renderCall(args, theme, contextForOriginal(context));
       }

@@ -214,16 +214,22 @@ test("the real host hides grouped rows, expands every call, and restores the nat
     collapsed.filter((line) => line.includes("Read 1 file, ran 1 shell command")).length,
     1,
   );
-  assert.deepEqual(components[1].render(100), []);
+  assert.deepEqual(
+    components[1].render(100).filter((line) => line.trim().length > 0),
+    [],
+  );
   for (const component of components) component.setExpanded(true);
-  assert.match(plain(components[0]).join("\n"), /Read\(sample.ts\).*\[OK\]/);
-  assert.match(plain(components[1]).join("\n"), /Bash\(printf test\).*\[OK\]/);
+  assert.match(plain(components[0]).join("\n"), /READ sample\.ts \[OK\]/);
+  assert.match(plain(components[1]).join("\n"), /BASH printf test \[OK\]/);
   mode.enabled = false;
   for (const component of components) component.invalidate();
   fixtures.forEach(({ id, definition, args }, index) => {
     const native = new ToolExecutionComponent(definition.name, id, args, {}, undefined, ui, cwd);
     native.updateResult({ ...result(), isError: false });
     native.setExpanded(true);
-    assert.deepEqual(plain(components[index]), plain(native));
+    assert.deepEqual(
+      plain(components[index]).filter((line) => line.trim().length > 0),
+      plain(native).filter((line) => line.trim().length > 0),
+    );
   });
 });

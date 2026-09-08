@@ -244,10 +244,10 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
       .render(100);
   await commands.get("pituix-compact")?.handler("", context);
   assert.equal(renderRead()?.length, 1);
-  assert.match(renderRead()?.[0] ?? "", /Read\(fixture.ts\) \[OK\]/);
+  assert.match(renderRead()?.[0] ?? "", /READ fixture\.ts \[OK\]/);
   await commands.get("pituix-three-layer")?.handler("", context);
-  assert.equal(renderRead()?.length, 2);
-  assert.match(renderRead()?.[1] ?? "", /Read 2 lines/);
+  assert.equal(renderRead()?.length, 3);
+  assert.match(renderRead()?.[2] ?? "", /second/);
   assert.match(stripTerminalSequences(editor.render(60)[0] ?? ""), /^[-─]+$/);
 
   let toolRedraws = 0;

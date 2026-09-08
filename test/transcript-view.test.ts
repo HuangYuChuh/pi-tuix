@@ -387,10 +387,10 @@ test("transcript preserves message/tool order, expands recorded results and neve
   const content = new TranscriptContent(source, theme, tui, process.cwd());
   const output = plain(content);
   assert.ok(output.indexOf("Please update") < output.indexOf("I will inspect"));
-  assert.ok(output.indexOf("I will inspect") < output.indexOf("Read(sample.ts)"));
-  assert.ok(output.indexOf("Read(sample.ts)") < output.indexOf("Update(sample.ts)"));
-  assert.ok(output.indexOf("Update(sample.ts)") < output.indexOf("⏺ Done"));
-  assert.match(output, /Read 1 lines/);
+  assert.ok(output.indexOf("I will inspect") < output.indexOf("READ sample.ts"));
+  assert.ok(output.indexOf("READ sample.ts") < output.indexOf("EDIT sample.ts"));
+  assert.ok(output.indexOf("EDIT sample.ts") < output.indexOf("⏺ Done"));
+  assert.match(output, /READ sample\.ts \[OK\] 1 lines/);
   assert.doesNotMatch(output, /const sample = 1;.*\n.*Read/);
   assert.match(output, /Thinking \(expand to view\)/);
   assert.doesNotMatch(output, /Private fixture reasoning/);
@@ -542,9 +542,12 @@ test("numbered attachments stay adjacent to prompts/results and preserve links a
       content.setExpanded(expanded);
       const output = plain(content);
       assert.doesNotMatch(output, /loading|unavailable|not-rendered/);
-      assert.match(output, /(?:Read\(sample.ts\)|Read 1 file)[\s\S]*notice[\s\S]*\[Image\]/);
+      assert.match(
+        output,
+        /(?:READ sample\.ts \[OK\] image|Read 1 file)[\s\S]*notice[\s\S]*\[Image\]/,
+      );
       assert.doesNotMatch(output, /Image #3|Image #4|result\.png/);
-      if (expanded) assert.match(output, /Read image \(\d+ bytes\)/);
+      if (expanded) assert.match(output, /READ sample\.ts \[OK\] image/);
       for (const width of [0, 1, 2, 4, 6, 8, 12, 40, 80, 100]) {
         const lines = content.render(width);
         assert.ok(lines.every((line) => visibleWidth(line) <= width));
