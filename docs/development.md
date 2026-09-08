@@ -1,6 +1,6 @@
 # Using the development version
 
-Pi-TUIX uses a local-path Pi package as its permanent development channel. The npm package is not published yet; `v0.1.0` is a source tag, not an npm release. Clone the repository, or use an existing checkout; Pi records that source in user settings and loads the current working tree, so code changes can be tested without publishing to npm or changing the package version.
+Pi-TUIX uses npm as the normal installation channel. The current release is `0.1.1`, and users can install it with `pi install npm:pi-tuix --approve`. A local-path Pi package remains available for development and follows the current working tree.
 
 > **Important:** A local-path installation follows the checked-out files. Switching branches or leaving incomplete changes in the working tree changes what Pi loads the next time it starts.
 
@@ -38,9 +38,21 @@ pi install -l "C:\path\to\pi-tuix" --approve
 
 Project-local packages are recorded in the project's `.pi/settings.json`. Do not commit a machine-specific absolute path to a shared repository.
 
-## npm publication status
+## npm installation
 
-The npm installation examples below describe future prerelease and stable channels. They are unavailable until Pi-TUIX is published to npm. For the current development version, use the local-path installation above.
+The current stable package is available from npm:
+
+```bash
+pi install npm:pi-tuix --approve
+```
+
+For a reproducible installation, pin the version:
+
+```bash
+pi install npm:pi-tuix@0.1.1 --approve
+```
+
+After installation, restart Pi. Use `pi list` to confirm the active source.
 
 ## Identify the active channel
 
