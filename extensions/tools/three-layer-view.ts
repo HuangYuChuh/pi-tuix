@@ -73,7 +73,8 @@ export class ThreeLayerToolView implements Component {
     const header = this.renderHeader(safeWidth);
     // 错误时高亮整个 header 行
     if (this.config.highlightErrors && this.summary.attention) {
-      lines.push(`${this.theme.fg("error", "▌")} ${header}`);
+      // The error marker is part of the line width, so truncate after adding it.
+      lines.push(truncateToWidth(`${this.theme.fg("error", "▌")} ${header}`, safeWidth));
     } else {
       lines.push(header);
     }
