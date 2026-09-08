@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use the reference syntax palette with Pi's public highlighter for added/context diff lines; retain the documented differences in token categories.
 
 ### Fixed
+- Rebind Pi-TUIX header, footer, editor and live transcript components after runtime theme changes on Pi versions without a public theme-change hook; stop the compatibility observer when the shell is disabled or the session ends.
 - Reflow assistant Markdown instead of clipping minimum-width rows in very narrow views; measure clamped host padding before slicing content. Share this behavior between live messages, transcript snapshots and resume previews, with regression coverage for complex Markdown, complete text, ANSI styles and links.
 - Restore the temporary reference theme with `/pituix` even when the shell is already active, preserving the editor and the replaced theme for `/pituix-default`. Keep ordinary refreshes from overriding a user's theme selection and document native session/reload theme resets.
 - Show the configured native image-paste shortcut and local-path alternative in empty-input help; document macOS copying, remote clipboard placeholders and model image-capability checks.
