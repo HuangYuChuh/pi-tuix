@@ -267,6 +267,14 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   assert.equal(toolRedraws, 3);
   assert.equal(editorFactories.at(-1), undefined);
   assert.equal(ui.theme, originalTheme);
+  const factoriesAfterDisable = editorFactories.length;
+  ui.theme = { ...originalTheme, name: "ignored-while-disabled" };
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  assert.equal(
+    editorFactories.length,
+    factoriesAfterDisable,
+    "theme synchronization stops after restoring Pi's default UI",
+  );
   assert.equal(workingMessages.at(-1), undefined);
   assert.equal(commands.has("pituix-settings"), true);
   await handlers.get("agent_start")?.({}, context);
