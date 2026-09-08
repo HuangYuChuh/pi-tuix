@@ -10,7 +10,7 @@ Pi-TUIX separates development, prerelease, and stable distribution by installati
 | --- | --- | --- | --- |
 | Development | No per-change bump | None; local path only | Maintainers testing the working tree |
 | Prerelease | `0.1.1-beta.1` | `beta` or `next` | Testers who accept incomplete behavior |
-| Stable | `0.1.0` | `latest` | General users |
+| Stable | `0.1.1` | `latest` | General users |
 
 Never publish a prerelease version with the `latest` dist-tag. Do not use npm prereleases for each private development iteration; the local-path channel already serves that workflow.
 
@@ -25,7 +25,7 @@ Never publish a prerelease version with the `latest` dist-tag. Do not use npm pr
 For a stable release:
 
 ```powershell
-npm run release:check -- --tag v0.1.0 --channel latest
+npm run release:check -- --tag v0.1.1 --channel latest
 ```
 
 For a prerelease:
@@ -41,10 +41,10 @@ The gate fetches `origin/main` and tags, then rejects the wrong branch, dirty fi
 After the release gate passes and publication is explicitly approved:
 
 ```powershell
-git tag -a v0.1.0 -m "release: v0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.1 -m "release: v0.1.1"
+git push origin v0.1.1
 npm publish --tag latest
-gh release create v0.1.0 --verify-tag --generate-notes --title "Pi-TUIX v0.1.0"
+gh release create v0.1.1 --verify-tag --generate-notes --title "Pi-TUIX v0.1.1"
 ```
 
 For a prerelease, substitute the prerelease version, publish with `--tag beta` or `--tag next`, and mark the GitHub Release as a prerelease.
@@ -52,8 +52,8 @@ For a prerelease, substitute the prerelease version, publish with `--tag beta` o
 ## Verify the release
 
 ```powershell
-npm view pi-tuix@0.1.0 version dist-tags
-pi install npm:pi-tuix@0.1.0
+npm view pi-tuix@0.1.1 version dist-tags
+pi install npm:pi-tuix@0.1.1
 pi list
 ```
 

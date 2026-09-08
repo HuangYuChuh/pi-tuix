@@ -11,7 +11,7 @@
 > [!NOTE]
 > Esta traducción es mantenida por la comunidad. Si encuentras errores, los PR son bienvenidos. Está basada en el [`README.md`](README.md) actual.
 
-> **Estado:** versión actual del código fuente: `0.1.1` (sin publicar). `pi-tuix` no está publicado en npm; instálalo desde una copia local.
+> **Estado:** versión actual: `0.1.1`, publicada en npm.
 
 **Pi-TUIX** es una extensión open source de interfaz de terminal para Pi Coding Agent. Ofrece una experiencia más clara y compacta para sesiones largas de programación, mientras Pi sigue controlando las solicitudes a modelos, herramientas integradas, sesiones, permisos e integraciones con providers.
 
@@ -26,9 +26,21 @@ Cuando una sesión se alarga, cuesta saber qué está ocurriendo, qué cambió y
 
 ## Inicio rápido
 
-### Instalar la versión de desarrollo
+### Instalación con un comando
 
-Requisitos: Node.js `>=22.19.0` y Pi Coding Agent `>=0.84.0`. El paquete npm aún no está publicado, así que la versión de desarrollo se instala desde una copia local del código fuente. Si todavía no tienes una copia, clona primero el repositorio:
+Requisitos: Node.js `>=22.19.0` y Pi Coding Agent `>=0.84.0`. Ejecuta este comando para instalar Pi-TUIX:
+
+```bash
+pi install npm:pi-tuix --approve
+```
+
+Pi descargará el paquete y lo cargará automáticamente en las próximas sesiones. Reinicia Pi completamente después de instalarlo. Usa `pi list` para confirmar el paquete activo.
+
+En la sesión actual, usa `/pituix-default` para volver a la interfaz nativa de Pi y `/pituix` para activar Pi-TUIX de nuevo.
+
+### Instalar la versión de desarrollo local
+
+Para probar el código fuente local, clona primero el repositorio.
 
 ```bash
 git clone https://github.com/HuangYuChuh/pi-tuix.git
@@ -41,9 +53,7 @@ pi list
 
 Pi guarda la ruta local en la configuración del usuario y carga ese working tree en todos los proyectos. Reinicia Pi después de cambiar el código. Usa `pi install -l /absolute/path/to/pi-tuix --approve` para una instalación por proyecto o `pi -e ./extensions/index.ts` para una vista previa puntual que no se guarda.
 
-### Instalar desde npm
-
-Pi-TUIX aún no está publicado en npm. `v0.1.0` es una etiqueta de código fuente, no una publicación de npm, por lo que `pi install npm:pi-tuix` no está disponible. El procedimiento posterior a la publicación se documenta en [el proceso de lanzamiento](docs/releasing.md).
+La instalación de desarrollo local usa el comando de ruta local mostrado arriba.
 
 Consulta [la guia de desarrollo](docs/development.md) para cambiar la fuente instalada y [el proceso de lanzamiento](docs/releasing.md) para las reglas de los canales development, prerelease y stable.
 
