@@ -8,7 +8,7 @@
 
 </div>
 
-> **Status:** `0.1.0` source release; npm publication is not available yet.
+> **Status:** Current source version: `0.1.1` (unreleased). Pi-TUIX is not published to npm; install from a local checkout.
 
 **Pi-TUIX** is an open-source terminal UI extension for the Pi Coding Agent. It adds a clearer, denser interface for long coding sessions while Pi continues to own model requests, built-in tools, sessions, permissions, and provider integrations.
 
@@ -18,6 +18,8 @@ When a coding session is long, the hard part is often knowing what is happening,
 
 - See the active model, workspace, and context signal in the shell.
 - Keep working and streaming feedback visible without transcript noise.
+- Review or resume saved sessions without replaying their tools.
+- Paste supported local images into the editor while Pi continues to own delivery.
 - Switch back to Pi's default interface in the same session.
 - Adopt it as a removable package; Pi remains the system of record.
 
@@ -40,7 +42,7 @@ Pi stores the local path in user settings and loads that working tree across pro
 
 ### npm installation
 
-Pi-TUIX has not been published to npm yet. Do not use `pi install npm:pi-tuix` until a release is announced. The eventual npm installation and release process is documented in [Releasing Pi-TUIX](docs/releasing.md).
+Pi-TUIX has not been published to npm yet. `v0.1.0` is a source tag, not an npm release. Do not use `pi install npm:pi-tuix` until a release is announced. The eventual npm installation and release process is documented in [Releasing Pi-TUIX](docs/releasing.md).
 
 See [Using the development version](docs/development.md) for local installation and [Releasing Pi-TUIX](docs/releasing.md) for development, prerelease, and stable channel rules.
 

@@ -11,7 +11,7 @@
 > [!NOTE]
 > Esta traducción es mantenida por la comunidad. Si encuentras errores, los PR son bienvenidos. Está basada en el [`README.md`](README.md) actual.
 
-> **Estado:** desarrollo inicial. `pi-tuix` aún no está publicado en npm.
+> **Estado:** versión actual del código fuente: `0.1.1` (sin publicar). `pi-tuix` no está publicado en npm; instálalo desde una copia local.
 
 **Pi-TUIX** es una extensión open source de interfaz de terminal para Pi Coding Agent. Ofrece una experiencia más clara y compacta para sesiones largas de programación, mientras Pi sigue controlando las solicitudes a modelos, herramientas integradas, sesiones, permisos e integraciones con providers.
 
@@ -43,17 +43,19 @@ Pi guarda la ruta local en la configuración del usuario y carga ese working tre
 
 ### Instalar desde npm
 
-Pi-TUIX aún no está publicado en npm, por lo que `pi install npm:pi-tuix` no está disponible. El procedimiento posterior a la publicación se documenta en [el proceso de lanzamiento](docs/releasing.md).
+Pi-TUIX aún no está publicado en npm. `v0.1.0` es una etiqueta de código fuente, no una publicación de npm, por lo que `pi install npm:pi-tuix` no está disponible. El procedimiento posterior a la publicación se documenta en [el proceso de lanzamiento](docs/releasing.md).
 
 Consulta [la guia de desarrollo](docs/development.md) para cambiar la fuente instalada y [el proceso de lanzamiento](docs/releasing.md) para las reglas de los canales development, prerelease y stable.
 
-## Versión estable 0.1.0
+## Versión de desarrollo actual
 
-La versión `0.1.0` conecta la `ExtensionAPI` pública de Pi con un header, footer, título de terminal, working indicator, editor chrome y una presentación de tres niveles para Read/Bash/Edit/Write. La ejecución de las herramientas sigue delegada a Pi sin cambios. El modo preview predeterminado muestra las dos primeras y las dos últimas líneas; collapsed muestra solo el resumen y expanded muestra toda la salida o el diff.
+El código actual conecta la `ExtensionAPI` pública de Pi con un header, footer, working indicator, editor chrome y una presentación de tres niveles para Read/Bash/Edit/Write. El título de terminal conserva la identificación nativa de sesión/proyecto de Pi. La ejecución de las herramientas sigue delegada a Pi sin cambios. El modo preview predeterminado muestra las dos primeras y las dos últimas líneas; collapsed muestra solo el resumen y expanded muestra toda la salida o el diff.
 
 El borde del editor muestra `READY/WORKING`, líneas y caracteres del prompt. Extiende el `CustomEditor` público de Pi, por lo que conserva submission, history, autocomplete, paste y los app shortcuts registrados.
 
 Cada tool row muestra explícitamente la acción, el objetivo, el estado y la señal `ATTENTION/CLEAR`. Read/Bash resumen el volumen de salida, Edit muestra estadísticas del diff y Write indica las líneas escritas; al expandir se muestran los detalles con límites de ancho compatibles con ANSI.
+
+`/pituix-resume` permite buscar sesiones guardadas, filtrarlas por rama Git, renombrarlas, abrir una vista previa de solo lectura y restaurarlas mediante Pi. `/pituix-transcript` abre una instantánea de solo lectura de la conversación actual. Ninguna de las dos funciones vuelve a ejecutar herramientas guardadas ni reescribe archivos de sesión. Una ruta local PNG/JPEG/GIF/WebP o la acción de pegado de imágenes de Pi puede insertarse como image chip en el editor; los bytes se entregan al enviar mediante la transformación de entrada pública de Pi.
 
 | Comando | Función |
 | --- | --- |
@@ -63,6 +65,12 @@ Cada tool row muestra explícitamente la acción, el objetivo, el estado y la se
 | `/pituix-three-layer` | Usar el renderer de tres niveles |
 | `/pituix-mode <collapsed\|preview\|expanded>` | Elegir el modo de detalle; preview es el predeterminado |
 | `/pituix-about` | Mostrar el package y la versión compatible de Pi |
+| `/pituix-status` | Alternar ayudas compactas y estadísticas detalladas de sesión |
+| `/pituix-model` | Elegir el modelo de Pi y el thinking level |
+| `/pituix-resume` | Buscar, previsualizar, renombrar y restaurar sesiones guardadas |
+| `/pituix-session` | Navegar el árbol de la sesión Pi actual |
+| `/pituix-transcript` | Mostrar una instantánea de conversación y detalles de herramientas |
+| `/pituix-settings` | Abrir ajustes de shell, footer, iconos y telemetría |
 | `/pituix-steer <mensaje>` | Enviar una corrección inmediata durante la ejecución |
 | `/pituix-followup <mensaje>` | Poner trabajo en cola para después de la ejecución actual |
 | `/pituix-queue` | Mostrar si Pi tiene mensajes pendientes |

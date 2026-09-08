@@ -1,6 +1,6 @@
 # Using the development version
 
-Pi-TUIX uses a local-path Pi package as its permanent development channel. The npm package is not published yet. Clone the repository, or use an existing checkout; Pi records that source in user settings and loads the current working tree, so code changes can be tested without publishing to npm or changing the package version.
+Pi-TUIX uses a local-path Pi package as its permanent development channel. The npm package is not published yet; `v0.1.0` is a source tag, not an npm release. Clone the repository, or use an existing checkout; Pi records that source in user settings and loads the current working tree, so code changes can be tested without publishing to npm or changing the package version.
 
 > **Important:** A local-path installation follows the checked-out files. Switching branches or leaving incomplete changes in the working tree changes what Pi loads the next time it starts.
 
@@ -50,8 +50,8 @@ Run `pi list` before diagnosing a version mismatch. The source determines the ch
 | --- | --- | --- |
 | `C:\path\to\pi-tuix` | Development | Follows the local working tree after Pi restarts |
 | `npm:pi-tuix@0.1.1-beta.1` | Prerelease | Pinned to the named npm version |
-| `npm:pi-tuix@0.1.0` | Stable, pinned | Stays on that exact npm version |
-| `npm:pi-tuix` | Stable, current | Resolves through npm's `latest` dist-tag |
+| `npm:pi-tuix@<published-version>` | Stable, pinned | Available after publication; stays on that exact npm version |
+| `npm:pi-tuix` | Stable, current | Available after publication; resolves through npm's `latest` dist-tag |
 
 The `version` field in `package.json` identifies package metadata; it does not prove that the working tree was published. Use the source shown by `pi list` when deciding which code Pi is actually loading.
 
@@ -61,7 +61,7 @@ Use the exact source shown by `pi list` when removing an installation:
 
 ```powershell
 pi remove "C:\path\to\pi-tuix"
-pi install npm:pi-tuix@0.1.0
+pi install npm:pi-tuix@<published-version>
 pi list
 ```
 

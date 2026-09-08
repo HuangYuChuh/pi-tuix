@@ -11,7 +11,7 @@
 > [!NOTE]
 > 本翻譯由社群維護。如有錯誤，歡迎提交 PR！內容基於目前的 [`README.md`](README.md)。
 
-> **狀態：** 早期開發階段。`pi-tuix` 尚未發佈至 npm。
+> **狀態：** 目前原始碼版本為 `0.1.1`（尚未發佈）。`pi-tuix` 尚未發佈至 npm，請從本機原始碼目錄安裝。
 
 **Pi-TUIX** 是 Pi Coding Agent 的開源終端 UI 擴充套件。它讓長時間的編碼工作階段更清晰、更緊湊，同時模型請求、內建工具、工作階段、權限及 provider 整合仍由 Pi 管理。
 
@@ -43,17 +43,19 @@ Pi 會將本機路徑記錄在使用者設定中，並於所有專案載入該�
 
 ### 從 npm 安裝
 
-Pi-TUIX 目前尚未發佈至 npm，因此暫時不能使用 `pi install npm:pi-tuix`。正式發佈後的流程請參閱[發佈流程](docs/releasing.md)。
+Pi-TUIX 目前尚未發佈至 npm。`v0.1.0` 是原始碼標籤，不是 npm 發佈版本，因此暫時不能使用 `pi install npm:pi-tuix`。正式發佈後的流程請參閱[發佈流程](docs/releasing.md)。
 
 安裝來源切換請參閱[開發版使用手冊](docs/development.md)，開發版、預發佈版與正式版規則請參閱[發佈流程](docs/releasing.md)。
 
-## 0.1.0 穩定版
+## 目前開發版
 
-`0.1.0` 透過 Pi 的公開 `ExtensionAPI` 提供 header、footer、終端標題、working indicator、editor chrome，以及三層 Read/Bash/Edit/Write 顯示。工具執行仍原樣委派給 Pi。預設 preview 顯示前兩行與後兩行；collapsed 只顯示摘要，expanded 顯示完整輸出或 diff。
+目前原始碼透過 Pi 的公開 `ExtensionAPI` 提供 header、footer、working indicator、editor chrome，以及三層 Read/Bash/Edit/Write 顯示。終端標題保留 Pi 原有的 session/project 顯示。工具執行仍原樣委派給 Pi。預設 preview 顯示前兩行與後兩行；collapsed 只顯示摘要，expanded 顯示完整輸出或 diff。
 
 Editor border 會顯示 `READY/WORKING`、輸入行數與字元數。它繼承 Pi 公開的 `CustomEditor`，保留提交、歷史記錄、autocomplete、貼上處理與應用快捷鍵。
 
 每個 tool row 都會清楚顯示 action、target、state 與 `ATTENTION/CLEAR`。Read/Bash 摘要輸出規模，Edit 顯示 diff stats，Write 顯示寫入行數；展開後可查看具 ANSI-aware 寬度限制的詳細內容。
+
+`/pituix-resume` 可搜尋已儲存的 session、依 Git branch 篩選、重新命名、開啟唯讀 preview，並交由 Pi 恢復。`/pituix-transcript` 開啟目前 conversation 的唯讀 snapshot。兩者都不會重新執行已記錄的 tool 或改寫 session file。PNG/JPEG/GIF/WebP 的本機 path 或 Pi 的 image-paste action 可在 editor 中變成 image chip，送出時經由 Pi 的公開 input transformation 傳遞圖片 byte。
 
 | 指令 | 用途 |
 | --- | --- |
@@ -63,6 +65,12 @@ Editor border 會顯示 `READY/WORKING`、輸入行數與字元數。它繼承 P
 | `/pituix-three-layer` | 使用三層 tool renderer |
 | `/pituix-mode <collapsed\|preview\|expanded>` | 設定 tool detail mode，預設為 preview |
 | `/pituix-about` | 顯示 package 與相容的 Pi 版本 |
+| `/pituix-status` | 切換 compact hint 與詳細 session 統計 |
+| `/pituix-model` | 選擇 Pi model 與 thinking level |
+| `/pituix-resume` | 搜尋、preview、重新命名及恢復已儲存的 session |
+| `/pituix-session` | 瀏覽目前 Pi session tree |
+| `/pituix-transcript` | 顯示 conversation 與 tool detail 的 snapshot |
+| `/pituix-settings` | 開啟 shell、footer、icon 與 telemetry 設定 |
 | `/pituix-steer <訊息>` | 立即修正目前執行中的任務 |
 | `/pituix-followup <訊息>` | 排隊追加，等目前任務結束後執行 |
 | `/pituix-queue` | 查看 Pi 是否還有待處理訊息 |
