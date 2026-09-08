@@ -164,9 +164,11 @@ and no captured session-bound object is used after a successful replacement.
 Pi 0.84 reapplies its saved theme after `session_start` during replacement.
 The picker reapplies the reference Theme instance through the fresh public
 `withSession` context, without changing Pi's saved theme preference. Native
-session/reload commands can still reset an extension-applied temporary theme;
-their post-rebind sequence is not intercepted by Pi-TUIX. The public extension
-context exposes no post-theme-rebind event or saved automatic-theme preference.
+session/reload commands can still reset an extension-applied temporary theme.
+While active, the shell polls the public `ctx.ui.theme` value and rebinds its
+custom factories when the theme object changes; the poll stops when the shell is
+removed. This compatibility fallback does not touch Pi's private theme controller
+or saved automatic-theme preference.
 Switching by theme name would persist a different Pi setting, so the adapter
 continues using a temporary Theme instance rather than silently replacing that
 preference.
@@ -174,8 +176,9 @@ Explicit `/pituix` recovery reapplies that instance even when the shell is alrea
 active. A successful change remembers the theme it replaced for later disable;
 repeated recovery while the reference theme is current does not overwrite that
 return value. Ordinary settings synchronization and tool-mode commands preserve
-themes selected while active. Recovery keeps the existing editor and transcript
-mount rather than removing and reinstalling them.
+themes selected while active. Theme recovery keeps the existing editor and transcript mount; an observed runtime
+theme switch rebinds the custom factories so newly created components receive the
+host theme.
 The preview shares the pure startup header and snapshot transcript components.
 It shows individual tool results (without live Read/Bash grouping), diffs,
 completion records and recorded assistant time/model above text responses.
@@ -249,12 +252,16 @@ budget. An unrecognized path stays as ordinary pasted text. Quoted, shell-escape
 relative, home and file-URL paths are supported. Native clipboard callbacks still
 own clipboard access; their public `insertTextAtCursor` call enters the same path.
 For multiple paths, a pure tokenizer accepts absolute, home and file-URL tokens
-with quoted or escaped spaces. It does not evaluate shell syntax. Limits of 64
-paths and 64 KiB of path-list text bound parsing and file operations. A path list
-containing ordinary prose stays as text. Valid images receive tokens in source
-order, separated by one space; unavailable and non-image paths retain their raw
-spelling. Remaining draft capacity bounds each read before allocation. The whole
-batch enters the native editor in one insertion, preserving a single undo step.
+with escaped spaces. Individually quoted path lists remain unchanged, matching
+the measured fallback; single quoted image paths remain supported. The tokenizer
+does not evaluate shell syntax. Limits of 64 paths and 64 KiB of path-list text
+bound parsing and file operations. A path list containing ordinary prose stays as
+text. When at least one image is accepted, valid images receive tokens in source
+order, missing paths are omitted and existing non-image paths retain their raw
+spelling. An image followed by retained text has no inserted separator, matching
+the measured reference. A list with no accepted image falls back unchanged.
+Remaining draft capacity bounds each read before allocation. The whole batch
+enters the native editor in one insertion, preserving a single undo step.
 
 Each chip occupies one private-use Unicode grapheme in the native editor buffer.
 Native movement, deletion, kill/yank and undo therefore retain atomic image
@@ -329,8 +336,8 @@ native: `setText` would otherwise clear the host's collapsed-paste registry.
 History remains Pi-owned and no display token or image data is inserted for a
 literal label. Collapsed-paste deletion, native commands consuming arguments
 before the input event, and a shared counter for long text/image paste references
-need further work. Quoted path-list acceptance and retaining unavailable paths
-are documented differences from the sampled reference parser.
+need further work. The measured quoted-list, missing-path and mixed-path fallback
+rules are covered by parser and editor regressions.
 
 The main view composes reversible presentation containers into the public
 document tree. A version-local adapter recognizes public
@@ -367,9 +374,15 @@ theme and icon mode. Invalidation propagates to the original components and
 clears presentation caches. Observed Markdown padding is reused to avoid
 alternating render widths when the host output padding differs from one cell.
 Streamed text, width and theme changes still refresh the affected display.
-Assistant chrome shares one final line-layout function with snapshot/preview
-messages. When the requested body is narrower than Pi's safe Markdown rendering
-width, it wraps the rendered rows rather than discarding their right edge.
+Assistant chrome shares one final line-layout function and one Markdown
+presentation adapter with snapshot/preview messages. The adapter consumes only
+lines returned by Pi's public `Markdown.render()`: it removes rendered fence rows
+and their two-cell code indent, centers table-header text within the existing
+Pi-calculated cells, and adds italic SGR around quote bodies while retaining Pi's
+rail, parser, wrapping, theme roles and syntax highlighting. It does not inspect
+Markdown private fields or transform source text. When the requested body is
+narrower than Pi's safe Markdown rendering width, it wraps the rendered rows
+rather than discarding their right edge.
 ANSI styles and links continue across those wrapped rows. A one-column view
 retains single-cell characters through column slicing; a two-cell glyph cannot
 be displayed at that width. A public Markdown callback whose available width

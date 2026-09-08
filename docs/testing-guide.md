@@ -200,6 +200,71 @@ Expected:
 ✅ Still shows error status and attention marker
 ✅ Manual expansion still works
 
+### Scenario 11: Markdown Presentation Across Surfaces
+
+**Test:** Send or replay a fixture containing a heading, a TypeScript fenced block,
+a table, a blockquote, nested lists, Chinese text and emoji. Check widths 24, 40,
+80 and 100 in both regular and fullscreen modes, then open `/pituix-transcript`
+and the same saved session through `/pituix-resume` preview.
+
+Expected:
+- Code fence delimiters are hidden and code starts at the assistant body column.
+- Table header text is centered within the same columns used by its data rows.
+- Quote text is italic beside a visible quote rail.
+- CJK, emoji, ANSI syntax colors and long table cells stay within terminal width.
+- Live, transcript and resume-preview message bodies agree at each width.
+- `/pituix-default` restores Pi's native Markdown presentation; `/pituix` reapplies the adapter.
+
+Record the terminal name/version, Pi version, renderer mode, dimensions and a
+plain-text or screenshot capture for the issue evidence.
+
+### Scenario 12: Runtime Theme Synchronization
+
+**Test:** Enable Pi-TUIX, switch the Pi theme from `/settings` while the shell is
+active, and return to the conversation without restarting Pi. Repeat after
+`/new`, `/resume`, or `/reload` if those commands are part of the target Pi
+version's workflow.
+
+Expected:
+- Header, footer, editor chrome and live transcript use the newly selected theme.
+- The editor draft and focus remain intact while the custom components are rebound.
+- `/pituix-default` stops synchronization and restores native components.
+- No theme preference is silently rewritten by the synchronization fallback.
+
+Record the original and selected theme names, Pi version, renderer mode, terminal
+dimensions and any visible delay before the new colors appear.
+
+### Scenario 13: Native transcript selection and copy
+
+**Test:** Verify copying a decorated multi-line response in fullscreen mode
+
+1. Start Pi-TUIX in fullscreen mode with a terminal that supports mouse selection.
+2. Send or display a disposable response containing a user prompt, a fenced code
+   block, a table, CJK text, emoji, and a local attachment link.
+3. Drag from the first user row through the final assistant row, including a
+   wrapped line when the terminal is narrow.
+4. Paste into a plain-text editor.
+
+Expected:
+
+✅ User and assistant text is copied in visible reading order
+✅ Prompt markers and assistant markers do not add duplicated text
+✅ Code and table rows remain present, including CJK and emoji characters
+✅ OSC 8 attachment links remain clickable in the terminal and do not add URL
+   escape sequences to copied text
+✅ Copied text contains no ANSI SGR controls, OSC sequences, or BEL characters
+✅ Selection still works after resizing between normal and narrow widths
+✅ Regular mode keeps native terminal selection behavior; fullscreen mode uses
+   Pi's public selection and clipboard callbacks
+
+The automated regression is in `test/live-transcript.test.ts`. It drives the
+public SGR mouse input path and `TuiAltScreen.copyActiveSelectionToClipboard()`;
+it does not replace Pi's viewport or clipboard implementation.
+
+For actual-terminal evidence, record the terminal name/version, Pi version,
+mode, terminal dimensions, the fixture text, and the pasted output. Do not use
+real credentials, private files, or production attachment URLs.
+
 ## Verification Checklist
 
 After testing, verify:
@@ -212,6 +277,11 @@ After testing, verify:
 - [ ] No regression in tool execution behavior
 - [ ] Performance is acceptable (no visible lag)
 - [ ] Works with both Unicode and ASCII icon modes
+- [ ] Markdown treatment agrees across live, transcript and resume preview
+- [ ] Markdown remains bounded at 24, 40, 80 and 100 columns
+- [ ] `/pituix-default` restores native Markdown rendering
+- [ ] Runtime theme changes rebind Pi-TUIX components while enabled
+- [ ] Theme synchronization stops after `/pituix-default` and session shutdown
 
 ## Debugging
 

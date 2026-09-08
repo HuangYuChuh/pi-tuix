@@ -78,7 +78,9 @@ export function createOpenTuiShellRuntime(
   let context: ExtensionContext | undefined;
   let requestRender: (() => void) | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
+  let themeSyncTimer: ReturnType<typeof setInterval> | undefined;
   let previousTheme: Theme | undefined;
+  let observedThemeName: string | undefined;
   let disposeHeader: (() => void) | undefined;
   let disposeFooter: (() => void) | undefined;
   let editor: ReturnType<typeof installEditor> | undefined;
@@ -86,6 +88,11 @@ export function createOpenTuiShellRuntime(
   const stopTimer = () => {
     if (timer) clearInterval(timer);
     timer = undefined;
+  };
+  const stopThemeSync = () => {
+    if (themeSyncTimer) clearInterval(themeSyncTimer);
+    themeSyncTimer = undefined;
+    observedThemeName = undefined;
   };
   const startTimer = () => {
     stopTimer();
@@ -128,20 +135,24 @@ export function createOpenTuiShellRuntime(
       requestRender?.();
     }
   };
-  const remove = (ctx: ExtensionContext) => {
-    if (!active || !isTuiContext(ctx)) return;
-    stopTimer();
-    ctx.ui.setWorkingIndicator();
-    ctx.ui.setWorkingMessage?.();
-    ctx.ui.setHiddenThinkingLabel();
-    if (previousTheme && ctx.ui.theme.name === "pi-tuix-dark") ctx.ui.setTheme(previousTheme);
-    previousTheme = undefined;
+  const disposeComponents = (_ctx: ExtensionContext) => {
     disposeHeader?.();
     disposeFooter?.();
     editor?.cleanup();
     disposeHeader = undefined;
     disposeFooter = undefined;
     editor = undefined;
+  };
+  const remove = (ctx: ExtensionContext) => {
+    if (!active || !isTuiContext(ctx)) return;
+    stopTimer();
+    stopThemeSync();
+    ctx.ui.setWorkingIndicator();
+    ctx.ui.setWorkingMessage?.();
+    ctx.ui.setHiddenThinkingLabel();
+    if (previousTheme && ctx.ui.theme.name === "pi-tuix-dark") ctx.ui.setTheme(previousTheme);
+    previousTheme = undefined;
+    disposeComponents(ctx);
     requestRender = undefined;
     active = false;
   };
@@ -154,24 +165,8 @@ export function createOpenTuiShellRuntime(
       intervalMs: 120,
     });
   };
-  const apply = (ctx: ExtensionContext, restoreTheme = false) => {
-    if (!isTuiContext(ctx)) return;
-    syncEffort(ctx);
-    // Only explicit recovery overrides a theme selected while the shell is active.
-    if (!active || restoreTheme) {
-      const referenceTheme = ctx.ui.getTheme?.("pi-tuix-dark");
-      if (referenceTheme && ctx.ui.theme.name !== referenceTheme.name) {
-        const currentTheme = ctx.ui.theme;
-        if (ctx.ui.setTheme(referenceTheme).success) previousTheme = currentTheme;
-      }
-    }
-    if (active) {
-      applyIndicator(ctx);
-      requestRender?.();
-      return;
-    }
-    applyIndicator(ctx);
-    ctx.ui.setHiddenThinkingLabel("Thinking (expand to view)");
+  const installComponents = (ctx: ExtensionContext) => {
+    disposeComponents(ctx);
     disposeHeader = installHeader(pi, ctx);
     disposeFooter = installFooter(
       ctx,
@@ -209,7 +204,50 @@ export function createOpenTuiShellRuntime(
       },
       draftImages,
     );
+  };
+  const syncTheme = (ctx: ExtensionContext) => {
+    if (!active || !isTuiContext(ctx)) return;
+    const themeName = ctx.ui.theme.name;
+    if (observedThemeName === undefined) {
+      observedThemeName = themeName;
+      return;
+    }
+    if (themeName === observedThemeName) return;
+    observedThemeName = themeName;
+    // Pi 0.84 has no public theme-change subscription. Rebind factories so
+    // custom components receive the newly selected theme without touching
+    // Pi's theme setting or its private theme controller. Compare the public
+    // name because Pi may expose a stable theme proxy across switches.
+    installComponents(ctx);
+    requestRender?.();
+  };
+  const startThemeSync = (ctx: ExtensionContext) => {
+    stopThemeSync();
+    observedThemeName = ctx.ui.theme.name;
+    themeSyncTimer = setInterval(() => syncTheme(context ?? ctx), 150);
+    themeSyncTimer.unref?.();
+  };
+  const apply = (ctx: ExtensionContext, restoreTheme = false) => {
+    if (!isTuiContext(ctx)) return;
+    syncEffort(ctx);
+    // Only explicit recovery overrides a theme selected while the shell is active.
+    if (!active || restoreTheme) {
+      const referenceTheme = ctx.ui.getTheme?.("pi-tuix-dark");
+      if (referenceTheme && ctx.ui.theme.name !== referenceTheme.name) {
+        const currentTheme = ctx.ui.theme;
+        if (ctx.ui.setTheme(referenceTheme).success) previousTheme = currentTheme;
+      }
+    }
+    if (active) {
+      applyIndicator(ctx);
+      requestRender?.();
+      return;
+    }
+    applyIndicator(ctx);
+    ctx.ui.setHiddenThinkingLabel("Thinking (expand to view)");
+    installComponents(ctx);
     active = true;
+    startThemeSync(ctx);
     if (state.workingSince !== undefined) startTimer();
   };
 
@@ -299,6 +337,7 @@ export function createOpenTuiShellRuntime(
       state.lastDoneIn = undefined;
       invalidateUsageCache();
       config = loadConfig((message, level) => ctx.ui.notify(message, level));
+      if (active) startThemeSync(ctx);
     },
     handleSessionShutdown(ctx) {
       lifecycle.shutdown();

@@ -155,6 +155,23 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   await commands.get("pituix")?.handler("", context);
   assert.equal(ui.theme, referenceTheme);
 
+  const switchedTheme = { ...originalTheme, name: "user-switched" };
+  const factoriesBeforeThemeSwitch = editorFactories.length;
+  ui.theme = switchedTheme;
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  const factoriesAfterThemeSwitch = editorFactories.length;
+  assert.ok(
+    factoriesAfterThemeSwitch > factoriesBeforeThemeSwitch,
+    "a runtime theme change rebinds the custom editor factory",
+  );
+  switchedTheme.name = "user-switched-again";
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  assert.ok(
+    editorFactories.length > factoriesAfterThemeSwitch,
+    "a theme proxy that keeps its identity still triggers a rebind",
+  );
+  ui.theme = originalTheme;
+
   await handlers.get("agent_start")?.({ type: "agent_start" }, context);
   assert.equal(workingMessages.at(-1), "Working...");
   await handlers.get("message_update")?.(
@@ -250,6 +267,14 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   assert.equal(toolRedraws, 3);
   assert.equal(editorFactories.at(-1), undefined);
   assert.equal(ui.theme, originalTheme);
+  const factoriesAfterDisable = editorFactories.length;
+  ui.theme = { ...originalTheme, name: "ignored-while-disabled" };
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  assert.equal(
+    editorFactories.length,
+    factoriesAfterDisable,
+    "theme synchronization stops after restoring Pi's default UI",
+  );
   assert.equal(workingMessages.at(-1), undefined);
   assert.equal(commands.has("pituix-settings"), true);
   await handlers.get("agent_start")?.({}, context);

@@ -11,7 +11,7 @@ import {
   ImageNumberObservations,
 } from "../../session/image-number-metadata.ts";
 import { DraftQueue, type QueueDraft } from "./draft-queue.ts";
-import { splitPastedPaths } from "./image-paths.ts";
+import { pastedPathExists, splitPastedPaths } from "./image-paths.ts";
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_DRAFT_BYTES = 128 * 1024 * 1024;
@@ -185,15 +185,24 @@ export class DraftImages {
     if (value) return this.attach(value, minimumNumber);
     const paths = splitPastedPaths(text);
     if (!paths) return;
-    let changed = false;
-    const transformed = paths.map(({ raw, path }) => {
+    let attached = false;
+    const transformed: { kind: "image" | "text"; value: string }[] = [];
+    for (const { raw, path } of paths) {
+      if (!pastedPathExists(path, cwd)) continue;
       const image = readImagePath(path, cwd, MAX_DRAFT_BYTES - this.bytes);
       const token = image ? this.attach(image, minimumNumber) : undefined;
-      if (!token) return this.display(raw);
-      changed = true;
-      return token;
-    });
-    return changed ? transformed.join(" ") : undefined;
+      if (token) {
+        attached = true;
+        transformed.push({ kind: "image", value: token });
+      } else transformed.push({ kind: "text", value: this.display(raw) });
+    }
+    if (!attached) return;
+    return transformed
+      .map(({ kind, value }, index) => {
+        const previous = transformed[index - 1];
+        return `${previous?.kind === "image" && kind === "text" ? "" : index ? " " : ""}${value}`;
+      })
+      .join("");
   }
 
   private attach(value: CapturedImage, minimumNumber: number): string | undefined {

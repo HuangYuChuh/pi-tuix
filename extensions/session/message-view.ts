@@ -9,6 +9,7 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
+import { styleReferenceMarkdownLines } from "./markdown-style.ts";
 
 /** Session text is data: terminal controls must not become viewport commands. */
 export function messageText(text: string): string {
@@ -114,7 +115,7 @@ export class ReferenceAssistantText implements Component {
     if (width <= 0) return [];
     const inset = width >= 4 ? 2 : 0;
     // Pi's Markdown wrapper needs room for a wide glyph even in one-cell views.
-    const lines = this.markdown.render(Math.max(4, width - inset));
+    const lines = styleReferenceMarkdownLines(this.markdown.render(Math.max(4, width - inset)));
     const rendered = renderAssistantLines(lines, width, this.theme, this.ascii, this.thinking);
     if (!this.metadata) return rendered;
     const metadataWidth = Math.max(0, width - 2);

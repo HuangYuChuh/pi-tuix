@@ -1,8 +1,23 @@
-import { isAbsolute } from "node:path";
+import { statSync } from "node:fs";
+import { homedir } from "node:os";
+import { isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export interface PastedPath {
   raw: string;
   path: string;
+}
+
+/** Return whether a parsed path names an existing filesystem entry. */
+export function pastedPathExists(path: string, cwd: string): boolean {
+  try {
+    if (path.startsWith("file:")) path = fileURLToPath(path);
+    if (path.startsWith("~/")) path = resolve(homedir(), path.slice(2));
+    statSync(resolve(cwd, path));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Parse terminal file-drop text as paths, without evaluating shell syntax. */
@@ -26,8 +41,9 @@ export function splitPastedPaths(text: string): PastedPath[] | undefined {
       const character = text[end];
       if (!quote && /\s/.test(character)) break;
       if (character === quote) quote = "";
-      else if (!quote && (character === "'" || character === '"')) quote = character;
-      else if (character === "\\" && quote !== "'") {
+      else if (!quote && (character === "'" || character === '"')) {
+        quote = character;
+      } else if (character === "\\" && quote !== "'") {
         if (++end === text.length) return;
         path += text[end];
       } else path += character;
@@ -42,5 +58,7 @@ export function splitPastedPaths(text: string): PastedPath[] | undefined {
     if (paths.length > 64) return;
     start = end;
   }
-  return paths.length > 1 ? paths : undefined;
+  return paths.length > 1 && paths.every(({ raw }) => !/^(['"]).*\1$/.test(raw))
+    ? paths
+    : undefined;
 }
