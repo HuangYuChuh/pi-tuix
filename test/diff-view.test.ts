@@ -79,7 +79,7 @@ test("diff lines compose through collapsed, preview and expanded tool views at a
         target: "中文.ts",
         status: "OK",
         attention: false,
-        resultSummary: "Added 1 line, removed 1 line",
+        meta: "Added 1 line, removed 1 line",
       },
       details,
       theme(),

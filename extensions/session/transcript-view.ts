@@ -114,7 +114,12 @@ export class TranscriptContent implements Component {
     const mode: ToolRendererMode = {
       enabled: true,
       ascii: () => this.ascii,
-      defaultMode: "preview",
+      config: {
+        defaultMode: "preview",
+        autoExpand: true,
+        maxPreviewLines: 4,
+        highlightErrors: true,
+      },
       ...(this.options.groupTools === false ? {} : { groups }),
     };
     const definitions = new Map<

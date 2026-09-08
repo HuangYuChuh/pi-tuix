@@ -12,6 +12,8 @@ export type CursorStyle = "block" | "bar" | "underline";
 
 export type { IconMode } from "./icons.ts";
 
+export type ToolDisplayMode = "collapsed" | "preview" | "expanded";
+
 export interface FooterSegments {
   cwd: boolean;
   sessionName: boolean;
@@ -39,6 +41,13 @@ export interface FullscreenConfig {
   wheelScrollLines: number;
 }
 
+export interface ToolRenderConfig {
+  defaultMode: ToolDisplayMode;
+  autoExpand: boolean; // 错误时自动展开
+  maxPreviewLines: number; // preview 模式显示的行数
+  highlightErrors: boolean; // 错误时高亮整行
+}
+
 export interface OpenTuiConfig {
   enabled: boolean;
   settingsLanguage: SettingsLanguage;
@@ -48,6 +57,7 @@ export interface OpenTuiConfig {
   icons: {
     mode: IconMode;
   };
+  toolRender: ToolRenderConfig;
   footerSegments: FooterSegments;
   telemetry: TelemetryConfig;
 }
@@ -62,6 +72,12 @@ export const DEFAULT_CONFIG: OpenTuiConfig = {
   },
   icons: {
     mode: "auto",
+  },
+  toolRender: {
+    defaultMode: "preview",
+    autoExpand: true,
+    maxPreviewLines: 4,
+    highlightErrors: true,
   },
   footerSegments: {
     cwd: true,
@@ -133,7 +149,7 @@ export function loadConfig(
     const raw = readFileSync(path, "utf8");
     const parsed: unknown = JSON.parse(raw);
     const config = deepMerge(DEFAULT_CONFIG, parsed);
-    if (!["auto", "nerd", "ascii"].includes(config.icons.mode)) {
+    if (!["", "auto", "nerd", "ascii"].includes(config.icons.mode)) {
       config.icons.mode = DEFAULT_CONFIG.icons.mode;
     }
     if (config.settingsLanguage !== "en" && config.settingsLanguage !== "zh") {
