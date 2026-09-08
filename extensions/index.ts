@@ -36,7 +36,7 @@ const PACKAGE_NAME = "Pi-TUIX";
 export default function piTuix(pi: ExtensionAPI): void {
   // 加载配置
   const config = loadConfig();
-  
+
   const subagentActivity = createSubagentActivityObserver(pi);
   let imageCache = new SessionImageCache();
   const prepareImages: PrepareImages = (entries, signal) => imageCache.prepare(entries, signal);
@@ -242,7 +242,10 @@ export default function piTuix(pi: ExtensionAPI): void {
     description: "Restore the Pi-TUIX interface and reference theme",
     handler: async (_args, ctx) => {
       enableInterface(ctx, true);
-      ctx.ui.notify(`${PACKAGE_NAME} interface enabled (${toolMode.config.defaultMode} tools)`, "info");
+      ctx.ui.notify(
+        `${PACKAGE_NAME} interface enabled (${toolMode.config.defaultMode} tools)`,
+        "info",
+      );
     },
   });
 

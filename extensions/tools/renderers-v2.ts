@@ -15,9 +15,7 @@ import {
   type ToolRenderResultOptions,
   type WriteToolInput,
 } from "@earendil-works/pi-coding-agent";
-import { Box, type Component } from "@earendil-works/pi-tui";
 import type { ToolRenderConfig } from "../shell/open-tui/config.ts";
-import type { ToolGroupRuntime } from "./tool-groups.ts";
 import {
   type DisplayMode,
   diffStats,
@@ -27,6 +25,7 @@ import {
   type ToolSummary,
   truncatePath,
 } from "./three-layer-view.ts";
+import type { ToolGroupRuntime } from "./tool-groups.ts";
 
 export interface ToolRendererMode {
   enabled: boolean;
@@ -42,21 +41,6 @@ type EditDefinition = ReturnType<typeof createEditToolDefinition>;
 type WriteDefinition = ReturnType<typeof createWriteToolDefinition>;
 
 // ===== 辅助函数 =====
-
-const emptyResult: Component = { render: () => [], invalidate() {} };
-
-function renderOriginal<
-  T extends { state: unknown; lastComponent: unknown; isPartial: boolean; isError: boolean },
->(
-  slot: "call" | "result",
-  context: T,
-  theme: Theme,
-  render: (context: T, theme: Theme) => Component | undefined,
-): Component {
-  const cleanContext = contextForOriginal(context);
-  const component = render(cleanContext, theme);
-  return component ?? emptyResult;
-}
 
 function contextForOriginal<T extends { lastComponent: unknown }>(context: T): T {
   if (!(context.lastComponent instanceof ThreeLayerToolView)) return context;
