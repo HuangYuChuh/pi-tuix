@@ -5,7 +5,7 @@ import {
   createWriteToolDefinition,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { type Component, stripTerminalSequences } from "@earendil-works/pi-tui";
+import { type Component, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import {
   createThreeLayerBashDefinition,
   createThreeLayerEditDefinition,
@@ -193,6 +193,20 @@ test("three-layer renderers mark errors, cancellations, and empty output", () =>
   assert.match(error[0] ?? "", /BASH bad \[ERROR\].*ATTENTION/);
   assert.match(error[0] ?? "", /Command exited with code 127/);
   assert.match(error[1] ?? "", /not found/);
+
+  const narrowError = render(
+    bash.renderResult?.(
+      result("Command exited with code 128"),
+      { expanded: false, isPartial: false },
+      theme,
+      context(
+        { command: "git status --short && git switch main && git merge --no-ff feature" },
+        { isError: true },
+      ),
+    ),
+    20,
+  );
+  assert.ok(narrowError.every((line) => visibleWidth(line) <= 20));
 
   const cancelled = render(
     bash.renderResult?.(

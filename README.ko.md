@@ -11,7 +11,7 @@
 > [!NOTE]
 > 이 번역은 커뮤니티에서 관리합니다. 오류가 있다면 PR을 보내 주세요. 현재 [`README.md`](README.md)를 기준으로 합니다.
 
-> **상태:** 현재 소스 버전은 `0.1.1`(미출시)입니다. `pi-tuix`는 npm에 배포되지 않았으므로 로컬 체크아웃에서 설치해야 합니다.
+> **상태:** 현재 버전은 `0.1.1`이며 npm에 배포되어 있습니다.
 
 **Pi-TUIX**는 Pi Coding Agent를 위한 오픈 소스 terminal UI 확장입니다. 긴 코딩 세션을 더 명확하고 조밀하게 보여 주면서도 모델 요청, 내장 도구, 세션, 권한 및 provider 연동은 계속 Pi가 관리합니다.
 
@@ -26,9 +26,21 @@
 
 ## 빠른 시작
 
-### 개발 버전 설치
+### 한 번에 설치
 
-요구 사항: Node.js `>=22.19.0`, Pi Coding Agent `>=0.84.0`. npm 패키지는 아직 배포되지 않았으므로 개발 버전은 로컬 소스 checkout에서 설치합니다. 아직 소스가 없다면 먼저 저장소를 복제하세요.
+요구 사항: Node.js `>=22.19.0`, Pi Coding Agent `>=0.84.0`. 다음 명령 하나로 Pi-TUIX를 설치하세요.
+
+```bash
+pi install npm:pi-tuix --approve
+```
+
+Pi가 패키지를 자동으로 다운로드하고 이후 세션에서 불러옵니다. 설치 후 Pi를 완전히 종료한 뒤 다시 시작하세요. `pi list`로 현재 로드된 패키지를 확인할 수 있습니다.
+
+현재 세션에서 `/pituix-default`를 입력하면 Pi 기본 UI로 돌아가고, `/pituix`를 입력하면 Pi-TUIX를 다시 활성화합니다.
+
+### 로컬 개발 버전 설치
+
+로컬 소스를 테스트하려면 먼저 저장소를 복제하세요.
 
 ```bash
 git clone https://github.com/HuangYuChuh/pi-tuix.git
@@ -41,9 +53,7 @@ pi list
 
 Pi는 로컬 경로를 사용자 설정에 저장하고 모든 프로젝트에서 해당 working tree를 로드합니다. 코드를 변경한 후 Pi를 다시 시작하세요. 프로젝트 단위 설치에는 `pi install -l /absolute/path/to/pi-tuix --approve`, 저장하지 않는 일회성 미리 보기에는 `pi -e ./extensions/index.ts`를 사용합니다.
 
-### npm 설치
-
-Pi-TUIX는 아직 npm에 배포되지 않았습니다. `v0.1.0`은 소스 태그이며 npm 릴리스가 아니므로 현재 `pi install npm:pi-tuix`를 사용할 수 없습니다. 배포 후 절차는 [릴리스 절차](docs/releasing.md)에 안내됩니다.
+로컬 개발 버전은 위의 로컬 경로 설치 명령을 사용합니다.
 
 설치 소스 전환은 [개발 버전 가이드](docs/development.md), 개발·prerelease·stable 채널 규칙은 [릴리스 절차](docs/releasing.md)를 참조하세요.
 

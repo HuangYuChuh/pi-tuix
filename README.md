@@ -8,7 +8,7 @@
 
 </div>
 
-> **Status:** Current source version: `0.1.1` (unreleased). Pi-TUIX is not published to npm; install from a local checkout.
+> **Status:** Current release: `0.1.1`. Pi-TUIX is available on npm.
 
 **Pi-TUIX** is an open-source terminal UI extension for the Pi Coding Agent. It adds a clearer, denser interface for long coding sessions while Pi continues to own model requests, built-in tools, sessions, permissions, and provider integrations.
 
@@ -25,9 +25,25 @@ When a coding session is long, the hard part is often knowing what is happening,
 
 ## Quick Start
 
-### Install the development version
+### Install
 
-Requirements: Node.js `>=22.19.0` and Pi Coding Agent `>=0.84.0`. The npm package is not published yet, so development installs use a local source checkout. Clone the repository first, or use an existing checkout:
+Requirements: Node.js `>=22.19.0` and Pi Coding Agent `>=0.84.0`. Install Pi-TUIX for your user with one command:
+
+```bash
+pi install npm:pi-tuix --approve
+```
+
+Pi will download the package and load it automatically for future sessions. Restart Pi after installation. Check the active package with:
+
+```bash
+pi list
+```
+
+To restore Pi's native interface in a session, use `/pituix-default`. Use `/pituix` to enable Pi-TUIX again.
+
+### Development installation
+
+To test a local checkout instead of the npm release:
 
 ```bash
 git clone https://github.com/HuangYuChuh/pi-tuix.git
@@ -38,11 +54,7 @@ pi install /absolute/path/to/pi-tuix --approve
 pi list
 ```
 
-Pi stores the local path in user settings and loads that working tree across projects. Restart Pi after code changes. Use `pi install -l /absolute/path/to/pi-tuix --approve` for a project-local installation, or `pi -e ./extensions/index.ts` for a one-off preview that is not saved.
-
-### npm installation
-
-Pi-TUIX has not been published to npm yet. `v0.1.0` is a source tag, not an npm release. Do not use `pi install npm:pi-tuix` until a release is announced. The eventual npm installation and release process is documented in [Releasing Pi-TUIX](docs/releasing.md).
+Pi follows the local working tree after restart. Use `pi install -l /absolute/path/to/pi-tuix --approve` for a project-local installation, or `pi -e ./extensions/index.ts` for a one-off preview that is not saved.
 
 See [Using the development version](docs/development.md) for local installation and [Releasing Pi-TUIX](docs/releasing.md) for development, prerelease, and stable channel rules.
 
