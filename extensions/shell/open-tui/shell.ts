@@ -80,7 +80,7 @@ export function createOpenTuiShellRuntime(
   let timer: ReturnType<typeof setInterval> | undefined;
   let themeSyncTimer: ReturnType<typeof setInterval> | undefined;
   let previousTheme: Theme | undefined;
-  let observedTheme: Theme | undefined;
+  let observedThemeName: string | undefined;
   let disposeHeader: (() => void) | undefined;
   let disposeFooter: (() => void) | undefined;
   let editor: ReturnType<typeof installEditor> | undefined;
@@ -92,7 +92,7 @@ export function createOpenTuiShellRuntime(
   const stopThemeSync = () => {
     if (themeSyncTimer) clearInterval(themeSyncTimer);
     themeSyncTimer = undefined;
-    observedTheme = undefined;
+    observedThemeName = undefined;
   };
   const startTimer = () => {
     stopTimer();
@@ -207,22 +207,23 @@ export function createOpenTuiShellRuntime(
   };
   const syncTheme = (ctx: ExtensionContext) => {
     if (!active || !isTuiContext(ctx)) return;
-    const theme = ctx.ui.theme;
-    if (observedTheme === undefined) {
-      observedTheme = theme;
+    const themeName = ctx.ui.theme.name;
+    if (observedThemeName === undefined) {
+      observedThemeName = themeName;
       return;
     }
-    if (theme === observedTheme) return;
-    observedTheme = theme;
+    if (themeName === observedThemeName) return;
+    observedThemeName = themeName;
     // Pi 0.84 has no public theme-change subscription. Rebind factories so
     // custom components receive the newly selected theme without touching
-    // Pi's theme setting or its private theme controller.
+    // Pi's theme setting or its private theme controller. Compare the public
+    // name because Pi may expose a stable theme proxy across switches.
     installComponents(ctx);
     requestRender?.();
   };
   const startThemeSync = (ctx: ExtensionContext) => {
     stopThemeSync();
-    observedTheme = ctx.ui.theme;
+    observedThemeName = ctx.ui.theme.name;
     themeSyncTimer = setInterval(() => syncTheme(context ?? ctx), 150);
     themeSyncTimer.unref?.();
   };

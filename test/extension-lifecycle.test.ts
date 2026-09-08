@@ -159,9 +159,16 @@ test("Pi-TUIX installs and reverses its editor component in the active session",
   const factoriesBeforeThemeSwitch = editorFactories.length;
   ui.theme = switchedTheme;
   await new Promise((resolve) => setTimeout(resolve, 220));
+  const factoriesAfterThemeSwitch = editorFactories.length;
   assert.ok(
-    editorFactories.length > factoriesBeforeThemeSwitch,
+    factoriesAfterThemeSwitch > factoriesBeforeThemeSwitch,
     "a runtime theme change rebinds the custom editor factory",
+  );
+  switchedTheme.name = "user-switched-again";
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  assert.ok(
+    editorFactories.length > factoriesAfterThemeSwitch,
+    "a theme proxy that keeps its identity still triggers a rebind",
   );
   ui.theme = originalTheme;
 
