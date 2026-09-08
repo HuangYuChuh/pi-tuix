@@ -109,28 +109,17 @@ export function getConfigPath(): string {
 
 function deepMerge<T>(base: T, override: unknown): T {
   if (typeof base !== "object" || base === null || Array.isArray(base)) {
-    return (override as T) ?? base;
+    return typeof override === typeof base ? (override as T) : base;
   }
   if (typeof override !== "object" || override === null || Array.isArray(override)) {
-    return base;
+    return structuredClone(base);
   }
   const result = { ...(base as Record<string, unknown>) };
   const overrideRec = override as Record<string, unknown>;
-  for (const key of Object.keys(overrideRec)) {
+  for (const key of Object.keys(base)) {
     const baseVal = (base as Record<string, unknown>)[key];
     const overVal = overrideRec[key];
-    if (
-      typeof baseVal === "object" &&
-      baseVal !== null &&
-      !Array.isArray(baseVal) &&
-      typeof overVal === "object" &&
-      overVal !== null &&
-      !Array.isArray(overVal)
-    ) {
-      result[key] = deepMerge(baseVal, overVal);
-    } else if (overVal !== undefined) {
-      result[key] = overVal;
-    }
+    result[key] = deepMerge(baseVal, overVal);
   }
   return result as T;
 }
@@ -160,6 +149,9 @@ export function loadConfig(
     const raw = readFileSync(path, "utf8");
     const parsed: unknown = JSON.parse(raw);
     const config = deepMerge(DEFAULT_CONFIG, parsed);
+    if (!["", "auto", "nerd", "ascii"].includes(config.icons.mode)) {
+      config.icons.mode = DEFAULT_CONFIG.icons.mode;
+    }
     if (config.settingsLanguage !== "en" && config.settingsLanguage !== "zh") {
       config.settingsLanguage = DEFAULT_CONFIG.settingsLanguage;
     }
@@ -169,6 +161,9 @@ export function loadConfig(
       config.cursorStyle !== "underline"
     ) {
       config.cursorStyle = DEFAULT_CONFIG.cursorStyle;
+    }
+    if (config.footerStyle !== "compact" && config.footerStyle !== "detailed") {
+      config.footerStyle = "compact";
     }
     config.fullscreen.wheelScrollLines = normalizeFullscreenWheelScrollLines(
       config.fullscreen.wheelScrollLines,
