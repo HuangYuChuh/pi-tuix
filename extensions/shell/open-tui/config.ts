@@ -12,6 +12,8 @@ export type CursorStyle = "block" | "bar" | "underline";
 
 export type { IconMode } from "./icons.ts";
 
+export type ToolDisplayMode = "collapsed" | "preview" | "expanded";
+
 export interface FooterSegments {
   cwd: boolean;
   sessionName: boolean;
@@ -39,6 +41,13 @@ export interface FullscreenConfig {
   wheelScrollLines: number;
 }
 
+export interface ToolRenderConfig {
+  defaultMode: ToolDisplayMode;
+  autoExpand: boolean; // 错误时自动展开
+  maxPreviewLines: number; // preview 模式显示的行数
+  highlightErrors: boolean; // 错误时高亮整行
+}
+
 export interface OpenTuiConfig {
   enabled: boolean;
   settingsLanguage: SettingsLanguage;
@@ -48,6 +57,7 @@ export interface OpenTuiConfig {
   icons: {
     mode: IconMode;
   };
+  toolRender: ToolRenderConfig;
   footerSegments: FooterSegments;
   telemetry: TelemetryConfig;
 }
@@ -62,6 +72,12 @@ export const DEFAULT_CONFIG: OpenTuiConfig = {
   },
   icons: {
     mode: "auto",
+  },
+  toolRender: {
+    defaultMode: "preview",
+    autoExpand: true,
+    maxPreviewLines: 4,
+    highlightErrors: true,
   },
   footerSegments: {
     cwd: true,
@@ -93,17 +109,28 @@ export function getConfigPath(): string {
 
 function deepMerge<T>(base: T, override: unknown): T {
   if (typeof base !== "object" || base === null || Array.isArray(base)) {
-    return typeof override === typeof base ? (override as T) : base;
+    return (override as T) ?? base;
   }
   if (typeof override !== "object" || override === null || Array.isArray(override)) {
-    return structuredClone(base);
+    return base;
   }
   const result = { ...(base as Record<string, unknown>) };
   const overrideRec = override as Record<string, unknown>;
-  for (const key of Object.keys(base)) {
+  for (const key of Object.keys(overrideRec)) {
     const baseVal = (base as Record<string, unknown>)[key];
     const overVal = overrideRec[key];
-    result[key] = deepMerge(baseVal, overVal);
+    if (
+      typeof baseVal === "object" &&
+      baseVal !== null &&
+      !Array.isArray(baseVal) &&
+      typeof overVal === "object" &&
+      overVal !== null &&
+      !Array.isArray(overVal)
+    ) {
+      result[key] = deepMerge(baseVal, overVal);
+    } else if (overVal !== undefined) {
+      result[key] = overVal;
+    }
   }
   return result as T;
 }
@@ -133,9 +160,6 @@ export function loadConfig(
     const raw = readFileSync(path, "utf8");
     const parsed: unknown = JSON.parse(raw);
     const config = deepMerge(DEFAULT_CONFIG, parsed);
-    if (!["auto", "nerd", "ascii"].includes(config.icons.mode)) {
-      config.icons.mode = DEFAULT_CONFIG.icons.mode;
-    }
     if (config.settingsLanguage !== "en" && config.settingsLanguage !== "zh") {
       config.settingsLanguage = DEFAULT_CONFIG.settingsLanguage;
     }
@@ -145,9 +169,6 @@ export function loadConfig(
       config.cursorStyle !== "underline"
     ) {
       config.cursorStyle = DEFAULT_CONFIG.cursorStyle;
-    }
-    if (config.footerStyle !== "compact" && config.footerStyle !== "detailed") {
-      config.footerStyle = "compact";
     }
     config.fullscreen.wheelScrollLines = normalizeFullscreenWheelScrollLines(
       config.fullscreen.wheelScrollLines,

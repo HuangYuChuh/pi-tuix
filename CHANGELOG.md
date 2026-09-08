@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Compact TUI configuration system
+  - `ToolRenderConfig` interface for fine-grained tool display control
+  - `maxPreviewLines` setting to control preview mode line count (default: 4)
+  - `autoExpand` setting to auto-upgrade collapsed → preview on errors (default: true)
+  - `highlightErrors` setting for visual error highlighting (default: true)
+  - Configuration exposed through `/pituix-settings` UI
+  - Persistent configuration in `~/.agents/pi-tuix.json`
+
+### Enhanced
+- Tool rendering system
+  - Three-layer display modes: collapsed, preview, expanded
+  - Smart preview truncation showing head + tail lines with hidden count
+  - Error auto-expansion from collapsed to preview when enabled
+  - Visual error highlighting with red vertical bar prefix
+  - Dynamic preview line splitting based on `maxPreviewLines` config
+  - Clear actionable hints: "use /pituix-mode expanded" for hidden content
+  - Improved status communication (QUEUED, RUNNING, OK, ERROR, CANCELLED)
+  - Tool-specific summary enhancements (line counts, diff stats, execution info)
+
 ### Changed
 - Show selected session index, file size and recorded Git branch in resume rows, with short relative time/message count/branch in preview footers; load metadata asynchronously with bounded concurrency and cancellation.
 - Record optional Git branch observations in existing display-only completion entries; preserve unknown historical values and follow saved parent links through compaction without reading today's checkout into old sessions.

@@ -172,7 +172,16 @@ test("group views collapse secondary rows, expose individual details and bound A
 test("the real host hides grouped rows, expands every call, and restores the native transcript", () => {
   const cwd = process.cwd();
   const groups = new ToolGroupRuntime();
-  const mode: ToolRendererMode = { enabled: true, defaultMode: "preview", groups };
+  const mode: ToolRendererMode = {
+    enabled: true,
+    config: {
+      defaultMode: "preview",
+      autoExpand: true,
+      maxPreviewLines: 4,
+      highlightErrors: true,
+    },
+    groups,
+  };
   const ui = { requestRender() {} } as ConstructorParameters<typeof ToolExecutionComponent>[5];
   const fixtures = [
     { id: "a", definition: createThreeLayerReadDefinition(cwd, mode), args: { path: "sample.ts" } },

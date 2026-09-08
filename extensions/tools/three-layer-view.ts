@@ -1,4 +1,4 @@
-import { keyText, type Theme } from "@earendil-works/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Component, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 /**
@@ -8,8 +8,6 @@ import { type Component, truncateToWidth, visibleWidth } from "@earendil-works/p
  * - Preview: Header + 前2行 + "...N hidden" + 后2行
  * - Expanded: Header + 完整输出
  */
-
-import { useAsciiChrome } from "../shell/open-tui/icons.ts";
 
 export type DisplayMode = "collapsed" | "preview" | "expanded";
 export type ToolStatus = "QUEUED" | "RUNNING" | "OK" | "ERROR" | "CANCELLED";
@@ -21,32 +19,45 @@ export interface ToolSummary {
   status: ToolStatus;
   meta?: string; // 元信息（行数/时长/diff统计）
   attention: boolean; // 是否需要关注（错误时）
-  resultSummary?: string;
-  previewDetails?: boolean;
 }
 
 /**
  * 三层工具视图组件
  */
+export interface ThreeLayerConfig {
+  maxPreviewLines?: number;
+  highlightErrors?: boolean;
+  autoExpand?: boolean;
+}
+
 export class ThreeLayerToolView implements Component {
   private mode: DisplayMode;
   private summary: ToolSummary;
   private details: ToolDetailLine[];
   private theme: Theme;
-  private readonly ascii: () => boolean;
+  private config: ThreeLayerConfig;
 
   constructor(
     mode: DisplayMode,
     summary: ToolSummary,
     details: ToolDetailLine[],
     theme: Theme,
-    ascii: () => boolean = useAsciiChrome,
+    config: ThreeLayerConfig = {},
   ) {
     this.mode = mode;
     this.summary = summary;
     this.details = details;
     this.theme = theme;
-    this.ascii = ascii;
+    this.config = {
+      maxPreviewLines: config.maxPreviewLines ?? 4,
+      highlightErrors: config.highlightErrors ?? true,
+      autoExpand: config.autoExpand ?? true,
+    };
+
+    // 错误时自动展开
+    if (this.config.autoExpand && summary.attention && mode === "collapsed") {
+      this.mode = "preview";
+    }
   }
 
   setMode(mode: DisplayMode): void {
@@ -59,54 +70,58 @@ export class ThreeLayerToolView implements Component {
     const safeWidth = width;
 
     // === Header 行（所有模式都显示）===
-    lines.push(this.renderHeader(safeWidth));
+    const header = this.renderHeader(safeWidth);
+    // 错误时高亮整个 header 行
+    if (this.config.highlightErrors && this.summary.attention) {
+      lines.push(`${this.theme.fg("error", "▌")} ${header}`);
+    } else {
+      lines.push(header);
+    }
 
     if (this.mode === "collapsed") {
       return lines;
     }
 
-    const branch = this.ascii() ? "  L  " : "  ⎿  ";
+    // 辅助函数：将 ToolDetailLine 转换为字符串
     const detailLine = (line: ToolDetailLine, first = false) => {
-      const prefix = first ? branch : "     ";
-      const content =
-        typeof line === "string" ? line : line(Math.max(0, safeWidth - visibleWidth(prefix)));
-      return truncateToWidth(`${prefix}${content}`, safeWidth);
+      const text = typeof line === "function" ? line(safeWidth) : line;
+      return first ? text : `  ${text}`;
     };
-    if (this.summary.resultSummary) {
-      lines.push(detailLine(this.theme.fg("dim", this.summary.resultSummary), true));
-    }
-    if (this.mode === "preview" && this.summary.previewDetails === false) return lines;
 
-    // === Preview 模式：前2 + 后2 ===
+    // === Preview 模式：根据配置动态计算显示行数 ===
     if (this.mode === "preview") {
+      const maxLines = this.config.maxPreviewLines ?? 4;
+      const headLines = Math.floor(maxLines / 2);
+      const tailLines = maxLines - headLines;
+
       const visibleLines =
-        this.details.length <= 4
+        this.details.length <= maxLines
           ? this.details
-          : [...this.details.slice(0, 2), ...this.details.slice(-2)];
+          : [...this.details.slice(0, headLines), ...this.details.slice(-tailLines)];
       const hidden = Math.max(0, this.details.length - visibleLines.length);
 
-      visibleLines.slice(0, 2).forEach((line, index) => {
-        lines.push(detailLine(line, index === 0 && !this.summary.resultSummary));
+      visibleLines.slice(0, headLines).forEach((line) => {
+        lines.push(truncateToWidth(detailLine(line), safeWidth));
       });
 
       if (hidden > 0) {
         const hiddenLine = this.theme.fg(
           "dim",
-          `     ... ${hidden} more lines hidden (${keyText("app.tools.expand") || "/pituix-mode expanded"} to expand)`,
+          `  ... ${hidden} more lines hidden (use /pituix-mode expanded)`,
         );
         lines.push(truncateToWidth(hiddenLine, safeWidth));
       }
 
-      visibleLines.slice(2).forEach((line) => {
-        lines.push(detailLine(line));
+      visibleLines.slice(headLines).forEach((line) => {
+        lines.push(truncateToWidth(detailLine(line), safeWidth));
       });
 
       return lines;
     }
 
     // === Expanded 模式：完整输出 ===
-    this.details.forEach((line, index) => {
-      lines.push(detailLine(line, index === 0 && !this.summary.resultSummary));
+    this.details.forEach((line) => {
+      lines.push(truncateToWidth(detailLine(line), safeWidth));
     });
 
     return lines;
@@ -114,42 +129,33 @@ export class ThreeLayerToolView implements Component {
 
   private renderHeader(width: number): string {
     // 格式：ACTION target [STATUS] meta | ATTENTION
-    const action = this.theme.bold(
-      this.theme.fg(
-        "toolTitle",
-        this.summary.action[0].toUpperCase() + this.summary.action.slice(1).toLowerCase(),
-      ),
-    );
+    const action = this.theme.bold(this.theme.fg("toolTitle", this.summary.action.toUpperCase()));
     const target = this.theme.fg("accent", this.summary.target);
     const statusLabel = this.statusLabel(this.summary.status);
     const statusText = this.statusStyle(this.summary.status, `[${statusLabel}]`);
 
     let suffix = statusText;
-    if (this.summary.meta && (this.mode === "collapsed" || !this.summary.resultSummary)) {
+    if (this.summary.meta) {
       suffix += ` ${this.theme.fg("dim", this.summary.meta)}`;
     }
     if (this.summary.attention) {
-      suffix += ` ${this.theme.fg("error", "! ATTENTION")}`;
+      suffix += ` ${this.theme.fg("error", "⚠ ATTENTION")}`;
     }
 
     // 计算固定宽度
     const actionWidth = visibleWidth(this.removeAnsi(action));
     const suffixWidth = visibleWidth(this.removeAnsi(suffix));
-    const fixedWidth = actionWidth + suffixWidth + 5; // +2 for spaces
+    const fixedWidth = actionWidth + suffixWidth + 2; // +2 for spaces
 
     // 动态分配 target 宽度
     if (fixedWidth < width) {
       const targetWidth = Math.max(1, width - fixedWidth);
       const truncatedTarget = truncateToWidth(target, targetWidth);
-      return `${this.statusStyle(this.summary.status, this.ascii() ? "*" : "⏺")} ${action}(${truncatedTarget}) ${suffix}`;
+      return `${action} ${truncatedTarget} ${suffix}`;
     }
 
     // 宽度不够：全部截断
-    return truncateToWidth(
-      `${statusText} ${action}(${target})${this.summary.attention ? " !" : ""}`,
-      width,
-      "",
-    );
+    return truncateToWidth(`${action} ${target} ${suffix}`, width);
   }
 
   private statusLabel(status: ToolStatus): string {

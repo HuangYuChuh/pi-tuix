@@ -6,6 +6,7 @@ import { type PrepareImages, SessionImageCache } from "./session/image-attachmen
 import { registerSessionTreeCommand } from "./session/session-tree.ts";
 import { createSubagentActivityObserver } from "./session/subagent-activity.ts";
 import { registerTranscriptCommand } from "./session/transcript-view.ts";
+import { loadConfig } from "./shell/open-tui/config.ts";
 import { createOpenTuiShellRuntime } from "./shell/open-tui/shell.ts";
 import {
   COMPLETION_ENTRY_TYPE,
@@ -33,6 +34,9 @@ import { ToolGroupRuntime } from "./tools/tool-groups.ts";
 const PACKAGE_NAME = "Pi-TUIX";
 
 export default function piTuix(pi: ExtensionAPI): void {
+  // 加载配置
+  const config = loadConfig();
+  
   const subagentActivity = createSubagentActivityObserver(pi);
   let imageCache = new SessionImageCache();
   const prepareImages: PrepareImages = (entries, signal) => imageCache.prepare(entries, signal);
@@ -55,7 +59,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     // Initial rendering must match the interface installed by that event.
     enabled: shell.isEnabled(),
     ascii: shell.useAscii,
-    defaultMode: "preview" as DisplayMode, // collapsed | preview | expanded
+    config: config.toolRender,
     groups,
   };
 
@@ -238,7 +242,7 @@ export default function piTuix(pi: ExtensionAPI): void {
     description: "Restore the Pi-TUIX interface and reference theme",
     handler: async (_args, ctx) => {
       enableInterface(ctx, true);
-      ctx.ui.notify(`${PACKAGE_NAME} interface enabled (${toolMode.defaultMode} tools)`, "info");
+      ctx.ui.notify(`${PACKAGE_NAME} interface enabled (${toolMode.config.defaultMode} tools)`, "info");
     },
   });
 
@@ -255,7 +259,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.registerCommand("pituix-compact", {
     description: "Show collapsed reference-style tool summaries",
     handler: async (_args, ctx) => {
-      toolMode.defaultMode = "collapsed";
+      toolMode.config.defaultMode = "collapsed";
       enableInterface(ctx);
       ctx.ui.setToolsExpanded?.(false);
       ctx.ui.notify(`${PACKAGE_NAME} compact mode enabled`, "info");
@@ -265,7 +269,7 @@ export default function piTuix(pi: ExtensionAPI): void {
   pi.registerCommand("pituix-three-layer", {
     description: "Show reference-style tool previews with expansion",
     handler: async (_args, ctx) => {
-      toolMode.defaultMode = "preview";
+      toolMode.config.defaultMode = "preview";
       enableInterface(ctx);
       ctx.ui.setToolsExpanded?.(false);
       ctx.ui.notify(`${PACKAGE_NAME} three-layer mode enabled`, "info");
@@ -280,7 +284,7 @@ export default function piTuix(pi: ExtensionAPI): void {
         ctx.ui.notify("Usage: /pituix-mode <collapsed|preview|expanded>", "warning");
         return;
       }
-      toolMode.defaultMode = mode;
+      toolMode.config.defaultMode = mode;
       ctx.ui.setToolsExpanded?.(mode === "expanded");
       toolRenderers.invalidate();
       ctx.ui.notify(`Default tool mode: ${mode}`, "info");
