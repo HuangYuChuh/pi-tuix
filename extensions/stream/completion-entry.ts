@@ -77,7 +77,8 @@ export function registerCompletionEntries(
 ) {
   let tui: TUI | undefined;
   let queued = false;
-  const compose = (parent: Container, remove = false): boolean => {
+  // TUI and Container both expose children, but need not share mouse-dispatch types.
+  const compose = (parent: Pick<TUI, "children">, remove = false): boolean => {
     let changed = false;
     for (let index = 0; index < parent.children.length; index++) {
       const child = parent.children[index];

@@ -138,9 +138,9 @@ test("disabled startup hides host entry spacing and restores history without a s
   };
   const saved = hostEntry();
   history.children = [before, saved, after];
-  const root = new Container();
-  root.addChild(history);
-  const tui = Object.assign(root, { requestRender() {} }) as unknown as TUI;
+  // Pi's TUI root is not necessarily a Container (its mouse contract differs).
+  const root = { children: [history], requestRender() {}, invalidate() {} };
+  const tui = root as unknown as TUI;
   let widget: (Component & { dispose?: () => void }) | undefined;
   const ctx = {
     mode: "tui",
