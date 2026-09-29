@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  createBashToolDefinition,
+  createReadToolDefinition,
   initTheme,
   type SessionEntry,
   type Theme,
@@ -224,7 +226,9 @@ test("the real host hides grouped rows, expands every call, and restores the nat
   mode.enabled = false;
   for (const component of components) component.invalidate();
   fixtures.forEach(({ id, definition, args }, index) => {
-    const native = new ToolExecutionComponent(definition.name, id, args, {}, undefined, ui, cwd);
+    const original =
+      definition.name === "read" ? createReadToolDefinition(cwd) : createBashToolDefinition(cwd);
+    const native = new ToolExecutionComponent(definition.name, id, args, {}, original, ui, cwd);
     native.updateResult({ ...result(), isError: false });
     native.setExpanded(true);
     assert.deepEqual(
