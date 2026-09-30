@@ -9,6 +9,7 @@ import {
   type KeybindingsManager,
   type MarkdownTransformer,
   type Theme,
+  ToolExecutionComponent,
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -261,6 +262,72 @@ test("complex Markdown stays consistent between live messages and snapshots acro
   }
 });
 
+test("an invisible host tool row does not leave its shell spacer in the transcript", () => {
+  const f = fixture();
+  const empty = { render: () => [], invalidate() {} };
+  const tool = new ToolExecutionComponent(
+    "read",
+    "secondary",
+    { path: "a.ts" },
+    {},
+    {
+      name: "read",
+      description: "Test-only hidden tool renderer",
+      parameters: {} as never,
+      execute: async () => ({ content: [], details: undefined }),
+      renderCall: () => empty,
+      renderResult: () => empty,
+    },
+    { requestRender() {} } as never,
+    process.cwd(),
+  );
+  tool.updateResult({ content: [], isError: false });
+  for (const width of [2, 40, 80, 133]) {
+    assert.ok(tool.render(width).length > 0, "Pi keeps a spacer around the invisible call");
+    assert.deepEqual(f.mirror.render(tool, width), []);
+  }
+  const native = new ToolExecutionComponent(
+    "read",
+    "visible",
+    { path: "a.ts" },
+    {},
+    undefined,
+    { requestRender() {} } as never,
+    process.cwd(),
+  );
+  native.updateResult({ content: [{ type: "text", text: "file contents" }], isError: false });
+  assert.deepEqual(f.mirror.render(native, 80), native.render(80));
+});
+
+test("hidden thinking before tool calls does not add a redundant blank row", () => {
+  const f = fixture();
+  const thinking = new AssistantMessageComponent(
+    undefined,
+    true,
+    getMarkdownTheme(),
+    "Thinking (expand to view)",
+  );
+  thinking.updateContent({
+    role: "assistant",
+    content: [
+      { type: "thinking", thinking: "private" },
+      { type: "toolCall", id: "read-1", name: "read", arguments: { path: "a.ts" } },
+    ],
+    stopReason: "toolUse",
+    timestamp: 0,
+  } as Parameters<typeof thinking.updateContent>[0]);
+  const native = thinking.render(80).map(stripTerminalSequences);
+  assert.equal(native[0], "", "Pi contributes a plain spacer before hidden thinking");
+  for (const width of [40, 80, 133]) {
+    const compact = f.mirror.render(thinking, width).map(stripTerminalSequences);
+    const original = thinking.render(width).map(stripTerminalSequences);
+    assert.equal(compact.length, original.length - 1);
+    assert.match(compact[0], /Thinking \(expand to view\)/);
+    assert.deepEqual(compact, original.slice(1));
+    assert.ok(compact.every((line) => visibleWidth(line) <= width));
+  }
+});
+
 test("unknown message shapes and absent Markdown callbacks fall back to original public renderers", () => {
   const f = fixture();
   const native = new UserMessageComponent("Native fallback");
@@ -360,6 +427,7 @@ function harness(mode: "regular" | "fullscreen" = "fullscreen", rows = 24, colum
     terminal,
     dock,
     queue,
+    status,
     input,
     runtime,
     dispose,
@@ -431,6 +499,26 @@ function dragSelect(
   h.send(`\x1b[<32;${end.column + 1};${end.row + 1}M`);
   h.send(`\x1b[<0;${end.column + 1};${end.row + 1}m`);
 }
+
+test("active status updates and typing survive repeated width changes in both native modes", async () => {
+  for (const mode of ["regular", "fullscreen"] as const) {
+    const h = harness(mode, 24, 133);
+    h.tui.start();
+    try {
+      for (const [index, width] of [65, 133, 65, 133].entries()) {
+        h.resize(width);
+        (h.status.children[0] as Text).setText(`Working ${index}s`);
+        h.send(String(index));
+        const status = h.dock.render(width).map(stripTerminalSequences).join("\n");
+        assert.equal(status.match(/Working \d+s/g)?.length, 1, `${mode} at ${width} columns`);
+        assert.equal(h.input.getText(), Array.from({ length: index + 1 }, (_, i) => i).join(""));
+        assert.ok(h.dock.render(width).every((line) => visibleWidth(line) <= width));
+      }
+    } finally {
+      h.close();
+    }
+  }
+});
 
 test("native search retains its selected location after closing and mouse copy uses the decorated document", async () => {
   const h = harness();
