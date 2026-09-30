@@ -360,6 +360,7 @@ function harness(mode: "regular" | "fullscreen" = "fullscreen", rows = 24, colum
     terminal,
     dock,
     queue,
+    status,
     input,
     runtime,
     dispose,
@@ -431,6 +432,26 @@ function dragSelect(
   h.send(`\x1b[<32;${end.column + 1};${end.row + 1}M`);
   h.send(`\x1b[<0;${end.column + 1};${end.row + 1}m`);
 }
+
+test("active status updates and typing survive repeated width changes in both native modes", async () => {
+  for (const mode of ["regular", "fullscreen"] as const) {
+    const h = harness(mode, 24, 133);
+    h.tui.start();
+    try {
+      for (const [index, width] of [65, 133, 65, 133].entries()) {
+        h.resize(width);
+        (h.status.children[0] as Text).setText(`Working ${index}s`);
+        h.send(String(index));
+        const status = h.dock.render(width).map(stripTerminalSequences).join("\n");
+        assert.equal(status.match(/Working \d+s/g)?.length, 1, `${mode} at ${width} columns`);
+        assert.equal(h.input.getText(), Array.from({ length: index + 1 }, (_, i) => i).join(""));
+        assert.ok(h.dock.render(width).every((line) => visibleWidth(line) <= width));
+      }
+    } finally {
+      h.close();
+    }
+  }
+});
 
 test("native search retains its selected location after closing and mouse copy uses the decorated document", async () => {
   const h = harness();
