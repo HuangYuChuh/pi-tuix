@@ -5,6 +5,7 @@ import {
   type MarkdownTransformContext,
   type MarkdownTransformer,
   type Theme,
+  ToolExecutionComponent,
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -14,6 +15,7 @@ import {
   Markdown,
   Spacer,
   sliceByColumn,
+  stripTerminalSequences,
   Text,
   type TUI,
   type TuiAltScreen,
@@ -189,7 +191,7 @@ export class LiveMessageMirror {
       return renderNative(component, width);
     }
     if (component instanceof AssistantMessageComponent) {
-      return component.children.flatMap(flatten).flatMap((child) => {
+      const lines = component.children.flatMap(flatten).flatMap((child) => {
         if (!(child instanceof Markdown)) return renderNative(child, width);
         const inset = width >= 4 ? 2 : 0;
         const bodyWidth = Math.max(4, width - inset);
@@ -228,6 +230,24 @@ export class LiveMessageMirror {
           ),
         );
       });
+      // Pi prefixes hidden, tool-only thinking with a plain spacer. Keep
+      // semantic prompt markers and all Markdown spacing; remove only that
+      // redundant spacer in our compact transcript presentation.
+      if (
+        lines[0] === "" &&
+        stripTerminalSequences(lines[1] ?? "").trim() === "Thinking (expand to view)"
+      )
+        return lines.slice(1);
+      return lines;
+    }
+    if (component instanceof ToolExecutionComponent) {
+      const lines = renderNative(component, width);
+      // Grouped secondary calls render no content, but Pi still mounts their
+      // shell spacer. Do not let those invisible calls add empty transcript rows.
+      return lines.length &&
+        lines.every((line) => !stripTerminalSequences(line).trim() && !line.includes("\x1b]133;"))
+        ? []
+        : lines;
     }
     if (plainContainer(component)) {
       if (this.media && !this.media.chat) {
