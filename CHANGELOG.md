@@ -71,7 +71,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Validation
 - Add shell, public extension loader, theme restoration, and shared tool-row regression tests.
 - Record observed surfaces, authenticated tool/approval workflows, gateway retry behavior and remaining rendering/API gaps in `docs/claude-code-parity.md`.
-- Full Claude Code TUI parity remains incomplete; no release or version bump is included.
+- Full Claude Code TUI parity remains incomplete.
+
+## [0.1.3] - 2026-09-30
+
+### Fixed
+- Remove redundant blank rows before hidden thinking messages and around invisible grouped tool calls, while preserving visible tool output and Pi's prompt markers (#35).
+- Keep the extension compatible with Pi 0.85.1's public TUI root type; compare restored tool rows against Pi's official renderers (#34).
+
+### Known limitations
+- Terminal resize may still leave stale Working/input rows in affected terminal emulators (#33). This release does not fix Pi's host redraw behavior; `pi --tui-mode fullscreen` is a possible workaround.
 
 ## [0.1.0] - 2026-08-27
 
